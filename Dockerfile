@@ -1,7 +1,18 @@
 # Multi-stage Dockerfile for Folio
 # Supports both amd64 and arm64 architectures
+# Pushes to: docker push deesh2025/no-name:tagname
 
-# Stage 1: Builder
+# Stage 1: Chef (prepares dependency recipe)
+FROM rust:1.88 AS chef
+WORKDIR /app
+RUN cargo install cargo-chef --locked
+
+# Stage 2: Planner (analyzes project dependencies)
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+# Stage 3: Builder (compiles dependencies and project)
 FROM rust:1.88 AS builder
 
 WORKDIR /app
@@ -42,20 +53,12 @@ RUN apt-get update && apt-get install -y \
 # Set Chromium as the browser
 ENV CHROME_PATH=/usr/bin/chromium
 
-# Copy Cargo.toml and Cargo.lock
-COPY Cargo.toml Cargo.lock ./
+# Install cargo-chef in builder stage too
+RUN cargo install cargo-chef --locked
 
-# Create dummy files to build dependencies (avoids building real code yet)
-RUN mkdir -p crates/engine/src crates/server/src crates/cli/src \
-    && echo "// dummy" > crates/engine/src/lib.rs \
-    && echo "// dummy" > crates/server/src/main.rs \
-    && echo "// dummy" > crates/cli/src/main.rs \
-    && echo "[package]\nname = \"engine\"\nversion = \"0.1.0\"\nedition = \"2024\"" > crates/engine/Cargo.toml \
-    && echo "[package]\nname = \"server\"\nversion = \"0.1.0\"\nedition = \"2024\"" > crates/server/Cargo.toml \
-    && echo "[package]\nname = \"cli\"\nversion = \"0.1.0\"\nedition = \"2024\"" > crates/cli/Cargo.toml
-
-# Build dependencies (cached layer)
-RUN cargo build --release || true
+# Copy recipe and cook dependencies (cached layer - only rebuilds if deps change)
+COPY --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
 
 # Copy actual source code
 COPY . .
@@ -63,7 +66,7 @@ COPY . .
 # Build the actual project
 RUN cargo build --release
 
-# Stage 2: Runtime
+# Stage 4: Runtime (minimal image with just binaries)
 FROM debian:bookworm-slim
 
 WORKDIR /app

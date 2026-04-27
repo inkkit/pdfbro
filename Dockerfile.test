@@ -3,7 +3,7 @@
 
 FROM rust:1.88 AS chef
 WORKDIR /app
-RUN cargo install cargo-chef
+RUN cargo install cargo-chef --locked
 
 FROM chef AS planner
 COPY . .
