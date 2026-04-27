@@ -9,6 +9,7 @@
 //! only [`ChromiumEngine`], [`RequestContext`], and [`Cookie`].
 
 mod launch;
+mod markdown;
 mod pdf_params;
 mod render;
 mod wait;
@@ -187,14 +188,12 @@ impl ChromiumEngine {
     /// See [`ChromiumEngine::html_to_pdf`].
     pub async fn markdown_to_pdf(
         &self,
-        _markdown_input: &str,
+        markdown_input: &str,
         opts: &PdfOptions,
-        _request: &RequestContext,
+        request: &RequestContext,
     ) -> EngineResult<Vec<u8>> {
-        opts.validate()?;
-        Err(EngineError::Internal(
-            "markdown_to_pdf not implemented yet (spec 11 follow-up commit)".into(),
-        ))
+        let html = markdown::render(markdown_input);
+        self.html_to_pdf(&html, None, opts, request).await
     }
 
     /// Best-effort liveness probe.
