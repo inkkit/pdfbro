@@ -10,6 +10,17 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 humantime-serde = { workspace = true }
 
+# Spec 11 — chromium engine
+tokio = { workspace = true }
+chromiumoxide = { workspace = true }
+futures-util = { workspace = true }
+pulldown-cmark = { workspace = true }
+tracing = { workspace = true }
+
 [dev-dependencies]
 serde_json = { workspace = true }
 static_assertions = { workspace = true }
+tokio = { workspace = true }
+lopdf = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
