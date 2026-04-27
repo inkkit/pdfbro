@@ -10,3 +10,48 @@ name = "folio-server"
 path = "src/main.rs"
 
 [dependencies]
+engine = { workspace = true }
+
+# Async / runtime
+tokio = { workspace = true }
+futures-util = { workspace = true }
+
+# HTTP server
+axum = { workspace = true }
+multer = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
+# Identifiers
+uuid = { workspace = true }
+
+# Serde
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_urlencoded = { workspace = true }
+
+# Filesystem helpers
+tempfile = { workspace = true }
+
+# Markdown (wrapper-template inlining for /forms/chromium/convert/markdown)
+pulldown-cmark = { workspace = true }
+
+# Errors
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Time / duration parsing
+humantime = { workspace = true }
+
+# CLI
+clap = { workspace = true }
+
+[dev-dependencies]
+tower = { workspace = true, features = ["util"] }
+reqwest = { workspace = true }
+static_assertions = { workspace = true }
+lopdf = { workspace = true }
