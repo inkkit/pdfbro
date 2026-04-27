@@ -68,9 +68,7 @@ fn assert_pdf_loadable(bytes: &[u8]) -> lopdf::Document {
     );
     let tail_window = &bytes[bytes.len().saturating_sub(64)..];
     assert!(
-        tail_window
-            .windows(5)
-            .any(|w| w == b"%%EOF"),
+        tail_window.windows(5).any(|w| w == b"%%EOF"),
         "expected %%EOF in trailer"
     );
     lopdf::Document::load_mem(bytes).expect("PDF parses with lopdf")
@@ -142,10 +140,7 @@ async fn convert_writer_page_ranges() {
         page_ranges: Some(PageRanges::parse("1-1").expect("parse")),
         ..Default::default()
     };
-    let one = lo
-        .convert(&writer_fixture(), &opts)
-        .await
-        .expect("single");
+    let one = lo.convert(&writer_fixture(), &opts).await.expect("single");
     let one_doc = assert_pdf_loadable(&one);
     assert_eq!(pdf_page_count(&one_doc), 1);
 }
@@ -158,10 +153,7 @@ async fn convert_with_pdf_a_2b_writes_pdfa_metadata() {
         pdf_a: Some(PdfAProfile::A2B),
         ..Default::default()
     };
-    let bytes = lo
-        .convert(&writer_fixture(), &opts)
-        .await
-        .expect("convert");
+    let bytes = lo.convert(&writer_fixture(), &opts).await.expect("convert");
     assert_pdf_loadable(&bytes);
     // PDF/A files carry an XMP metadata stream containing "pdfaid".
     let needle = b"pdfaid";

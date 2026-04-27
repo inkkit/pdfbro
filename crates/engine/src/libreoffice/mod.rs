@@ -120,11 +120,7 @@ impl LibreOfficeEngine {
     /// [`filter::for_extension`] for the dispatch table. Concurrent calls
     /// are gated by `max_concurrency` and each gets a fresh
     /// `UserInstallation` directory.
-    pub async fn convert(
-        &self,
-        input: &Path,
-        opts: &OfficeOptions,
-    ) -> EngineResult<Vec<u8>> {
+    pub async fn convert(&self, input: &Path, opts: &OfficeOptions) -> EngineResult<Vec<u8>> {
         opts.validate()?;
         if !input.exists() {
             return Err(EngineError::Io(std::io::Error::new(
@@ -170,8 +166,7 @@ impl LibreOfficeEngine {
         let mut slots: Vec<Option<EngineResult<Vec<u8>>>> =
             (0..inputs.len()).map(|_| None).collect();
         while let Some(joined) = set.join_next().await {
-            let (i, res) =
-                joined.map_err(|e| EngineError::Internal(format!("join error: {e}")))?;
+            let (i, res) = joined.map_err(|e| EngineError::Internal(format!("join error: {e}")))?;
             slots[i] = Some(res);
         }
 
@@ -370,7 +365,11 @@ mod tests {
 
     #[test]
     fn office_options_with_pdf_a_maps_select_pdf_version_long() {
-        let cases = [(PdfAProfile::A1B, 1), (PdfAProfile::A2B, 2), (PdfAProfile::A3B, 3)];
+        let cases = [
+            (PdfAProfile::A1B, 1),
+            (PdfAProfile::A2B, 2),
+            (PdfAProfile::A3B, 3),
+        ];
         for (prof, expected) in cases {
             let opts = OfficeOptions {
                 pdf_a: Some(prof),
