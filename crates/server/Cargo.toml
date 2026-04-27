@@ -14,6 +14,7 @@ engine = { workspace = true }
 
 # Async / runtime
 tokio = { workspace = true }
+async-trait = { workspace = true }
 futures-util = { workspace = true }
 
 # HTTP server

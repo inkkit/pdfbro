@@ -1,0 +1,142 @@
+//! Router construction + middleware stack.
+//!
+//! The router is built in three layers:
+//! 1. Route table (handlers from [`crate::routes`]).
+//! 2. Per-route logic (e.g. timeout-bypass on `/health` and `/version`).
+//! 3. Outer cross-cutting middleware (request-id, body limit, CORS,
+//!    tracing).
+
+use std::time::Duration;
+
+use axum::Router;
+use axum::error_handling::HandleErrorLayer;
+use axum::extract::DefaultBodyLimit;
+use axum::http::{HeaderName, Request};
+use axum::response::IntoResponse;
+use axum::routing::{get, post};
+use engine::EngineError;
+use tower::BoxError;
+use tower::ServiceBuilder;
+use tower::timeout::TimeoutLayer;
+use tower_http::cors::CorsLayer;
+use tower_http::request_id::{
+    MakeRequestId, PropagateRequestIdLayer, RequestId, SetRequestIdLayer,
+};
+use tower_http::trace::{DefaultMakeSpan, DefaultOnFailure, DefaultOnResponse, TraceLayer};
+use tracing::Level;
+
+use crate::error::ApiError;
+
+use crate::routes::{chromium, health, libreoffice, pdfengines};
+use crate::state::AppState;
+
+const REQUEST_ID_HEADER: &str = "x-request-id";
+
+/// Generates a UUIDv4 for every incoming request that did not already
+/// carry an `X-Request-Id` header.
+#[derive(Clone, Default)]
+pub struct UuidRequestId;
+
+impl MakeRequestId for UuidRequestId {
+    fn make_request_id<B>(&mut self, _request: &Request<B>) -> Option<RequestId> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let header = id.parse::<axum::http::HeaderValue>().ok()?;
+        Some(RequestId::new(header))
+    }
+}
+
+/// Build the full HTTP router for the given [`AppState`].
+///
+/// The middleware stack (outer → inner) is:
+/// `Trace → SetRequestId → PropagateRequestId → RequestBodyLimit → Timeout
+/// → CORS → routes`. `/health` and `/version` are served from a separate
+/// sub-router that bypasses the timeout layer (they must always respond
+/// quickly even under heavy load).
+pub fn build_router(state: AppState) -> Router {
+    let max_body = state.config.max_body_bytes;
+    let request_timeout = state.config.request_timeout;
+
+    let timed = Router::new()
+        .route(
+            "/forms/chromium/convert/html",
+            post(chromium::chromium_html),
+        )
+        .route("/forms/chromium/convert/url", post(chromium::chromium_url))
+        .route(
+            "/forms/chromium/convert/markdown",
+            post(chromium::chromium_markdown),
+        )
+        .route(
+            "/forms/libreoffice/convert",
+            post(libreoffice::libreoffice_convert),
+        )
+        .route(
+            "/forms/pdfengines/merge",
+            post(pdfengines::pdfengines_merge),
+        )
+        .route(
+            "/forms/pdfengines/split",
+            post(pdfengines::pdfengines_split),
+        )
+        .route(
+            "/forms/pdfengines/flatten",
+            post(pdfengines::pdfengines_flatten),
+        )
+        .route(
+            "/forms/pdfengines/metadata/read",
+            post(pdfengines::pdfengines_metadata_read),
+        )
+        .route(
+            "/forms/pdfengines/metadata/write",
+            post(pdfengines::pdfengines_metadata_write),
+        )
+        .layer(
+            ServiceBuilder::new()
+                .layer(HandleErrorLayer::new(handle_timeout_error))
+                .layer(TimeoutLayer::new(request_timeout)),
+        )
+        .layer(DefaultBodyLimit::max(max_body));
+
+    let untimed = Router::new()
+        .route("/health", get(health::health))
+        .route("/version", get(health::version));
+
+    let header_name = HeaderName::from_static(REQUEST_ID_HEADER);
+
+    Router::new()
+        .merge(timed)
+        .merge(untimed)
+        .with_state(state)
+        .layer(
+            ServiceBuilder::new()
+                .layer(
+                    TraceLayer::new_for_http()
+                        .make_span_with(
+                            DefaultMakeSpan::new()
+                                .level(Level::INFO)
+                                .include_headers(false),
+                        )
+                        .on_response(DefaultOnResponse::new().level(Level::INFO))
+                        .on_failure(DefaultOnFailure::new().level(Level::WARN)),
+                )
+                .layer(SetRequestIdLayer::new(header_name.clone(), UuidRequestId))
+                .layer(PropagateRequestIdLayer::new(header_name))
+                .layer(CorsLayer::permissive()),
+        )
+}
+
+/// Default request timeout exposed for integration tests.
+#[allow(dead_code)]
+pub fn default_request_timeout() -> Duration {
+    Duration::from_secs(120)
+}
+
+/// Maps `tower::timeout::error::Elapsed` (and any other boxed error
+/// raised by middleware) into the documented JSON shape.
+async fn handle_timeout_error(err: BoxError) -> impl IntoResponse {
+    if err.is::<tower::timeout::error::Elapsed>() {
+        ApiError::Engine(EngineError::Timeout(default_request_timeout()))
+    } else {
+        ApiError::Internal(err.to_string())
+    }
+}
