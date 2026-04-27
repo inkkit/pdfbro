@@ -47,9 +47,7 @@ pub(super) async fn run_convert(
     let output = match tokio::time::timeout(timeout, cmd.output()).await {
         Err(_) => return Err(EngineError::Timeout(timeout)),
         Ok(Err(e)) => {
-            return Err(EngineError::Internal(format!(
-                "soffice spawn failed: {e}"
-            )));
+            return Err(EngineError::Internal(format!("soffice spawn failed: {e}")));
         }
         Ok(Ok(o)) => o,
     };
@@ -76,10 +74,9 @@ pub(super) async fn run_convert(
     pdf_path.set_extension("pdf");
 
     let bytes = std::fs::read(&pdf_path).map_err(|e| match e.kind() {
-        std::io::ErrorKind::NotFound => EngineError::Internal(format!(
-            "soffice produced no PDF at {}",
-            pdf_path.display()
-        )),
+        std::io::ErrorKind::NotFound => {
+            EngineError::Internal(format!("soffice produced no PDF at {}", pdf_path.display()))
+        }
         _ => EngineError::Io(e),
     })?;
 
