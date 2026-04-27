@@ -7,7 +7,7 @@
 //! `/Outlines` from the first input is preserved; `/AcroForm` and `/Names`
 //! are dropped to avoid name collisions (per spec 13).
 
-use lopdf::{Document, Object, ObjectId, dictionary};
+use lopdf::{Dictionary, Document, Object, ObjectId, dictionary};
 
 use crate::types::{EngineError, EngineResult};
 
@@ -47,7 +47,8 @@ pub fn merge(pdfs: &[&[u8]]) -> EngineResult<Vec<u8>> {
 
     // Multi-input path.
     let mut merged = Document::with_version("1.7");
-    let mut pages_in_order: Vec<ObjectId> = Vec::new();
+    // Store page objects (not IDs) to rebuild Pages tree after renumbering.
+    let mut page_objects_in_order: Vec<Dictionary> = Vec::new();
     let mut max_id: u32 = 1;
     let mut outlines_from_first: Option<ObjectId> = None;
 
@@ -57,8 +58,13 @@ pub fn merge(pdfs: &[&[u8]]) -> EngineResult<Vec<u8>> {
         doc.renumber_objects_with(max_id);
         max_id = doc.max_id + 1;
 
-        // Collect this doc's page object IDs in page order.
-        pages_in_order.extend(doc.get_pages().into_values());
+        // Collect this doc's page objects in page order (clone the dictionaries).
+        let page_ids: Vec<ObjectId> = doc.get_pages().into_values().collect();
+        for page_id in page_ids {
+            if let Ok(Object::Dictionary(dict)) = doc.get_object(page_id) {
+                page_objects_in_order.push(dict.clone());
+            }
+        }
 
         // On the first input only, remember the /Outlines id so we can
         // wire it into the merged /Catalog. Subsequent inputs drop theirs.
@@ -67,8 +73,8 @@ pub fn merge(pdfs: &[&[u8]]) -> EngineResult<Vec<u8>> {
         }
 
         // Copy every non-Catalog, non-root-Pages object into the merged
-        // document. The fresh /Pages tree and /Catalog are built below;
-        // carrying the old ones would create dangling roots.
+        // document. The fresh /Pages tree and /Catalog are built AFTER
+        // renumbering to ensure references are valid.
         for (id, obj) in doc.objects {
             if is_catalog_or_pages(&obj) {
                 continue;
@@ -77,18 +83,22 @@ pub fn merge(pdfs: &[&[u8]]) -> EngineResult<Vec<u8>> {
         }
     }
 
-    // Build a fresh /Pages tree that references all collected page objects.
+    // Compact object IDs BEFORE building Pages tree.
+    // This ensures all references are valid and sequential.
+    merged.renumber_objects();
+
+    // Build a fresh /Pages tree AFTER renumbering with correct references.
     let pages_id = merged.new_object_id();
-    for page_id in &pages_in_order {
-        if let Some(Object::Dictionary(d)) = merged.objects.get_mut(page_id) {
-            d.set("Parent", Object::Reference(pages_id));
-        }
+    let mut kids: Vec<Object> = Vec::with_capacity(page_objects_in_order.len());
+
+    for mut page_dict in page_objects_in_order {
+        // Insert the page object and get its new (renumbered) ID.
+        page_dict.set("Parent", Object::Reference(pages_id));
+        let page_id = merged.add_object(Object::Dictionary(page_dict));
+        kids.push(Object::Reference(page_id));
     }
-    let kids: Vec<Object> = pages_in_order
-        .iter()
-        .map(|id| Object::Reference(*id))
-        .collect();
-    let page_count = pages_in_order.len() as u32;
+
+    let page_count = kids.len() as u32;
     merged.objects.insert(
         pages_id,
         Object::Dictionary(dictionary! {
@@ -102,16 +112,15 @@ pub fn merge(pdfs: &[&[u8]]) -> EngineResult<Vec<u8>> {
     // omitted. /Outlines, if present on the first input, is preserved.
     let mut catalog = dictionary! {
         "Type" => "Catalog",
-        "Pages" => pages_id,
+        "Pages" => Object::Reference(pages_id),
     };
     if let Some(outlines_id) = outlines_from_first {
         catalog.set("Outlines", Object::Reference(outlines_id));
     }
     let catalog_id = merged.add_object(catalog);
-    merged.trailer.set("Root", catalog_id);
+    merged.trailer.set("Root", Object::Reference(catalog_id));
 
-    // Compact IDs and stamp producer in the common finalize step.
-    merged.renumber_objects();
+    // Stamp producer in the common finalize step.
     super::finalize(merged)
 }
 
