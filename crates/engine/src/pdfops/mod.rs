@@ -5,7 +5,7 @@
 //! stateless free functions that take and return owned PDF byte streams.
 //! Encrypted inputs are uniformly rejected at parse time.
 
-use lopdf::{Dictionary, Document, Object, ObjectId, StringFormat};
+use lopdf::{Dictionary, Document, Object, ObjectId};
 
 use crate::types::{EngineError, EngineResult};
 
@@ -26,14 +26,8 @@ pub use watermark::{Position, WatermarkKind, WatermarkOptions, watermark};
 // ---------------------------------------------------------------------------
 // Crate-private helpers shared by all ops.
 // ---------------------------------------------------------------------------
-//
-// The `allow(dead_code)` attributes carry their weight only during the
-// spec-13 scaffold commit. Each helper is wired up by the implementation
-// commits that follow (merge, split, flatten, metadata, watermark, rotate)
-// and the attributes are removed as they become live.
 
 /// Producer string written to every output PDF.
-#[allow(dead_code)]
 pub(crate) fn producer_string() -> String {
     format!("folio/{}", env!("CARGO_PKG_VERSION"))
 }
@@ -54,7 +48,6 @@ pub(crate) fn parse_input(bytes: &[u8]) -> EngineResult<Document> {
 
 /// Finalize a document for output: stamp `/Producer`, compress streams,
 /// and serialize to bytes.
-#[allow(dead_code)]
 pub(crate) fn finalize(mut doc: Document) -> EngineResult<Vec<u8>> {
     set_producer(&mut doc);
     doc.compress();
@@ -66,7 +59,6 @@ pub(crate) fn finalize(mut doc: Document) -> EngineResult<Vec<u8>> {
 
 /// Write `/Producer` into the document's `/Info` dict, creating the dict if
 /// it doesn't exist.
-#[allow(dead_code)]
 fn set_producer(doc: &mut Document) {
     let producer = producer_string();
     let info_id = ensure_info_dict(doc);
@@ -77,7 +69,6 @@ fn set_producer(doc: &mut Document) {
 
 /// Return the `ObjectId` of the document's `/Info` dictionary, creating an
 /// empty one if absent.
-#[allow(dead_code)]
 pub(crate) fn ensure_info_dict(doc: &mut Document) -> ObjectId {
     if let Ok(id) = doc.trailer.get(b"Info").and_then(|o| o.as_reference()) {
         return id;
@@ -87,35 +78,18 @@ pub(crate) fn ensure_info_dict(doc: &mut Document) -> ObjectId {
     id
 }
 
-/// Encode a Rust string as a PDF text string. ASCII strings use a literal
-/// `()` form; non-ASCII strings use UTF-16BE with a leading BOM (per the
-/// PDF 1.7 spec, §7.9.2.2).
-#[allow(dead_code)]
+/// Encode a Rust string as a PDF text string. Thin wrapper over lopdf's
+/// canonical `text_string`: ASCII flows out as a `()` literal, non-ASCII
+/// as a UTF-16BE hex string with the BOM, per PDF 1.7 §7.9.2.2.
 pub(crate) fn encode_pdf_text_string(s: &str) -> Object {
-    if s.is_ascii() {
-        Object::String(s.as_bytes().to_vec(), StringFormat::Literal)
-    } else {
-        let mut bytes = vec![0xFE, 0xFF];
-        for u in s.encode_utf16() {
-            bytes.extend_from_slice(&u.to_be_bytes());
-        }
-        Object::String(bytes, StringFormat::Literal)
-    }
+    lopdf::text_string(s)
 }
 
-/// Decode a PDF text-string byte slice. Recognises the UTF-16BE BOM and
-/// falls back to lossy UTF-8 for ASCII / PDFDocEncoding strings.
-#[allow(dead_code)]
-pub(crate) fn decode_pdf_text_string(bytes: &[u8]) -> String {
-    if bytes.starts_with(&[0xFE, 0xFF]) {
-        let units: Vec<u16> = bytes[2..]
-            .chunks_exact(2)
-            .map(|c| u16::from_be_bytes([c[0], c[1]]))
-            .collect();
-        String::from_utf16_lossy(&units)
-    } else {
-        String::from_utf8_lossy(bytes).into_owned()
-    }
+/// Decode a PDF text-string [`Object`] into a Rust `String`. Supports
+/// UTF-16BE BOM, UTF-8 BOM, and PDFDocEncoding via lopdf's
+/// `decode_text_string`.
+pub(crate) fn decode_pdf_text_string(obj: &Object) -> Option<String> {
+    lopdf::decode_text_string(obj).ok()
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +100,7 @@ pub(crate) fn decode_pdf_text_string(bytes: &[u8]) -> String {
 pub(crate) mod test_support {
     //! Test-only helpers: build minimal valid PDFs in memory.
     use super::*;
-    use lopdf::dictionary;
+    use lopdf::{StringFormat, dictionary};
 
     /// Build a minimal valid 1-page PDF document and serialize to bytes.
     /// Page size is US Letter (612×792 pt); content stream is empty.
@@ -315,7 +289,7 @@ mod tests {
     fn encode_text_string_ascii_uses_literal() {
         let obj = encode_pdf_text_string("Hello");
         match obj {
-            Object::String(bytes, StringFormat::Literal) => {
+            Object::String(bytes, lopdf::StringFormat::Literal) => {
                 assert_eq!(bytes, b"Hello");
             }
             other => panic!("unexpected encoding: {other:?}"),
@@ -325,23 +299,18 @@ mod tests {
     #[test]
     fn encode_text_string_unicode_uses_utf16be_bom() {
         let obj = encode_pdf_text_string("héllo");
-        match obj {
-            Object::String(bytes, StringFormat::Literal) => {
+        match &obj {
+            Object::String(bytes, _) => {
                 assert_eq!(&bytes[..2], &[0xFE, 0xFF]);
-                let decoded = decode_pdf_text_string(&bytes);
-                assert_eq!(decoded, "héllo");
             }
             other => panic!("unexpected encoding: {other:?}"),
         }
+        assert_eq!(decode_pdf_text_string(&obj).unwrap(), "héllo");
     }
 
     #[test]
     fn decode_text_string_round_trips_ascii() {
         let obj = encode_pdf_text_string("plain ASCII");
-        if let Object::String(bytes, _) = obj {
-            assert_eq!(decode_pdf_text_string(&bytes), "plain ASCII");
-        } else {
-            panic!("unexpected object");
-        }
+        assert_eq!(decode_pdf_text_string(&obj).unwrap(), "plain ASCII");
     }
 }
