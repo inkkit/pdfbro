@@ -1,14 +1,12 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+#![deny(rust_2018_idioms, missing_docs)]
+//! Folio engine — Chrome / LibreOffice / PDF backends behind a single Rust API.
+//!
+//! This crate hosts the engine layer used by the `cli`, `server`, `py`, and
+//! `js` crates. See `docs/specs/` for per-module specifications.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod types;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use types::{
+    BrowserConfig, EngineError, EngineResult, Margins, MediaType, PageRange, PageRanges, PaperSize,
+    PdfOptions, WaitCondition,
+};
