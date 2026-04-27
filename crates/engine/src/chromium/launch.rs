@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use chromiumoxide::Browser;
 use chromiumoxide::browser::BrowserConfig as CxBrowserConfig;
-use chromiumoxide::browser::HeadlessMode;
+// HeadlessMode removed in 0.9 - use arg() instead
 use futures_util::StreamExt;
 
 use crate::types::{BrowserConfig, EngineError, EngineResult};
@@ -113,7 +113,7 @@ fn build_chromiumoxide_config(
     if !config.headless {
         builder = builder.with_head();
     } else {
-        builder = builder.headless_mode(HeadlessMode::New);
+        // Default is headless; --headless=new set via baseline args
     }
 
     if config.no_sandbox {
@@ -127,7 +127,7 @@ fn build_chromiumoxide_config(
     }
 
     for extra in &config.extra_args {
-        builder = builder.arg(extra);
+        builder = builder.arg(extra.as_str());
     }
 
     builder
