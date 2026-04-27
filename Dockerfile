@@ -1,6 +1,8 @@
 # Multi-stage Dockerfile for Folio
+# Supports both amd64 and arm64 architectures
+
 # Stage 1: Builder
-FROM rust:1.85 AS builder
+FROM rust:1.88 AS builder
 
 WORKDIR /app
 
@@ -33,19 +35,12 @@ RUN apt-get update && apt-get install -y \
     wget \
     curl \
     unzip \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Chrome for Chromium tests
-RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install LibreOffice
-RUN apt-get update && apt-get install -y \
+    chromium \
     libreoffice \
     && rm -rf /var/lib/apt/lists/*
+
+# Set Chromium as the browser
+ENV CHROME_PATH=/usr/bin/chromium
 
 # Copy Cargo.toml and Cargo.lock
 COPY Cargo.toml Cargo.lock ./
@@ -100,23 +95,20 @@ RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     fonts-liberation \
     xdg-utils \
+    chromium \
     libreoffice \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Chrome from builder
-COPY --from=builder /usr/bin/google-chrome-stable /usr/bin/google-chrome
-COPY --from=builder /opt/google/chrome /opt/google/chrome
+ENV CHROME_PATH=/usr/bin/chromium
+ENV RUST_LOG=info
 
 # Copy built binaries
 COPY --from=builder /app/target/release/folio-server /app/folio-server
 COPY --from=builder /app/target/release/folio /app/folio
 
-# Copy test data and specs
+# Copy test data and docs
 COPY docs /app/docs
 COPY crates/server/tests /app/tests
-
-ENV RUST_LOG=info
-ENV CHROME_PATH=/usr/bin/google-chrome
 
 EXPOSE 3000
 
