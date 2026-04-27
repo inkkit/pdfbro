@@ -4,9 +4,11 @@
 //! This crate hosts the engine layer used by the `cli`, `server`, `py`, and
 //! `js` crates. See `docs/specs/` for per-module specifications.
 
+pub mod chromium;
 pub mod pdfops;
 pub mod types;
 
+pub use chromium::{ChromiumEngine, Cookie, RequestContext};
 pub use pdfops::{
     Metadata, Position, SplitMode, WatermarkKind, WatermarkOptions, flatten, merge, read_metadata,
     rotate, split, watermark, write_metadata,
