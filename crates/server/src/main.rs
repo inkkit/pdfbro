@@ -75,7 +75,14 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
 }
 
 fn init_tracing(config: &ServerConfig) {
-    let filter = EnvFilter::try_new(&config.log_level).unwrap_or_else(|_| EnvFilter::new("info"));
+    // Default: info level, but suppress noisy chromiumoxide::handler warnings
+    // (Chrome 147+ sends CDP messages that chromiumoxide 0.9 doesn't recognize)
+    let default_filter = "info,chromiumoxide::handler=error";
+    let filter = if config.log_level == "info" {
+        EnvFilter::new(default_filter)
+    } else {
+        EnvFilter::try_new(&config.log_level).unwrap_or_else(|_| EnvFilter::new(default_filter))
+    };
     let builder = tracing_subscriber::fmt().with_env_filter(filter);
     match config.log_format {
         LogFormat::Json => {
