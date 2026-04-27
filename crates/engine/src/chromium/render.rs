@@ -18,9 +18,8 @@ use futures_util::StreamExt;
 
 use crate::types::{EngineError, EngineResult, PdfOptions};
 
-use crate::types::WaitCondition;
-
 use super::pdf_params::{build_printtopdf_params, media_kind};
+use super::wait;
 use super::{ChromiumEngine, Cookie, RequestContext};
 
 /// `html_to_pdf` entrypoint. See the spec for the step-by-step
@@ -96,7 +95,7 @@ async fn render_html_on(
     }
 
     apply_emulated_media(engine, page, opts).await?;
-    apply_wait(&opts.wait)?;
+    wait::apply(page, &opts.wait).await?;
     print_to_pdf(engine, page, opts).await
 }
 
@@ -144,25 +143,13 @@ async fn render_url_on(
     }
 
     apply_emulated_media(engine, page, opts).await?;
-    apply_wait(&opts.wait)?;
+    wait::apply(page, &opts.wait).await?;
     print_to_pdf(engine, page, opts).await
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/// Placeholder wait handler: only `WaitCondition::Load` is supported in
-/// this commit. Other variants are implemented by the follow-up
-/// `feat(engine/11): implement wait conditions` commit.
-fn apply_wait(wait: &WaitCondition) -> EngineResult<()> {
-    match wait {
-        WaitCondition::Load => Ok(()),
-        _ => Err(EngineError::Internal(
-            "wait conditions other than Load are not yet implemented (spec 11 follow-up)".into(),
-        )),
-    }
-}
 
 async fn open_page(engine: &ChromiumEngine) -> EngineResult<Page> {
     let guard = engine.inner().browser.lock().await;

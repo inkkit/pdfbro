@@ -11,6 +11,7 @@
 mod launch;
 mod pdf_params;
 mod render;
+mod wait;
 
 use std::collections::HashMap;
 use std::sync::Arc;
