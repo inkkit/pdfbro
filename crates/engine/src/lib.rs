@@ -4,8 +4,10 @@
 //! This crate hosts the engine layer used by the `cli`, `server`, `py`, and
 //! `js` crates. See `docs/specs/` for per-module specifications.
 
+pub mod libreoffice;
 pub mod types;
 
+pub use libreoffice::{LibreOfficeConfig, LibreOfficeEngine, OfficeOptions, PdfAProfile};
 pub use types::{
     BrowserConfig, EngineError, EngineResult, Margins, MediaType, PageRange, PageRanges, PaperSize,
     PdfOptions, WaitCondition,
