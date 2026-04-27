@@ -5,10 +5,12 @@
 //! `js` crates. See `docs/specs/` for per-module specifications.
 
 pub mod chromium;
+pub mod libreoffice;
 pub mod pdfops;
 pub mod types;
 
 pub use chromium::{ChromiumEngine, Cookie, RequestContext};
+pub use libreoffice::{LibreOfficeConfig, LibreOfficeEngine, OfficeOptions, PdfAProfile};
 pub use pdfops::{
     Metadata, Position, SplitMode, WatermarkKind, WatermarkOptions, flatten, merge, read_metadata,
     rotate, split, watermark, write_metadata,
