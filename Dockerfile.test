@@ -1,0 +1,59 @@
+# Dockerfile for running tests with all dependencies
+# Uses cargo-chef for efficient dependency caching
+
+FROM rust:1.88 AS chef
+WORKDIR /app
+RUN cargo install cargo-chef --locked
+
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS builder
+
+# Install system dependencies including Chrome (Chromium) and LibreOffice
+RUN apt-get update && apt-get install -y \
+    libgtk-3-0 \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxi6 \
+    libxtst6 \
+    libnss3 \
+    libcups2 \
+    libxss1 \
+    libxrandr2 \
+    libasound2 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libpangocairo-1.0-0 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libgdk-pixbuf2.0-0 \
+    libgconf-2-4 \
+    libgdm1 \
+    libglib2.0-0 \
+    libgl1-mesa-glx \
+    fonts-liberation \
+    xdg-utils \
+    wget \
+    curl \
+    unzip \
+    chromium \
+    libreoffice \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV CHROME_PATH=/usr/bin/chromium
+ENV RUST_LOG=info
+
+# Build dependencies (cached layer) - only re-runs if recipe.json changes
+COPY --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
+
+# Copy source code (only invalidates cache if source changes)
+COPY . .
+
+# Run tests by default
+CMD ["cargo", "test", "--release", "--", "--ignored", "--test-threads=1"]

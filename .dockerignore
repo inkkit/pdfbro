@@ -1,0 +1,39 @@
+# Git and IDE
+.git/
+.gitignore
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Build artifacts
+target/
+**/target/
+Cargo.lock.bk
+
+# Test data - include for Docker testing
+# tests/
+
+# Gotenberg reference (if exists)
+gotenberg/
+
+# Docs - needed for Docker build
+# docs/
+
+# Temporary files
+*.tmp
+*.log
+.env
+
+# Python/Node bindings (not needed for Docker build)
+crates/py/
+crates/js/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# OS files
+.DS_Store
+Thumbs.db
