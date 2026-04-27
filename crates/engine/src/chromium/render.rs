@@ -206,16 +206,23 @@ async fn apply_request_context(
 }
 
 fn cookie_to_param(c: &Cookie) -> CookieParam {
+    let path = c.path.clone();
     let mut b = CookieParam::builder()
         .name(c.name.clone())
         .value(c.value.clone())
         .secure(c.secure)
         .http_only(c.http_only);
     if let Some(d) = &c.domain {
-        b = b.domain(d.clone());
+        // CDP refuses Network.setCookie on about:blank when only a
+        // domain is supplied — the cookie has no origin to attach to.
+        // Synthesize a URL from scheme + domain + path so cookies can
+        // be installed before any navigation has occurred.
+        let scheme = if c.secure { "https" } else { "http" };
+        let url_path = path.as_deref().unwrap_or("/");
+        b = b.domain(d.clone()).url(format!("{scheme}://{d}{url_path}"));
     }
-    if let Some(p) = &c.path {
-        b = b.path(p.clone());
+    if let Some(p) = path {
+        b = b.path(p);
     }
     // The builder's `build` is infallible when name+value are set.
     b.build().unwrap_or_else(|_| {
