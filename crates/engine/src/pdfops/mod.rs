@@ -141,7 +141,6 @@ pub(crate) mod test_support {
 
     /// Build an N-page PDF with the given paper size (in points). Used by
     /// integration tests for fixtures.
-    #[allow(dead_code)]
     pub fn make_multipage_pdf(num_pages: u32, width_pt: i64, height_pt: i64) -> Vec<u8> {
         let mut doc = Document::with_version("1.5");
         let pages_id = doc.new_object_id();
@@ -180,6 +179,66 @@ pub(crate) mod test_support {
 
         let mut bytes = Vec::new();
         doc.save_to(&mut bytes).expect("save multipage pdf");
+        bytes
+    }
+
+    /// Build a 1-page PDF that has a one-widget `/AcroForm` and an
+    /// `/Annots` array on its first (and only) page. The widget has no
+    /// `/AP /N` appearance, so this fixture exercises the unfilled-forms
+    /// case explicitly called out by spec 13.
+    pub fn make_pdf_with_form_widget() -> Vec<u8> {
+        let mut doc = Document::with_version("1.5");
+
+        let pages_id = doc.new_object_id();
+        let resources_id = doc.add_object(dictionary! {});
+        let content_id = doc.add_object(lopdf::Stream::new(dictionary! {}, Vec::new()));
+
+        // Field + widget merged into a single object (legal per PDF 1.7).
+        let widget_id = doc.add_object(dictionary! {
+            "Type" => "Annot",
+            "Subtype" => "Widget",
+            "FT" => "Tx",
+            "T" => Object::String(b"Field1".to_vec(), StringFormat::Literal),
+            "Rect" => vec![100.into(), 100.into(), 300.into(), 130.into()],
+        });
+
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+            "Resources" => resources_id,
+            "Contents" => content_id,
+            "Annots" => vec![widget_id.into()],
+        });
+
+        // Now attach Parent back on the widget.
+        if let Ok(Object::Dictionary(d)) = doc.get_object_mut(widget_id) {
+            d.set("P", Object::Reference(page_id));
+        }
+
+        doc.objects.insert(
+            pages_id,
+            Object::Dictionary(dictionary! {
+                "Type" => "Pages",
+                "Kids" => vec![page_id.into()],
+                "Count" => 1,
+            }),
+        );
+
+        let acroform_id = doc.add_object(dictionary! {
+            "Fields" => vec![widget_id.into()],
+            "NeedAppearances" => true,
+        });
+
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+            "AcroForm" => acroform_id,
+        });
+        doc.trailer.set("Root", catalog_id);
+
+        let mut bytes = Vec::new();
+        doc.save_to(&mut bytes).expect("save form pdf");
         bytes
     }
 
