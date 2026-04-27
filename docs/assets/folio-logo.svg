@@ -1,29 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
   <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#DE2910;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#FF6B35;stop-opacity:1" />
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B35;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#DE2910;stop-opacity:1" />
     </linearGradient>
+    <filter id="s">
+      <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#000" flood-opacity="0.15"/>
+    </filter>
   </defs>
   
-  <!-- Background circle -->
-  <circle cx="100" cy="100" r="95" fill="url(#grad)" stroke="#fff" stroke-width="2"/>
+  <!-- Clean background circle -->
+  <circle cx="100" cy="100" r="88" fill="url(#g)" filter="url(#s)"/>
   
-  <!-- Document shape -->
-  <rect x="50" y="40" width="100" height="120" rx="5" fill="white" opacity="0.95"/>
+  <!-- Modern "F" letterform (clean, geometric) -->
+  <path d="M 75 55 L 75 145 M 75 55 L 125 55 M 75 100 L 115 100" 
+        stroke="white" stroke-width="18" stroke-linecap="round" fill="none"/>
   
-  <!-- Lines representing text -->
-  <rect x="65" y="60" width="70" height="6" rx="2" fill="#DE2910"/>
-  <rect x="65" y="75" width="60" height="6" rx="2" fill="#DE2910" opacity="0.7"/>
-  <rect x="65" y="90" width="70" height="6" rx="2" fill="#DE2910" opacity="0.7"/>
-  <rect x="65" y="105" width="50" height="6" rx="2" fill="#DE2910" opacity="0.7"/>
-  <rect x="65" y="120" width="65" height="6" rx="2" fill="#DE2910" opacity="0.7"/>
+  <!-- Subtle page accent (bottom right) -->
+  <rect x="118" y="108" width="30" height="38" rx="4" fill="white" opacity="0.25"/>
+  <rect x="123" y="115" width="20" height="3" rx="1" fill="white" opacity="0.6"/>
+  <rect x="123" y="122" width="16" height="3" rx="1" fill="white" opacity="0.4"/>
+  <rect x="123" y="129" width="20" height="3" rx="1" fill="white" opacity="0.4"/>
   
-  <!-- PDF indicator -->
-  <rect x="70" y="140" width="60" height="12" rx="3" fill="#DE2910"/>
-  <text x="100" y="149" font-family="Arial,sans-serif" font-size="8" fill="white" text-anchor="middle" font-weight="bold">PDF</text>
-  
-  <!-- Rust gear accent (top right) -->
-  <circle cx="150" cy="50" r="15" fill="#000" opacity="0.3"/>
-  <text x="150" y="55" font-family="monospace" font-size="16" fill="white" text-anchor="middle" font-weight="bold">R</text>
+  <!-- Small "pdf" label -->
+  <text x="100" y="170" font-family="Arial,sans-serif" font-size="11" font-weight="600" 
+        fill="white" text-anchor="middle" letter-spacing="2">PDF</text>
 </svg>
