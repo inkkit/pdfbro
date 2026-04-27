@@ -14,7 +14,7 @@ so existing Gotenberg clients can switch by changing only the base URL.
 
 **In:**
 
-- The seven Phase-1/2 routes listed below (chromium html/url/markdown,
+- The Phase-1/2 routes listed below (chromium html/url/markdown/screenshot,
   libreoffice convert, pdfengines merge/split/flatten/metadata).
 - Form-multipart parsing (matching Gotenberg field names).
 - One shared `ChromiumEngine` and `LibreOfficeEngine` per process.
@@ -44,6 +44,9 @@ so existing Gotenberg clients can switch by changing only the base URL.
 | POST   | `/forms/chromium/convert/html`           | `chromium_html`                  |
 | POST   | `/forms/chromium/convert/url`            | `chromium_url`                   |
 | POST   | `/forms/chromium/convert/markdown`       | `chromium_markdown`              |
+| POST   | `/forms/chromium/screenshot/html`        | `chromium_screenshot_html`       |
+| POST   | `/forms/chromium/screenshot/url`         | `chromium_screenshot_url`        |
+| POST   | `/forms/chromium/screenshot/markdown`    | `chromium_screenshot_markdown`   |
 | POST   | `/forms/libreoffice/convert`             | `libreoffice_convert`            |
 | POST   | `/forms/pdfengines/merge`                | `pdfengines_merge`               |
 | POST   | `/forms/pdfengines/split`                | `pdfengines_split`               |
@@ -177,6 +180,48 @@ Implementation:
    conversion (delegating to spec 11) and inline into the wrapper.
 4. Send the resulting HTML to `html_to_pdf` with `base_url` set to the
    tempdir.
+
+### `chromium_screenshot_html`
+
+Multipart fields:
+
+| Field name                | Type     | Maps to                              |
+|---------------------------|----------|--------------------------------------|
+| `files` (one .html file)  | file     | inlined as the HTML string            |
+| `format`                  | string   | `ScreenshotOptions::format` (png/jpeg/webp) |
+| `quality`                 | int      | `ScreenshotOptions::quality` (0-100) |
+| `fullPage`                | bool     | `ScreenshotOptions::full_page`       |
+| `clip.x`, `clip.y`        | float    | Clip rectangle position               |
+| `clip.width`, `clip.height` | float | Clip rectangle dimensions             |
+| `viewport.width`          | int      | `ScreenshotOptions::viewport_width`  |
+| `viewport.height`         | int      | `ScreenshotOptions::viewport_height`  |
+| `viewport.scale`          | float    | `ScreenshotOptions::scale`           |
+| `waitDelay`               | duration | `WaitCondition::Delay`                |
+| `waitForSelector`         | string   | `WaitCondition::Selector`             |
+| `waitForExpression`       | string   | `WaitCondition::Expression`           |
+| `userAgent`               | string   | `RequestContext::user_agent`          |
+| `extraHttpHeaders`        | json     | `RequestContext::extra_headers`       |
+| `cookies`                 | json     | `RequestContext::cookies`             |
+| `failOnHttpStatusCodes`   | json     | `RequestContext::fail_on_status`      |
+
+Steps:
+
+1. Acquire semaphore permit.
+2. Parse multipart; require a file named `index.html`.
+3. Build `ScreenshotOptions` and `RequestContext` from form map.
+4. Call `state.chromium.screenshot_html(html, base_url, &opts, &ctx)`.
+5. Return bytes as `image/png`, `image/jpeg`, or `image/webp` with
+   `Content-Disposition: attachment; filename="result.{png|jpg|webp}"`.
+
+### `chromium_screenshot_url`
+
+Same as `chromium_screenshot_html`, except uses `url` field instead of
+`files`, and calls `screenshot_url`.
+
+### `chromium_screenshot_markdown`
+
+Same pattern as `chromium_markdown` but renders to screenshot instead of
+PDF. Calls `screenshot_markdown`.
 
 ### `libreoffice_convert`
 
@@ -370,6 +415,11 @@ concrete engine.
 - `chromium_url_400_on_missing_url_field`.
 - `chromium_html_504_when_backend_returns_timeout`.
 - `chromium_html_502_when_backend_returns_navigation_error`.
+- `chromium_screenshot_html_returns_png_on_success` — mock returns
+  PNG bytes (`\x89PNG`).
+- `chromium_screenshot_url_returns_jpeg_when_format_set` — mock returns
+  JPEG bytes (`0xFF 0xD8`).
+- `chromium_screenshot_markdown_returns_webp` — mock returns WebP.
 - `body_too_large_returns_413`.
 - `nonexistent_route_returns_404`.
 
@@ -394,7 +444,7 @@ responses for a small fixture set. Runs in CI on Linux runners only.
 
 ## Acceptance
 
-- [ ] All routes implemented per the table.
+- [ ] All routes implemented per the table (including screenshot routes).
 - [ ] Multipart parser handles repeated fields and named files
       (Gotenberg-style: `files` repeated; the *file name* matters for
       `index.html`).
@@ -409,16 +459,16 @@ responses for a small fixture set. Runs in CI on Linux runners only.
 - [ ] `cargo clippy -p server -- -D warnings` clean.
 - [ ] No `unsafe`. No `unwrap`/`expect` outside `#[cfg(test)]`.
 - [ ] Output content types: `application/pdf` for single PDFs,
-      `application/zip` for multi, `application/json` for metadata read.
+      `application/zip` for multi, `application/json` for metadata read,
+      `image/png`/`image/jpeg`/`image/webp` for screenshots.
 - [ ] `Content-Disposition: attachment; filename="result.pdf"` (or
-      `result.zip` / `result.json`) on success responses.
+      `result.zip` / `result.json` / `result.{png|jpg|webp}`) on success.
+- [ ] Screenshot routes return correct image format based on `format` field.
 
 ## Out of scope / follow-ups
 
 - Webhook routes (`/forms/webhook`) — Gotenberg has them; defer until
   user demand.
-- Screenshot routes — fold in once `engine::chromium` adds screenshot
-  capture.
 - Full route set behind `/forms/pdfengines/*` (encrypt, watermark,
   stamp, rotate, embed, bookmarks) — wired as their backing `pdfops`
   functions land.
