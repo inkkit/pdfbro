@@ -38,9 +38,11 @@ pub fn merge(pdfs: &[&[u8]]) -> EngineResult<Vec<u8>> {
     }
 
     // Single-input shortcut: round-trip through finalize so /Producer is
-    // stamped uniformly.
-    if docs.len() == 1 {
-        return super::finalize(docs.into_iter().next().unwrap());
+    // stamped uniformly. `pop` keeps the function `.unwrap()`-free.
+    if docs.len() == 1
+        && let Some(only) = docs.pop()
+    {
+        return super::finalize(only);
     }
 
     // Multi-input path.
