@@ -6,3 +6,10 @@ license.workspace = true
 description = "Folio core engine: ChromiumEngine, LibreOfficeEngine, PdfOperations"
 
 [dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+humantime-serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+static_assertions = { workspace = true }
