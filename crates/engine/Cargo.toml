@@ -7,9 +7,13 @@ description = "Folio core engine: ChromiumEngine, LibreOfficeEngine, PdfOperatio
 
 [dependencies]
 serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 humantime-serde = { workspace = true }
+tokio = { workspace = true }
+tempfile = { workspace = true }
 
 [dev-dependencies]
-serde_json = { workspace = true }
+lopdf = { workspace = true }
 static_assertions = { workspace = true }
+tokio = { workspace = true }
