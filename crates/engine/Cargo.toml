@@ -6,3 +6,20 @@ license.workspace = true
 description = "Folio core engine: ChromiumEngine, LibreOfficeEngine, PdfOperations"
 
 [dependencies]
+chromiumoxide = { workspace = true }
+futures-util = { workspace = true }
+humantime-serde = { workspace = true }
+lopdf = { workspace = true }
+pulldown-cmark = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+axum = { workspace = true }
+proptest = { workspace = true }
+static_assertions = { workspace = true }
+tower = { workspace = true }
