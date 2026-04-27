@@ -24,7 +24,6 @@ stream from HTML strings, remote URLs, or Markdown — usable from binaries
 - Connection pooling for HTTP server (spec 30 wraps this engine in a pool).
 - Auto-download of Chrome (deferred — first cut requires a chrome on `$PATH`
   or in `BrowserConfig::executable`).
-- Screenshot capture (separate follow-up spec).
 - PDF/A / PDF/UA conformance (spec 13).
 
 ## Public API
@@ -79,6 +78,33 @@ impl ChromiumEngine {
         request: &RequestContext,
     ) -> EngineResult<Vec<u8>>;
 
+    /// Capture an HTML string as a screenshot.
+    /// Returns PNG, JPEG, or WebP bytes based on `format`.
+    /// `base_url`, when `Some`, is used as the document's base URL.
+    pub async fn screenshot_html(
+        &self,
+        html: &str,
+        base_url: Option<&str>,
+        opts: &ScreenshotOptions,
+        request: &RequestContext,
+    ) -> EngineResult<Vec<u8>>;
+
+    /// Navigate to `url` and capture a screenshot.
+    pub async fn screenshot_url(
+        &self,
+        url: &str,
+        opts: &ScreenshotOptions,
+        request: &RequestContext,
+    ) -> EngineResult<Vec<u8>>;
+
+    /// Render Markdown to HTML then capture a screenshot.
+    pub async fn screenshot_markdown(
+        &self,
+        markdown: &str,
+        opts: &ScreenshotOptions,
+        request: &RequestContext,
+    ) -> EngineResult<Vec<u8>>;
+
     /// Best-effort liveness probe — `true` iff the browser process responds
     /// to `Browser.getVersion` within `BrowserConfig::timeout`.
     pub async fn healthy(&self) -> bool;
@@ -107,6 +133,52 @@ pub struct Cookie {
     pub secure: bool,
     pub http_only: bool,
 }
+
+/// Screenshot output format.
+#[derive(Debug, Clone, Copy)]
+pub enum ScreenshotFormat {
+    Png,
+    Jpeg,
+    Webp,
+}
+
+/// Options for screenshot capture.
+#[derive(Debug, Clone)]
+pub struct ScreenshotOptions {
+    /// Output format (default: Png).
+    pub format: ScreenshotFormat,
+    /// JPEG/WebP quality (0-100, default: 80).
+    pub quality: Option<u8>,
+    /// Capture full scrollable page (default: false).
+    pub full_page: bool,
+    /// Viewport dimensions (default: 1920x1080).
+    pub viewport_width: u32,
+    pub viewport_height: u32,
+    /// Device scale factor (default: 1.0).
+    pub scale: f32,
+    /// Clip rectangle (optional). When set, only this region is captured.
+    pub clip_x: Option<f64>,
+    pub clip_y: Option<f64>,
+    pub clip_width: Option<f64>,
+    pub clip_height: Option<f64>,
+}
+
+impl Default for ScreenshotOptions {
+    fn default() -> Self {
+        Self {
+            format: ScreenshotFormat::Png,
+            quality: None,
+            full_page: false,
+            viewport_width: 1920,
+            viewport_height: 1080,
+            scale: 1.0,
+            clip_x: None,
+            clip_y: None,
+            clip_width: None,
+            clip_height: None,
+        }
+    }
+}
 ```
 
 ## Behavior
@@ -127,6 +199,28 @@ pub struct Cookie {
    → `EngineError::ChromeLaunch(msg)`.
 4. Spawn a background task to drive the chromiumoxide handler future. Store
    its `JoinHandle` in `Inner` so `shutdown` can abort it.
+
+### Chrome Version Compatibility
+
+The engine uses `chromiumoxide` 0.9 which is generated from Chrome DevTools
+Protocol (CDP) definitions matching Chrome up to version ~135. Newer Chrome
+versions (136+) may emit CDP event types that chromiumoxide doesn't recognize,
+causing deserialization warnings like:
+
+```
+WS Invalid message: data did not match any variant of untagged enum Message
+```
+
+**Impact:** These are non-fatal. PDF generation continues to work because core
+CDP commands (`Page.printToPDF`, navigation, etc.) remain compatible. The
+warnings only affect event notifications Chrome sends asynchronously.
+
+**Resolution options:**
+1. Use Chrome 134-135 for clean logs (matching chromiumoxide 0.9 CDP version)
+2. Accept warnings with Chrome 136+ (PDF generation still works)
+3. Wait for chromiumoxide update with newer CDP definitions
+
+The engine logs the detected Chrome version at startup and warns if >135.
 
 ### `html_to_pdf`
 
@@ -187,6 +281,34 @@ monospace, table borders.
 | `Delay { duration }`  | `tokio::time::sleep(duration)`.                                                                |
 
 All wait paths are bounded by `BrowserConfig::timeout`.
+
+### Screenshot behavior
+
+#### `screenshot_html`
+
+1. Apply `RequestContext` (user agent, headers, cookies) same as `html_to_pdf`.
+2. Set page content via `page.set_content(html)` or navigate to `base_url` first.
+3. Wait per `opts.wait` (see Wait Conditions).
+4. Build screenshot params from `ScreenshotOptions`:
+   - `format` → `ScreenshotFormat::Png/Jpeg/Webp`
+   - `quality` → JPEG/WebP quality (0-100)
+   - `clip` → Optional clip rectangle
+   - `full_page` → Capture full scrollable page
+5. Call `page.screenshot(params)`.
+6. Return image bytes.
+
+#### `screenshot_url`
+
+Same as `screenshot_html` but step 2 becomes `page.goto(url)`.
+
+If `RequestContext::fail_on_status` is non-empty, listen for
+`Network.responseReceived`; if the main frame's response status is in the
+list → cancel and return `EngineError::Navigation`.
+
+#### `screenshot_markdown`
+
+1. Convert Markdown to HTML via `pulldown-cmark` (same as `markdown_to_pdf`).
+2. Delegate to `screenshot_html` with `base_url = None`.
 
 ### `Page.printToPDF` parameter mapping
 
@@ -271,6 +393,24 @@ Marked `#[ignore]`; require `CHROME_PATH` env or system Chrome. Run via
 - `shutdown_cancels_in_flight_render` — assert in-flight render returns
   the documented internal error.
 
+### Screenshot integration tests (`crates/engine/tests/chromium_screenshot.rs`)
+
+Marked `#[ignore]`; require `CHROME_PATH` env or system Chrome.
+
+- `screenshot_html_returns_valid_png` — bytes start with PNG magic
+  (`\x89PNG`).
+- `screenshot_html_jpeg_format` — set format to JPEG; bytes start with
+  `0xFF 0xD8` (JPEG magic).
+- `screenshot_url_captures_page` — navigate to local server, capture,
+  verify non-empty image.
+- `screenshot_full_page` — render tall page, set `full_page = true`,
+  verify image height > viewport height.
+- `screenshot_clip_rect` — set clip rectangle, verify output dimensions.
+- `screenshot_markdown_renders` — convert Markdown to screenshot, verify
+  output is valid image.
+- `screenshot_quality_jpeg` — set JPEG quality to 50, verify output
+  smaller than quality 100.
+
 ### Doc tests (`engine/src/chromium/mod.rs`)
 
 Compile-only example showing the canonical usage from `@README.md:85-97`,
@@ -287,10 +427,15 @@ behind `#[cfg(doctest)]` `no_run`.
 - [ ] `cargo clippy -p engine -- -D warnings` clean.
 - [ ] `ChromiumEngine` is `Send + Sync + Clone` (assert via `static_assertions`).
 - [ ] `shutdown` is idempotent (test).
+- [ ] Screenshot methods (`screenshot_html`, `screenshot_url`,
+      `screenshot_markdown`) implemented.
+- [ ] `ScreenshotOptions` and `ScreenshotFormat` types exist.
+- [ ] Screenshot integration tests pass with system Chrome.
 
 ## Out of scope / follow-ups
 
-- Screenshot routes (`/screenshot/*`) — separate spec.
+- Screenshot routes (`/screenshot/*`) — implemented in this spec, server
+  routes in spec 30.
 - Auto-download of Chrome — feature flag `auto-download` once stable.
 - PDF/A and PDF/UA — picked up in spec 13 + a Ghostscript-style post-pass.
 - Browser pool (multiple Chrome processes) — picked up in spec 30 once
