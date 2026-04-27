@@ -85,12 +85,14 @@ pub(crate) async fn launch_with(config: BrowserConfig) -> EngineResult<ChromiumE
         .map_err(|e| EngineError::ChromeLaunch(e.to_string()))?;
 
     let handler_task = tokio::spawn(async move {
-        while let Some(h) = handler.next().await {
-            if h.is_err() {
-                // Handler errors typically mean the browser closed.
-                // Stop polling; the engine's shutdown / drop will handle
-                // cleanup.
-                break;
+        // chromiumoxide's handler stream yields Result<(), CdpError>.
+        // Many emitted errors are non-fatal (e.g. transient WS frames,
+        // unknown event payloads); breaking on the first Err strands
+        // every subsequent CDP request as `oneshot canceled`. Drive the
+        // stream until it ends and only log errors.
+        while let Some(item) = handler.next().await {
+            if let Err(e) = item {
+                tracing::debug!(error = %e, "chromiumoxide handler event error (ignored)");
             }
         }
     });
