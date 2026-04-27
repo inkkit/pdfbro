@@ -13,47 +13,63 @@ rest of the conversation history.
 4. The agent will create its own branch, implement the spec, run tests,
    and commit.
 
-## Currently dispatchable (post-spec-10)
+## Status
 
-| File                              | Spec | Crate    | Branch              | External deps to test         |
-|-----------------------------------|------|----------|---------------------|-------------------------------|
-| `spec-11-chromium.md`             | 11   | engine   | `feat/spec-11-chromium`     | Chrome / Chromium on PATH     |
-| `spec-12-libreoffice.md`          | 12   | engine   | `feat/spec-12-libreoffice`  | `soffice` (LibreOffice)       |
-| `spec-13-pdfops.md`               | 13   | engine   | `feat/spec-13-pdfops`       | None (pure Rust + `lopdf`)    |
+| Spec | Status      | Worktree            | Branch                     |
+|------|-------------|---------------------|----------------------------|
+| 10   | merged      | —                   | (on `dev`)                 |
+| 11   | merged      | —                   | (was `feat/spec-11-chromium`) |
+| 12   | merged      | —                   | (was `feat/spec-12-libreoffice`) |
+| 13   | merged      | —                   | (was `feat/spec-13-pdfops`) |
+| 20   | dispatchable | `../folio-spec20`  | `feat/spec-20-cli`         |
+| 30   | dispatchable | `../folio-spec30`  | `feat/spec-30-server`      |
+| 40   | deferred    | —                   | —                          |
+| 41   | deferred    | —                   | —                          |
 
-Specs 11, 12, 13 share only the `engine::types` foundation (already on
-`dev`). They touch disjoint files (`crates/engine/src/chromium/`,
-`crates/engine/src/libreoffice/`, `crates/engine/src/pdfops/`) and each
-crate's `Cargo.toml` additions are dep-only — merge conflicts should be
-limited to the dependency block.
+## Currently dispatchable
 
-## Blocked until 11/12/13 merge
+| File                              | Spec | Crate    | External deps to test         |
+|-----------------------------------|------|----------|-------------------------------|
+| `spec-20-cli.md`                  | 20   | cli      | Chrome and/or `soffice` for the `#[ignore]`d tests |
+| `spec-30-server.md`               | 30   | server   | Chrome and `soffice` for the `#[ignore]`d e2e tests |
 
-These need the engine APIs they consume:
+Specs 20 and 30 share the engine API surface (already on `dev`) and
+touch disjoint files (`crates/cli/`, `crates/server/`). They will both
+add workspace dependencies to the root `Cargo.toml`; conflicts are
+expected only in the `[workspace.dependencies]` block and are
+mechanical to resolve (alphabetical union).
 
-| Spec | Reason                                                    |
-|------|-----------------------------------------------------------|
-| 20 (cli)        | Consumes `engine::ChromiumEngine` (spec 11).    |
-| 30 (server)     | Consumes specs 11, 12, 13.                      |
-| 40 (bindings-py)| Wraps spec 11.                                  |
-| 41 (bindings-js)| Wraps spec 11.                                  |
+## Deferred
 
-Dispatch files for these will be added once their dependencies merge.
+`spec-40-bindings-py.md` and `spec-41-bindings-js.md` will be revived
+once specs 20 and 30 are stable on `dev`.
+
+## Already merged (historical)
+
+The following dispatch files describe completed work on `dev`. Keep
+them around as references; do not re-dispatch them.
+
+- `spec-11-chromium.md`
+- `spec-12-libreoffice.md`
+- `spec-13-pdfops.md`
 
 ## Coordination rules for parallel agents
 
-1. **Branch off `dev`.** Each agent creates `feat/spec-NN-<slug>`.
-2. **Don't touch other crates.** Engine sub-modules only; do not edit
-   `crates/cli/`, `crates/server/`, `crates/py/`, `crates/js/`.
-3. **Cargo.toml conflicts:** if your spec needs a workspace dependency
-   that another agent also adds (unlikely, but possible), keep the entry
-   alphabetical inside its section. The merger resolves conflicts.
-4. **`engine::types` is frozen.** If your spec genuinely needs a new
-   variant on `EngineError`, add it to spec 10 first (a separate
-   `docs/specs/10-engine-types.md` PR) and wait for that to merge.
-5. **Tests must pass before commit.** `cargo test -p engine`,
-   `cargo clippy -p engine --all-targets -- -D warnings`,
+1. **Branch off `dev`.** Each agent works on a `feat/spec-NN-<slug>`
+   branch in its own worktree.
+2. **Stay inside your spec's crate.** Touch only the crate listed in
+   your dispatch file (and the workspace `Cargo.toml` for dependency
+   additions). Do not edit other crates.
+3. **The engine API is frozen.** Specs 20+ consume `engine::*` as a
+   black box. If you genuinely need a new variant on `EngineError` or
+   a new engine method, **stop and report back** rather than editing
+   `crates/engine/` from a downstream branch.
+4. **Cargo.toml conflicts:** when adding workspace dependencies, keep
+   entries alphabetical inside `[workspace.dependencies]`. The merger
+   resolves overlaps via union.
+5. **Tests must pass before commit.** Run `cargo test -p <crate>`,
+   `cargo clippy -p <crate> --all-targets -- -D warnings`,
    `cargo fmt --check`. Integration tests that need Chrome / soffice
    are `#[ignore]` and not required to run on commit; document how to
    run them in the PR description.
-6. **One spec, one PR.** Don't bundle multiple specs together.
+6. **One spec, one PR / merge.** Don't bundle multiple specs together.
