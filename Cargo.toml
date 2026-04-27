@@ -54,6 +54,7 @@ tower-http = { version = "0.6", features = ["trace", "cors"] }
 assert_cmd = "2"
 clap = { version = "4", features = ["derive", "env"] }
 clap_complete = "4"
+glob = "0.3"
 humantime = "2"
 predicates = "3"
 walkdir = "2"
