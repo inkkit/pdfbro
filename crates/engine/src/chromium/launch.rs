@@ -69,6 +69,42 @@ pub(crate) fn resolve_executable_with(
     Err(EngineError::ChromeNotFound { searched })
 }
 
+/// Check Chrome version and warn if it's newer than what chromiumoxide supports.
+/// chromiumoxide 0.9 supports Chrome up to ~135. Newer versions emit warnings
+/// for unknown CDP events but PDF generation still works.
+fn check_chrome_version(executable: &Path) {
+    let output = std::process::Command::new(executable)
+        .arg("--version")
+        .output();
+
+    if let Ok(output) = output {
+        if output.status.success() {
+            let version_str = String::from_utf8_lossy(&output.stdout);
+            // Parse "Google Chrome 147.0.7727.102" -> 147
+            if let Some(major) = version_str
+                .split_whitespace()
+                .last()
+                .and_then(|v| v.split('.').next())
+                .and_then(|m| m.parse::<u32>().ok())
+            {
+                const MAX_TESTED: u32 = 135;
+                if major > MAX_TESTED {
+                    tracing::warn!(
+                        chrome_version = %version_str.trim(),
+                        max_tested = MAX_TESTED,
+                        "Chrome version newer than chromiumoxide supports. \
+                         You may see 'WS Invalid message' warnings - PDF generation \
+                         still works, but consider downgrading Chrome or waiting \
+                         for chromiumoxide update."
+                    );
+                } else {
+                    tracing::info!(chrome_version = %version_str.trim(), "Chrome version OK");
+                }
+            }
+        }
+    }
+}
+
 /// Public entrypoint used by `ChromiumEngine::launch_with`.
 pub(crate) async fn launch_with(config: BrowserConfig) -> EngineResult<ChromiumEngine> {
     let executable = resolve_executable_with(
@@ -77,6 +113,9 @@ pub(crate) async fn launch_with(config: BrowserConfig) -> EngineResult<ChromiumE
         &which_in_path,
         &Path::exists,
     )?;
+
+    // Check Chrome version and warn if potentially incompatible
+    check_chrome_version(&executable);
 
     let cx_config = build_chromiumoxide_config(&config, &executable)?;
 
