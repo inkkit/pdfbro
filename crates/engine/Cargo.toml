@@ -9,7 +9,9 @@ description = "Folio core engine: ChromiumEngine, LibreOfficeEngine, PdfOperatio
 serde = { workspace = true }
 thiserror = { workspace = true }
 humantime-serde = { workspace = true }
+lopdf = { workspace = true }
 
 [dev-dependencies]
+proptest = { workspace = true }
 serde_json = { workspace = true }
 static_assertions = { workspace = true }

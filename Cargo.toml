@@ -26,6 +26,7 @@ serde_json = "1"
 humantime-serde = "1"
 
 # Test utilities
+proptest = "1"
 static_assertions = "1"
 
 # Logging
