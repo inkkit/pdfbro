@@ -9,6 +9,8 @@
 //! only [`ChromiumEngine`], [`RequestContext`], and [`Cookie`].
 
 mod launch;
+mod pdf_params;
+mod render;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -149,15 +151,12 @@ impl ChromiumEngine {
     /// render exceeds `BrowserConfig::timeout`.
     pub async fn html_to_pdf(
         &self,
-        _html: &str,
-        _base_url: Option<&str>,
+        html: &str,
+        base_url: Option<&str>,
         opts: &PdfOptions,
-        _request: &RequestContext,
+        request: &RequestContext,
     ) -> EngineResult<Vec<u8>> {
-        opts.validate()?;
-        Err(EngineError::Internal(
-            "html_to_pdf not implemented yet (spec 11 follow-up commit)".into(),
-        ))
+        render::html_to_pdf(self, html, base_url, opts, request).await
     }
 
     /// Navigate to `url` and render the resulting page to a PDF byte
@@ -168,22 +167,19 @@ impl ChromiumEngine {
     /// See [`ChromiumEngine::html_to_pdf`].
     pub async fn url_to_pdf(
         &self,
-        _url: &str,
+        url: &str,
         opts: &PdfOptions,
-        _request: &RequestContext,
+        request: &RequestContext,
     ) -> EngineResult<Vec<u8>> {
-        opts.validate()?;
-        Err(EngineError::Internal(
-            "url_to_pdf not implemented yet (spec 11 follow-up commit)".into(),
-        ))
+        render::url_to_pdf(self, url, opts, request).await
     }
 
     /// Convert a Markdown string to a PDF byte stream.
     ///
     /// CommonMark plus tables, strikethrough, and task lists are
-    /// supported. The rendered HTML is wrapped in a small built-in
-    /// stylesheet and then handed off to
-    /// [`ChromiumEngine::html_to_pdf`].
+    /// supported (per [`pulldown_cmark::Options::all`]). The rendered
+    /// HTML is wrapped in a small built-in stylesheet and then handed
+    /// off to [`ChromiumEngine::html_to_pdf`].
     ///
     /// # Errors
     ///
@@ -235,8 +231,11 @@ impl ChromiumEngine {
     /// Returns [`EngineError::Cdp`] if Chrome reports an error while
     /// closing. The browser is dropped regardless.
     pub async fn shutdown(self) -> EngineResult<()> {
+        // Mark shutdown first so concurrent renders can interpret CDP
+        // errors as intentional teardown.
         let was_running = !self.inner.is_shutdown.swap(true, Ordering::SeqCst);
 
+        // Take the browser out of the option and drop it.
         let mut close_err: Option<chromiumoxide::error::CdpError> = None;
         {
             let mut guard = self.inner.browser.lock().await;
@@ -244,10 +243,13 @@ impl ChromiumEngine {
                 if let Err(e) = browser.close().await {
                     close_err = Some(e);
                 }
+                // Drop the browser explicitly to terminate the chrome
+                // process even if `close` failed.
                 drop(browser);
             }
         }
 
+        // Abort the chromiumoxide event-loop task.
         if let Ok(mut g) = self.inner.handler_task.lock()
             && let Some(handle) = g.take()
         {
@@ -289,6 +291,20 @@ impl ChromiumEngine {
                 handler_task: std::sync::Mutex::new(Some(handler_task)),
                 config,
             }),
+        }
+    }
+
+    pub(crate) fn inner(&self) -> &Inner {
+        &self.inner
+    }
+
+    /// Map a CDP error to the engine's error model, accounting for
+    /// intentional shutdown.
+    pub(crate) fn map_cdp_error(&self, err: chromiumoxide::error::CdpError) -> EngineError {
+        if self.inner.is_shutdown.load(Ordering::SeqCst) {
+            EngineError::Internal("engine shut down".into())
+        } else {
+            EngineError::Cdp(err.to_string())
         }
     }
 }
