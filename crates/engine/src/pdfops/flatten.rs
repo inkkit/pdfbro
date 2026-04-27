@@ -20,8 +20,8 @@ use crate::types::EngineResult;
 ///
 /// # Errors
 ///
-/// [`EngineError::Internal`] if the input fails to parse, is encrypted,
-/// or the result fails to save.
+/// [`crate::EngineError::Internal`] if the input fails to parse, is
+/// encrypted, or the result fails to save.
 pub fn flatten(pdf: &[u8]) -> EngineResult<Vec<u8>> {
     let mut doc = super::parse_input(pdf)?;
 
