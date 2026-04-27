@@ -1,0 +1,38 @@
+# Docker Compose for Folio development and testing
+version: '3.8'
+
+services:
+  # Folio server
+  folio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${API_PORT:-3000}:3000"
+    environment:
+      - RUST_LOG=${LOG_LEVEL:-info}
+      - CHROME_PATH=/usr/bin/google-chrome
+      - LIBREOFFICE_PATH=/usr/bin/soffice
+      - FOLIO_PORT=3000
+      - FOLIO_CONCURRENCY=${CONCURRENCY:-4}
+      - FOLIO_REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-120s}
+    volumes:
+      - ./:/app
+      - cargo-cache:/usr/local/cargo/registry
+    command: ["/app/folio-server", "serve"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Chromium headless for testing
+  chromium:
+    image: chromedp/headless-shell:latest
+    ports:
+      - "9222:9222"
+    command: ["--no-sandbox", "--remote-debugging-port=9222", "--remote-debugging-address=0.0.0.0"]
+
+volumes:
+  cargo-cache:
