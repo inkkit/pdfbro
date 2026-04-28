@@ -13,6 +13,8 @@ use crate::multipart::{FormFields, UploadedFile};
 use crate::routes::chromium::{pdf_response, zip_response};
 use crate::routes::libreoffice::build_zip;
 use crate::state::AppState;
+use engine::PdfAProfile;
+use engine::pdfa::convert_to_pdfa;
 
 const SPAWN_BLOCKING_THRESHOLD: usize = 1024 * 1024;
 
@@ -338,6 +340,43 @@ fn parse_bool_field(map: &HashMap<String, String>, key: &'static str) -> ApiResu
             }),
         },
     }
+}
+
+// ---------------------------------------------------------------------------
+// /forms/pdfengines/convert (PDF/A conversion)
+// ---------------------------------------------------------------------------
+
+/// `POST /forms/pdfengines/convert`.
+/// Converts PDF to PDF/A conformance (PDF/A-1b, PDF/A-2b, PDF/A-3b).
+pub async fn pdfengines_convert(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+    let _permit = acquire_permit(&state).await?;
+    let form = FormFields::from_multipart(mp).await?;
+    let files = form.files_by_field("files");
+    if files.len() != 1 {
+        return Err(ApiError::InvalidField {
+            field: "files",
+            message: "convert expects exactly one PDF file".to_string(),
+        });
+    }
+    let bytes = read_one(files[0]).await?;
+
+    // Parse PDF/A profile
+    let profile_str = form.map.get("pdfa").ok_or(ApiError::MissingField("pdfa"))?;
+    let profile: PdfAProfile = profile_str.parse().map_err(|e: String| ApiError::InvalidField {
+        field: "pdfa",
+        message: e,
+    })?;
+
+    // Run conversion
+    let converted = convert_to_pdfa(&bytes, profile).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let filename = form
+        .map
+        .get(" Gotenberg-Output-Filename")
+        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
+        .unwrap_or_else(|| "converted.pdf".to_string());
+
+    Ok(pdf_response(converted, &filename))
 }
 
 #[cfg(test)]

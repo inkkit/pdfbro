@@ -113,6 +113,9 @@ RUN apt-get update -qq && apt-get upgrade -yqq && \
     fontconfig \
     # PDF tools
     qpdf \
+    ghostscript \
+    # Color profiles for PDF/A
+    icc-profiles \
     # Chromium runtime libs
     libgtk-3-0 libx11-xcb1 libxcomposite1 libxcursor1 \
     libxdamage1 libxi6 libxtst6 libnss3 libcups2 libxss1 \
@@ -131,6 +134,7 @@ COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" --from=builder \
 # Environment variables
 ENV CHROME_PATH=/usr/bin/chromium
 ENV CHROME_BIN=/usr/bin/chromium
+ENV GS_BIN=/usr/bin/gs
 ENV RUST_LOG=info
 ENV FOLIO_VERSION=${FOLIO_VERSION}
 

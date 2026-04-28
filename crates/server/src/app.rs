@@ -90,6 +90,10 @@ pub fn build_router(state: AppState) -> Router {
             "/forms/pdfengines/metadata/write",
             post(pdfengines::pdfengines_metadata_write),
         )
+        .route(
+            "/forms/pdfengines/convert",
+            post(pdfengines::pdfengines_convert),
+        )
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(handle_timeout_error))
