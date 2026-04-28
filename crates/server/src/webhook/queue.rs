@@ -7,7 +7,6 @@ use tokio::sync::{Mutex, mpsc};
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
-use crate::state::AppState;
 
 use super::{WebhookClient, WebhookConfig, WebhookError, WebhookJob, WebhookOperation, process_webhook_job};
 

@@ -12,7 +12,6 @@ use axum::extract::{Multipart, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use engine::{Cookie, MediaType, PageRanges, PdfOptions, RequestContext, WaitCondition, CaptureMode, ScreenshotFormat, ScreenshotOptions};
-use engine::chromium::screenshot::{html_to_screenshot, url_to_screenshot};
 
 use crate::error::{ApiError, ApiResult};
 use crate::multipart::FormFields;
