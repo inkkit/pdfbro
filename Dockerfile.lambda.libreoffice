@@ -1,0 +1,50 @@
+# Folio - AWS Lambda Optimized Dockerfile (LibreOffice-Only)
+# Tags: latest-libreoffice-aws-lambda, 8-libreoffice-aws-lambda
+# Pushes to: docker push deesh2025/no-name:tagname
+
+# Stage 1: Chef
+FROM rust:1.88 AS chef
+WORKDIR /app
+RUN cargo install cargo-chef --locked
+
+# Stage 2: Planner
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+# Stage 3: Builder
+FROM rust:1.88 AS builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    fonts-liberation xdg-utils wget curl unzip libreoffice \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN cargo install cargo-chef --locked
+
+COPY --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
+
+COPY . .
+RUN cargo build --release && \
+    strip target/release/folio-server && \
+    strip target/release/folio
+
+# Stage 4: Runtime - AWS Lambda
+FROM public.ecr.aws/lambda/provided:al2023
+
+RUN dnf install -y \
+    libreoffice-writer \
+    libreoffice-calc \
+    libreoffice-impress \
+    liberation-fonts \
+    && dnf clean all
+
+ENV RUST_LOG=info
+
+COPY --from=builder /app/target/release/folio-server ${LAMBDA_RUNTIME_DIR}/
+COPY --from=builder /app/target/release/folio ${LAMBDA_RUNTIME_DIR}/
+
+ENTRYPOINT ["/var/runtime/folio-server"]
+CMD ["lambda"]
