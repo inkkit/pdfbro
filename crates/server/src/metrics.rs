@@ -3,10 +3,19 @@
 //! Exposes conversion counts, latencies, error rates, queue depths,
 //! and engine health metrics in Prometheus text format.
 
+use once_cell::sync::Lazy;
 use prometheus::{self, CounterVec, Encoder, Gauge, HistogramOpts, HistogramVec, TextEncoder, register};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+/// Global metrics instance - only registered once.
+pub static METRICS: Lazy<FolioMetrics> = Lazy::new(|| {
+    let metrics = FolioMetrics::new().expect("Failed to create Prometheus metrics");
+    metrics.init();
+    metrics
+});
+
 /// All Prometheus metrics for the Folio server.
+#[derive(Clone)]
 pub struct FolioMetrics {
     // Conversion metrics
     pub conversions_total: CounterVec,

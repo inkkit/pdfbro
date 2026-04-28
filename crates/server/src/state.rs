@@ -41,11 +41,11 @@ impl AppState {
         chromium: Arc<dyn PdfBackend>,
         libreoffice: Option<Arc<LibreOfficeEngine>>,
         config: ServerConfig,
-    ) -> Result<Self, prometheus::Error> {
+    ) -> Self {
         let sem = Arc::new(Semaphore::new(config.concurrency));
-        let metrics = Arc::new(FolioMetrics::new()?);
-        metrics.init();
-        Ok(Self {
+        // Use global metrics instance (registered once via Lazy)
+        let metrics = Arc::new((*crate::metrics::METRICS).clone());
+        Self {
             chromium,
             libreoffice,
             sem,
@@ -53,7 +53,7 @@ impl AppState {
             started_at: Instant::now(),
             webhook_queue: None,
             metrics,
-        })
+        }
     }
 
     /// Attach a webhook queue for async processing.
