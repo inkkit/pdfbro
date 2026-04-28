@@ -98,6 +98,24 @@ impl PdfBackend for MockBackend {
     async fn healthy(&self) -> bool {
         self.healthy
     }
+
+    async fn html_to_screenshot(
+        &self,
+        _html: &str,
+        _opts: &engine::ScreenshotOptions,
+    ) -> EngineResult<Vec<u8>> {
+        self.record();
+        self.produce()
+    }
+
+    async fn url_to_screenshot(
+        &self,
+        _url: &str,
+        _opts: &engine::ScreenshotOptions,
+    ) -> EngineResult<Vec<u8>> {
+        self.record();
+        self.produce()
+    }
 }
 
 fn clone_engine_error(e: &EngineError) -> EngineError {
@@ -116,6 +134,7 @@ fn clone_engine_error(e: &EngineError) -> EngineError {
         EngineError::Timeout(d) => EngineError::Timeout(*d),
         EngineError::Io(e) => EngineError::Io(std::io::Error::new(e.kind(), e.to_string())),
         EngineError::Internal(s) => EngineError::Internal(s.clone()),
+        EngineError::Pdf(s) => EngineError::Pdf(s.clone()),
     }
 }
 
