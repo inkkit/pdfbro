@@ -12,6 +12,7 @@ mod launch;
 mod markdown;
 mod pdf_params;
 mod render;
+mod screenshot;
 mod wait;
 
 use std::collections::HashMap;
@@ -194,6 +195,32 @@ impl ChromiumEngine {
     ) -> EngineResult<Vec<u8>> {
         let html = markdown::render(markdown_input);
         self.html_to_pdf(&html, None, opts, request).await
+    }
+
+    /// Screenshot an HTML string to a PNG or JPEG image.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::Cdp`] if CDP screenshot fails.
+    pub async fn html_to_screenshot(
+        &self,
+        html: &str,
+        opts: &screenshot::ScreenshotOptions,
+    ) -> EngineResult<Vec<u8>> {
+        screenshot::html_to_screenshot(self, html, opts).await
+    }
+
+    /// Screenshot a URL to a PNG or JPEG image.
+    ///
+    /// # Errors
+    ///
+    /// See [`ChromiumEngine::html_to_screenshot`].
+    pub async fn url_to_screenshot(
+        &self,
+        url: &str,
+        opts: &screenshot::ScreenshotOptions,
+    ) -> EngineResult<Vec<u8>> {
+        screenshot::url_to_screenshot(self, url, opts).await
     }
 
     /// Best-effort liveness probe.

@@ -67,6 +67,18 @@ pub fn build_router(state: AppState) -> Router {
             post(chromium::chromium_markdown),
         )
         .route(
+            "/forms/chromium/screenshot/html",
+            post(chromium::chromium_screenshot_html),
+        )
+        .route(
+            "/forms/chromium/screenshot/url",
+            post(chromium::chromium_screenshot_url),
+        )
+        .route(
+            "/forms/chromium/screenshot/markdown",
+            post(chromium::chromium_screenshot_markdown),
+        )
+        .route(
             "/forms/libreoffice/convert",
             post(libreoffice::libreoffice_convert),
         )
@@ -109,6 +121,14 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/forms/pdfengines/stamp",
             post(pdfengines::pdfengines_stamp),
+        )
+        .route(
+            "/forms/pdfengines/encrypt",
+            post(pdfengines::pdfengines_encrypt),
+        )
+        .route(
+            "/forms/pdfengines/decrypt",
+            post(pdfengines::pdfengines_decrypt),
         )
         .layer(
             ServiceBuilder::new()

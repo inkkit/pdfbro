@@ -11,7 +11,8 @@ use axum::body::Bytes;
 use axum::extract::{Multipart, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use engine::{Cookie, MediaType, PageRanges, PdfOptions, RequestContext, WaitCondition};
+use engine::{Cookie, MediaType, PageRanges, PdfOptions, RequestContext, WaitCondition, CaptureMode, ScreenshotFormat, ScreenshotOptions};
+use engine::chromium::screenshot::{html_to_screenshot, url_to_screenshot};
 
 use crate::error::{ApiError, ApiResult};
 use crate::multipart::FormFields;
@@ -466,6 +467,144 @@ fn file_url_for(path: &Path) -> String {
     } else {
         format!("file:///{s}")
     }
+}
+
+// ---------------------------------------------------------------------------
+// Screenshot handlers
+// ---------------------------------------------------------------------------
+
+/// `POST /forms/chromium/screenshot/html`.
+pub async fn chromium_screenshot_html(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+    let _permit = acquire_permit(&state).await?;
+    let form = FormFields::from_multipart(mp).await?;
+    let index = form
+        .find_named("files", INDEX_HTML)
+        .ok_or_else(|| ApiError::MissingFile(INDEX_HTML.to_string()))?;
+    let html = tokio::fs::read_to_string(&index.path)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    
+    let opts = parse_screenshot_options(&form.map)?;
+    let image = state.chromium.html_to_screenshot(&html, &opts).await?;
+    
+    let ext = opts.format.extension();
+    let filename = format!("screenshot.{}", ext);
+    
+    Ok(image_response(image, &filename, opts.format.content_type()))
+}
+
+/// `POST /forms/chromium/screenshot/url`.
+pub async fn chromium_screenshot_url(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+    let _permit = acquire_permit(&state).await?;
+    let form = FormFields::from_multipart(mp).await?;
+    let url = form.map.get("url").ok_or(ApiError::MissingField("url"))?;
+    
+    let opts = parse_screenshot_options(&form.map)?;
+    let image = state.chromium.url_to_screenshot(url, &opts).await?;
+    
+    let ext = opts.format.extension();
+    let filename = format!("screenshot.{}", ext);
+    
+    Ok(image_response(image, &filename, opts.format.content_type()))
+}
+
+/// `POST /forms/chromium/screenshot/markdown`.
+pub async fn chromium_screenshot_markdown(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+    let _permit = acquire_permit(&state).await?;
+    let form = FormFields::from_multipart(mp).await?;
+    let index = form
+        .find_named("files", "index.md")
+        .ok_or_else(|| ApiError::MissingFile("index.md".to_string()))?;
+    let md = tokio::fs::read_to_string(&index.path)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    
+    // Convert markdown to HTML
+    let html = render_markdown_to_html(&md);
+    
+    let opts = parse_screenshot_options(&form.map)?;
+    let image = state.chromium.html_to_screenshot(&html, &opts).await?;
+    
+    let ext = opts.format.extension();
+    let filename = format!("screenshot.{}", ext);
+    
+    Ok(image_response(image, &filename, opts.format.content_type()))
+}
+
+fn parse_screenshot_options(map: &HashMap<String, String>) -> ApiResult<ScreenshotOptions> {
+    let format = match map.get("format").map(|s| s.as_str()) {
+        Some("jpeg") | Some("jpg") => {
+            let quality = map.get("quality").and_then(|s| s.parse::<u8>().ok()).unwrap_or(80);
+            ScreenshotFormat::Jpeg { quality }
+        }
+        _ => ScreenshotFormat::Png,
+    };
+
+    let mode = match map.get("fullPage").map(|s| s.as_str()) {
+        Some("true") | Some("1") => CaptureMode::FullPage,
+        _ => CaptureMode::Viewport,
+    };
+
+    let width = map.get("width").and_then(|s| s.parse::<u32>().ok()).unwrap_or(1920);
+    let height = map.get("height").and_then(|s| s.parse::<u32>().ok()).unwrap_or(1080);
+    
+    let device_scale_factor = map.get("scale")
+        .and_then(|s| s.parse::<f32>().ok())
+        .unwrap_or(1.0);
+
+    Ok(ScreenshotOptions {
+        format,
+        mode,
+        width,
+        height,
+        device_scale_factor,
+        wait_condition: WaitCondition::Load,
+        extra_headers: HashMap::new(),
+        background_color: map.get("backgroundColor").cloned(),
+    })
+}
+
+fn image_response(data: Vec<u8>, filename: &str, content_type: &str) -> Response {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, content_type)
+        .header(header::CONTENT_DISPOSITION, format!("attachment; filename=\"{}\"", filename))
+        .body(data.into())
+        .unwrap()
+}
+
+fn render_markdown_to_html(md: &str) -> String {
+    use pulldown_cmark::{Parser, Options, html};
+    
+    let mut opts = Options::empty();
+    opts.insert(Options::ENABLE_TABLES);
+    opts.insert(Options::ENABLE_STRIKETHROUGH);
+    
+    let parser = Parser::new_ext(md, opts);
+    let mut html_output = String::new();
+    html::push_html(&mut html_output, parser);
+    
+    format!(
+        r#"<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; padding: 2em; max-width: 900px; margin: 0 auto; }}
+table {{ border-collapse: collapse; width: 100%; }}
+th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+th {{ background-color: #f2f2f2; }}
+code {{ background-color: #f4f4f4; padding: 2px 4px; border-radius: 3px; }}
+pre {{ background-color: #f4f4f4; padding: 16px; overflow-x: auto; border-radius: 5px; }}
+blockquote {{ border-left: 4px solid #ddd; padding-left: 16px; margin-left: 0; color: #666; }}
+</style>
+</head>
+<body>
+{}
+</body>
+</html>"#,
+        html_output
+    )
 }
 
 #[cfg(test)]
