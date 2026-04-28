@@ -44,6 +44,8 @@ pub struct FolioWorld {
 
     /// Response body bytes
     pub body: Option<Vec<u8>>,
+    /// Multiple responses from concurrent requests
+    pub concurrent_responses: Option<Vec<(u16, Vec<u8>)>>,
 
     /// Temporary directory for test files
     #[allow(dead_code)]
@@ -66,6 +68,7 @@ impl FolioWorld {
             status_code: None,
             response_headers: None,
             body: None,
+            concurrent_responses: None,
             temp_dir: tempfile::tempdir().unwrap(),
             base_url: None,
             server_process: None,

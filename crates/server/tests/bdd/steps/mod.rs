@@ -45,6 +45,17 @@ async fn make_request_with_form(
     http::make_request_with_form(world, method, endpoint, table).await;
 }
 
+#[when(regex = r#"^I make concurrent "(POST)" requests to "(.+)" with the following form data:$"#)]
+async fn make_concurrent_requests(
+    world: &mut FolioWorld,
+    method: String,
+    endpoint: String,
+    step: &cucumber::gherkin::Step,
+) {
+    let table = step.table.as_ref().expect("Expected form data table");
+    http::make_concurrent_requests(world, method, endpoint, table).await;
+}
+
 // =================================================================
 // Response assertion steps (Then)
 // =================================================================
@@ -52,6 +63,11 @@ async fn make_request_with_form(
 #[then(regex = r#"the response status code should be (\d+)"#)]
 async fn check_status_code(world: &mut FolioWorld, expected: u16) {
     http::check_status_code(world, expected).await;
+}
+
+#[then(regex = r#"^all responses should have status code (\d+)$"#)]
+async fn check_all_status_codes(world: &mut FolioWorld, expected: u16) {
+    http::check_all_status_codes(world, expected).await;
 }
 
 #[then(regex = r#"the response header "(.+)" should be "(.+)""#)]

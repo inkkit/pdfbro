@@ -250,3 +250,87 @@ fn assert_json_matches(expected: &serde_json::Value, actual: &serde_json::Value,
         }
     }
 }
+
+/// Step: When I make concurrent "POST" requests to "/forms/chromium/convert/html" with the following form data:
+/// Sends 10 concurrent requests and collects all responses.
+pub async fn make_concurrent_requests(world: &mut FolioWorld, _method: String, endpoint: String, table: &Table) {
+    let url = format!("{}{}", world.base_url.as_ref().unwrap(), endpoint);
+
+    // Store table data for rebuilding forms (Form doesn't implement Clone)
+    let table_rows: Vec<(String, String, String)> = table.rows.iter()
+        .filter(|row| row.len() >= 3)
+        .map(|row| (row[0].clone(), row[1].clone(), row[2].clone()))
+        .collect();
+
+    // Spawn 10 concurrent requests
+    let client = world.client.clone();
+    let mut handles = Vec::new();
+
+    for _ in 0..10 {
+        let client = client.clone();
+        let url = url.clone();
+        let rows = table_rows.clone();
+
+        let handle = tokio::spawn(async move {
+            // Rebuild form for this request
+            let mut form = reqwest::multipart::Form::new();
+            for (field_name, field_value, field_type) in rows {
+                match field_type.as_str() {
+                    "file" => {
+                        let file_path = format!("tests/bdd/testdata/{}", field_value);
+                        let content = match tokio::fs::read(&file_path).await {
+                            Ok(c) => c,
+                            Err(_) => return (0, Vec::new()),
+                        };
+                        let mime = guess_mime_type(&field_value);
+                        let part = reqwest::multipart::Part::bytes(content)
+                            .file_name(field_value)
+                            .mime_str(&mime)
+                            .unwrap();
+                        form = form.part(field_name, part);
+                    }
+                    "field" => {
+                        form = form.text(field_name, field_value);
+                    }
+                    _ => {}
+                }
+            }
+
+            let response = client
+                .post(&url)
+                .multipart(form)
+                .send()
+                .await;
+
+            match response {
+                Ok(resp) => {
+                    let status = resp.status().as_u16();
+                    let body = resp.bytes().await.unwrap_or_default().to_vec();
+                    (status, body)
+                }
+                Err(_) => (0, Vec::new()),
+            }
+        });
+        handles.push(handle);
+    }
+
+    // Collect all responses
+    let mut responses = Vec::new();
+    for handle in handles {
+        if let Ok(result) = handle.await {
+            responses.push(result);
+        }
+    }
+
+    world.concurrent_responses = Some(responses);
+}
+
+/// Step: Then all responses should have status code 200
+/// Verifies all concurrent responses have the expected status code.
+pub async fn check_all_status_codes(world: &mut FolioWorld, expected: u16) {
+    let responses = world.concurrent_responses.as_ref().expect("No concurrent responses available");
+
+    for (i, (status, _)) in responses.iter().enumerate() {
+        assert_eq!(*status, expected, "Response {} expected status {}, got {}", i, expected, status);
+    }
+}
