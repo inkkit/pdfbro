@@ -16,6 +16,11 @@ use support::world::FolioWorld;
 
 #[tokio::main]
 async fn main() {
-    // Run cucumber with default config - features auto-discovered from tests/bdd/features
-    FolioWorld::run("tests/bdd/features").await;
+    // cargo test passes libtest flags (e.g. --test-threads) to all test
+    // binaries. This custom harness uses default CLI options so those
+    // flags don't cause a clap error in cucumber's runner.
+    FolioWorld::cucumber()
+        .with_default_cli()
+        .run("tests/bdd/features")
+        .await;
 }
