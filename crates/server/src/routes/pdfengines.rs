@@ -27,7 +27,11 @@ const SPAWN_BLOCKING_THRESHOLD: usize = 1024 * 1024;
 // ---------------------------------------------------------------------------
 
 /// `POST /forms/pdfengines/merge`.
-pub async fn pdfengines_merge(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_merge(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -37,6 +41,43 @@ pub async fn pdfengines_merge(State(state): State<AppState>, mp: Multipart) -> A
             message: "merge requires at least two files".to_string(),
         });
     }
+
+    // Check for async webhook mode before processing.
+    tracing::info!("pdfengines_merge: extracting webhook config from headers");
+    match crate::webhook::extract_webhook_config(&headers) {
+        Ok(Some(config)) => {
+            tracing::info!("pdfengines_merge: webhook config found, sync_mode={}", config.sync_mode);
+            if !config.sync_mode {
+                let blobs = read_all(&files).await?;
+                if let Some(queue) = &state.webhook_queue {
+                    let job_id = crate::webhook::spawn_job(
+                        queue,
+                        crate::webhook::WebhookOperation::PdfMerge,
+                        config,
+                        crate::webhook::JobData::PdfMerge { files: blobs },
+                    )
+                    .await?;
+
+                    let body = serde_json::json!({ "job_id": job_id });
+                    let mut resp_headers = HeaderMap::new();
+                    resp_headers.insert(
+                        header::CONTENT_TYPE,
+                        HeaderValue::from_static("application/json"),
+                    );
+                    return Ok((StatusCode::ACCEPTED, resp_headers, axum::body::Body::from(body.to_string())).into_response());
+                }
+                tracing::warn!("pdfengines_merge: webhook config but no queue available");
+            }
+        }
+        Ok(None) => {
+            tracing::info!("pdfengines_merge: no webhook config");
+        }
+        Err(e) => {
+            tracing::warn!("pdfengines_merge: webhook config extraction failed: {}", e);
+            return Err(ApiError::Webhook(e.to_string()));
+        }
+    }
+
     let blobs = read_all(&files).await?;
     let total: usize = blobs.iter().map(Vec::len).sum();
     let merged = if total > SPAWN_BLOCKING_THRESHOLD {

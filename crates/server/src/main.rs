@@ -7,6 +7,7 @@ use anyhow::Context;
 use clap::Parser;
 use engine::{BrowserConfig, ChromiumEngine, LibreOfficeConfig, LibreOfficeEngine};
 use server::config::{Cli, Command, LogFormat};
+use server::webhook::{WebhookClient, WebhookQueue, start_workers};
 use server::{AppState, ChromiumBackend, ServerArgs, ServerConfig, build_router, shutdown};
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
@@ -44,11 +45,17 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
 
     let chromium_handle = chromium.clone();
     let backend = ChromiumBackend::new(chromium);
+
+    // Start webhook workers for async processing.
+    let (webhook_queue, webhook_rx) = WebhookQueue::new(100);
+    start_workers(webhook_rx, 2, WebhookClient::default());
+
     let state = AppState::new(
         Arc::new(backend),
         Some(Arc::new(libreoffice)),
         config.clone(),
-    );
+    )
+    .with_webhook_queue(webhook_queue);
 
     let router = build_router(state);
     let addr: SocketAddr = SocketAddr::new(config.host, config.port);
