@@ -110,6 +110,16 @@ pub enum LogFormat {
     Json,
 }
 
+impl LogFormat {
+    /// Return the format as a string slice suitable for `init_logging()`.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            LogFormat::Text => "text",
+            LogFormat::Json => "json",
+        }
+    }
+}
+
 /// Fully-resolved runtime configuration.
 ///
 /// Constructed via [`ServerConfig::resolve`]. All values are concrete; no

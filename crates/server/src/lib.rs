@@ -10,6 +10,7 @@ pub mod app;
 pub mod backend;
 pub mod config;
 pub mod error;
+pub mod logging;
 pub mod multipart;
 pub mod routes;
 pub mod shutdown;

@@ -23,6 +23,8 @@ use chromiumoxide::Browser;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 
+use tracing::{debug, info, instrument};
+
 use crate::types::{BrowserConfig, EngineError, EngineResult, PdfOptions};
 
 // ---------------------------------------------------------------------------
@@ -115,6 +117,15 @@ pub struct Cookie {
 // ---------------------------------------------------------------------------
 
 impl ChromiumEngine {
+    /// Return a tracing span for this engine instance, tagged with
+    /// `engine="chromium"`.
+    pub fn logger(&self) -> tracing::Span {
+        tracing::info_span!(
+            "engine",
+            engine = "chromium",
+        )
+    }
+
     /// Launch a new Chrome / Chromium instance with default
     /// [`BrowserConfig`].
     ///
@@ -152,6 +163,7 @@ impl ChromiumEngine {
     /// [`EngineError::Navigation`] if the base URL fails to load or
     /// `request.fail_on_status` matches; [`EngineError::Timeout`] if the
     /// render exceeds `BrowserConfig::timeout`.
+    #[instrument(skip_all, fields(url = "<html>", len = html.len()))]
     pub async fn html_to_pdf(
         &self,
         html: &str,
@@ -159,7 +171,23 @@ impl ChromiumEngine {
         opts: &PdfOptions,
         request: &RequestContext,
     ) -> EngineResult<Vec<u8>> {
-        render::html_to_pdf(self, html, base_url, opts, request).await
+        let _span = self.logger();
+        debug!("Starting HTML to PDF conversion");
+        let start = std::time::Instant::now();
+        let result = render::html_to_pdf(self, html, base_url, opts, request).await;
+        let duration = start.elapsed();
+        match &result {
+            Ok(_) => info!(
+                duration_ms = duration.as_millis() as u64,
+                "HTML to PDF conversion completed"
+            ),
+            Err(e) => tracing::error!(
+                duration_ms = duration.as_millis() as u64,
+                error = %e,
+                "HTML to PDF conversion failed"
+            ),
+        }
+        result
     }
 
     /// Navigate to `url` and render the resulting page to a PDF byte
@@ -168,13 +196,30 @@ impl ChromiumEngine {
     /// # Errors
     ///
     /// See [`ChromiumEngine::html_to_pdf`].
+    #[instrument(skip_all, fields(url = %url))]
     pub async fn url_to_pdf(
         &self,
         url: &str,
         opts: &PdfOptions,
         request: &RequestContext,
     ) -> EngineResult<Vec<u8>> {
-        render::url_to_pdf(self, url, opts, request).await
+        let _span = self.logger();
+        debug!("Starting URL to PDF conversion");
+        let start = std::time::Instant::now();
+        let result = render::url_to_pdf(self, url, opts, request).await;
+        let duration = start.elapsed();
+        match &result {
+            Ok(_) => info!(
+                duration_ms = duration.as_millis() as u64,
+                "URL to PDF conversion completed"
+            ),
+            Err(e) => tracing::error!(
+                duration_ms = duration.as_millis() as u64,
+                error = %e,
+                "URL to PDF conversion failed"
+            ),
+        }
+        result
     }
 
     /// Convert a Markdown string to a PDF byte stream.
@@ -187,12 +232,15 @@ impl ChromiumEngine {
     /// # Errors
     ///
     /// See [`ChromiumEngine::html_to_pdf`].
+    #[instrument(skip_all, fields(len = markdown_input.len()))]
     pub async fn markdown_to_pdf(
         &self,
         markdown_input: &str,
         opts: &PdfOptions,
         request: &RequestContext,
     ) -> EngineResult<Vec<u8>> {
+        let _span = self.logger();
+        info!("Starting Markdown to PDF conversion");
         let html = markdown::render(markdown_input);
         self.html_to_pdf(&html, None, opts, request).await
     }
@@ -202,11 +250,14 @@ impl ChromiumEngine {
     /// # Errors
     ///
     /// Returns [`EngineError::Cdp`] if CDP screenshot fails.
+    #[instrument(skip_all, fields(len = html.len()))]
     pub async fn html_to_screenshot(
         &self,
         html: &str,
         opts: &screenshot::ScreenshotOptions,
     ) -> EngineResult<Vec<u8>> {
+        let _span = self.logger();
+        info!("Starting HTML to screenshot");
         screenshot::html_to_screenshot(self, html, opts).await
     }
 
@@ -215,11 +266,14 @@ impl ChromiumEngine {
     /// # Errors
     ///
     /// See [`ChromiumEngine::html_to_screenshot`].
+    #[instrument(skip_all, fields(url = %url))]
     pub async fn url_to_screenshot(
         &self,
         url: &str,
         opts: &screenshot::ScreenshotOptions,
     ) -> EngineResult<Vec<u8>> {
+        let _span = self.logger();
+        info!("Starting URL to screenshot");
         screenshot::url_to_screenshot(self, url, opts).await
     }
 
@@ -257,7 +311,9 @@ impl ChromiumEngine {
     ///
     /// Returns [`EngineError::Cdp`] if Chrome reports an error while
     /// closing. The browser is dropped regardless.
+    #[instrument(skip_all)]
     pub async fn shutdown(self) -> EngineResult<()> {
+        info!("Starting Chromium engine shutdown");
         // Mark shutdown first so concurrent renders can interpret CDP
         // errors as intentional teardown.
         let was_running = !self.inner.is_shutdown.swap(true, Ordering::SeqCst);
@@ -284,8 +340,10 @@ impl ChromiumEngine {
         }
 
         if was_running && let Some(e) = close_err {
+            tracing::error!(error = %e, "Chromium close error");
             return Err(EngineError::Cdp(e.to_string()));
         }
+        info!("Chromium engine shutdown complete");
         Ok(())
     }
 }

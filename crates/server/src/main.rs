@@ -6,11 +6,11 @@ use std::sync::Arc;
 use anyhow::Context;
 use clap::Parser;
 use engine::{BrowserConfig, ChromiumEngine, LibreOfficeConfig, LibreOfficeEngine};
-use server::config::{Cli, Command, LogFormat};
+use server::config::{Cli, Command};
+use server::logging::init_logging;
 use server::webhook::{WebhookClient, WebhookQueue, start_workers};
 use server::{AppState, ChromiumBackend, ServerArgs, ServerConfig, build_router, shutdown};
 use tokio::net::TcpListener;
-use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -22,7 +22,8 @@ async fn main() -> anyhow::Result<()> {
 
 async fn serve(args: ServerArgs) -> anyhow::Result<()> {
     let config = ServerConfig::from_args(&args).context("config resolution")?;
-    init_tracing(&config);
+    init_logging(config.log_format.as_str(), &config.log_level)
+        .context("logging initialization")?;
 
     tracing::info!(
         host = %config.host,
@@ -79,43 +80,6 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
 
     tracing::info!("folio-server exited cleanly");
     Ok(())
-}
-
-/// Writer that silently drops `BrokenPipe` errors so `tracing` doesn't
-/// complain when its stdout pipe is closed (e.g. during test-harness
-/// shutdown).
-#[derive(Clone)]
-struct PipeSafeWriter;
-
-impl std::io::Write for PipeSafeWriter {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        match std::io::stdout().write(buf) {
-            Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => Ok(buf.len()),
-            other => other,
-        }
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        match std::io::stdout().flush() {
-            Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
-            other => other,
-        }
-    }
-}
-
-fn init_tracing(config: &ServerConfig) {
-    let filter = EnvFilter::try_new(&config.log_level).unwrap_or_else(|_| EnvFilter::new("info"));
-    let builder = tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_writer(|| PipeSafeWriter);
-    match config.log_format {
-        LogFormat::Json => {
-            let _ = builder.json().try_init();
-        }
-        LogFormat::Text => {
-            let _ = builder.try_init();
-        }
-    }
 }
 
 fn browser_config_from(config: &ServerConfig) -> BrowserConfig {

@@ -17,6 +17,8 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Semaphore;
 
+use tracing::{debug, info, instrument};
+
 use crate::types::{EngineError, EngineResult, PageRanges};
 
 // ---------------------------------------------------------------------------
@@ -77,6 +79,15 @@ impl Default for LibreOfficeConfig {
 }
 
 impl LibreOfficeEngine {
+    /// Return a tracing span for this engine instance, tagged with
+    /// `engine="libreoffice"`.
+    pub fn logger(&self) -> tracing::Span {
+        tracing::info_span!(
+            "engine",
+            engine = "libreoffice",
+        )
+    }
+
     /// Discover `soffice` on `$PATH` and platform defaults using
     /// [`LibreOfficeConfig::default`].
     pub async fn discover() -> EngineResult<Self> {
@@ -88,7 +99,9 @@ impl LibreOfficeEngine {
     /// If `config.executable` is `Some`, the path is required to exist;
     /// otherwise auto-discovery is performed. The chosen executable is then
     /// probed (`--headless --version`) before the engine is returned.
+    #[instrument(skip(config), fields(executable = ?config.executable))]
     pub async fn launch(config: LibreOfficeConfig) -> EngineResult<Self> {
+        info!("Launching LibreOffice engine");
         let exe = match config.executable {
             Some(p) => {
                 if !p.exists() {
@@ -105,6 +118,7 @@ impl LibreOfficeEngine {
         discover::probe(&exe, config.timeout).await?;
 
         let max = config.max_concurrency.max(1);
+        info!(executable = %exe.display(), timeout = ?config.timeout, max_concurrency = max, "LibreOffice engine launched");
         Ok(Self {
             inner: Arc::new(Inner {
                 exe,
@@ -120,7 +134,9 @@ impl LibreOfficeEngine {
     /// [`filter::for_extension`] for the dispatch table. Concurrent calls
     /// are gated by `max_concurrency` and each gets a fresh
     /// `UserInstallation` directory.
+    #[instrument(skip_all, fields(input = %input.display()))]
     pub async fn convert(&self, input: &Path, opts: &OfficeOptions) -> EngineResult<Vec<u8>> {
+        let _span = self.logger();
         opts.validate()?;
         if !input.exists() {
             return Err(EngineError::Io(std::io::Error::new(
@@ -134,7 +150,22 @@ impl LibreOfficeEngine {
             .acquire()
             .await
             .map_err(|e| EngineError::Internal(format!("semaphore closed: {e}")))?;
-        convert::run_convert(&self.inner.exe, self.inner.timeout, input, opts).await
+        debug!("Starting LibreOffice conversion");
+        let start = std::time::Instant::now();
+        let result = convert::run_convert(&self.inner.exe, self.inner.timeout, input, opts).await;
+        let duration = start.elapsed();
+        match &result {
+            Ok(_) => info!(
+                duration_ms = duration.as_millis() as u64,
+                "LibreOffice conversion completed"
+            ),
+            Err(e) => tracing::error!(
+                duration_ms = duration.as_millis() as u64,
+                error = %e,
+                "LibreOffice conversion failed"
+            ),
+        }
+        result
     }
 
     /// Convert many inputs in parallel (bounded by `max_concurrency`),
@@ -142,6 +173,7 @@ impl LibreOfficeEngine {
     ///
     /// Merging into a single PDF is **not** part of this API — call
     /// `engine::pdfops::merge` (spec 13) on the result if needed.
+    #[instrument(skip_all)]
     pub async fn convert_many(
         &self,
         inputs: &[PathBuf],
@@ -182,6 +214,7 @@ impl LibreOfficeEngine {
                 }
             }
         }
+        info!(count = inputs.len(), "convert_many completed");
         Ok(out)
     }
 

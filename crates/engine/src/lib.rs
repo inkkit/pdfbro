@@ -8,6 +8,7 @@ pub mod bookmarks;
 pub mod chromium;
 pub mod encrypt;
 pub mod libreoffice;
+pub mod logging;
 pub mod pdfa;
 pub mod pdfops;
 pub mod types;
