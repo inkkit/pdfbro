@@ -12,6 +12,7 @@ use tokio::sync::Semaphore;
 
 use crate::ServerConfig;
 use crate::backend::PdfBackend;
+use crate::webhook::WebhookQueue;
 
 /// Per-process server state.
 #[derive(Clone)]
@@ -26,6 +27,8 @@ pub struct AppState {
     pub config: Arc<ServerConfig>,
     /// Process start time, for `/health` uptime reporting.
     pub started_at: Instant,
+    /// Webhook job queue; `None` when webhook workers are not started.
+    pub webhook_queue: Option<WebhookQueue>,
 }
 
 impl AppState {
@@ -42,7 +45,14 @@ impl AppState {
             sem,
             config: Arc::new(config),
             started_at: Instant::now(),
+            webhook_queue: None,
         }
+    }
+
+    /// Attach a webhook queue for async processing.
+    pub fn with_webhook_queue(mut self, queue: WebhookQueue) -> Self {
+        self.webhook_queue = Some(queue);
+        self
     }
 }
 

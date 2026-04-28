@@ -60,9 +60,19 @@ pub enum EngineError {
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// A PDF parsing/manipulation error.
+    #[error("pdf error: {0}")]
+    Pdf(String),
+
     /// A bug or unhandled internal condition.
     #[error("internal error: {0}")]
     Internal(String),
+}
+
+impl From<lopdf::Error> for EngineError {
+    fn from(e: lopdf::Error) -> Self {
+        EngineError::Pdf(e.to_string())
+    }
 }
 
 /// Convenience alias for results returned by engine operations.
@@ -283,6 +293,38 @@ impl PageRanges {
     /// View the underlying parsed segments.
     pub fn as_slice(&self) -> &[PageRange] {
         &self.0
+    }
+
+    /// Expand this expression into a sorted, deduplicated list of 1-indexed
+    /// page numbers that are within `1..=total`.
+    pub fn expand(&self, total: u32) -> Vec<u32> {
+        use std::collections::BTreeSet;
+        let mut pages = BTreeSet::new();
+        for r in &self.0 {
+            match *r {
+                PageRange::Single(n) => {
+                    if (1..=total).contains(&n) {
+                        pages.insert(n);
+                    }
+                }
+                PageRange::Closed(a, b) => {
+                    let lo = a.max(1);
+                    let hi = b.min(total);
+                    if lo <= hi {
+                        for p in lo..=hi {
+                            pages.insert(p);
+                        }
+                    }
+                }
+                PageRange::OpenEnd(a) => {
+                    let lo = a.max(1);
+                    for p in lo..=total {
+                        pages.insert(p);
+                    }
+                }
+            }
+        }
+        pages.into_iter().collect()
     }
 }
 

@@ -2,14 +2,11 @@
 //!
 //! Implements spec 15 — Webhook System.
 
-use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use axum::http::{HeaderMap, HeaderValue, header};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{Mutex, mpsc};
 use tracing::{error, info, warn};
 
 mod config;
@@ -60,7 +57,7 @@ impl WebhookOperation {
 }
 
 /// Job status.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum JobStatus {
     /// Job completed successfully.
@@ -105,43 +102,72 @@ pub struct WebhookJob {
 /// Job data types.
 #[derive(Debug, Clone)]
 pub enum JobData {
+    /// Chromium HTML conversion job.
     ChromiumHtml {
+        /// Raw HTML bytes.
         html: Vec<u8>,
+        /// Conversion options (JSON).
         options: serde_json::Value,
     },
+    /// Chromium URL conversion job.
     ChromiumUrl {
+        /// Target URL.
         url: String,
+        /// Conversion options (JSON).
         options: serde_json::Value,
     },
+    /// Chromium Markdown conversion job.
     ChromiumMarkdown {
+        /// Raw Markdown bytes.
         markdown: Vec<u8>,
+        /// Conversion options (JSON).
         options: serde_json::Value,
     },
+    /// LibreOffice conversion job.
     LibreOffice {
+        /// Source file bytes.
         file: Vec<u8>,
+        /// Conversion options (JSON).
         options: serde_json::Value,
+        /// Original filename.
         filename: String,
     },
+    /// PDF merge job.
     PdfMerge {
+        /// Files to merge.
         files: Vec<Vec<u8>>,
     },
+    /// PDF split job.
     PdfSplit {
+        /// Source file bytes.
         file: Vec<u8>,
+        /// Split mode (e.g. "pages").
         mode: String,
+        /// Page span expression.
         span: Option<String>,
     },
+    /// PDF flatten job.
     PdfFlatten {
+        /// Source file bytes.
         file: Vec<u8>,
     },
+    /// PDF metadata read job.
     PdfMetadataRead {
+        /// Source file bytes.
         file: Vec<u8>,
     },
+    /// PDF metadata write job.
     PdfMetadataWrite {
+        /// Source file bytes.
         file: Vec<u8>,
+        /// Metadata to write (JSON).
         metadata: serde_json::Value,
     },
+    /// PDF/A conversion job.
     PdfConvert {
+        /// Source file bytes.
         file: Vec<u8>,
+        /// Target PDF/A profile string.
         profile: String,
     },
 }
@@ -211,7 +237,7 @@ impl WebhookClient {
         let mut headers = HeaderMap::new();
         headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
         headers.insert(
-            HeaderValue::from_static("gotenberg-trace"),
+            "gotenberg-trace",
             HeaderValue::from_str(&result.job_id)?,
         );
 
@@ -223,7 +249,7 @@ impl WebhookClient {
         request = request.headers(headers);
 
         // Build body
-        let body = if let Some(pdf) = pdf_data {
+        let _body = if let Some(pdf) = pdf_data {
             // Multipart with JSON metadata and PDF file
             let form = reqwest::multipart::Form::new()
                 .text("metadata", serde_json::to_string(result)?)
@@ -254,18 +280,30 @@ impl WebhookClient {
 /// Webhook errors.
 #[derive(Debug, thiserror::Error)]
 pub enum WebhookError {
+    /// Invalid webhook URL.
     #[error("Invalid webhook URL: {0}")]
     InvalidUrl(String),
+    /// SSRF protection blocked the URL.
     #[error("SSRF protection: URL not allowed: {0}")]
     SsrfProtection(String),
+    /// HTTP client error.
     #[error("HTTP error: {0}")]
     Http(#[from] reqwest::Error),
+    /// Non-success HTTP status.
     #[error("HTTP error status {status}: {body}")]
-    HttpStatus { status: reqwest::StatusCode, body: String },
+    HttpStatus {
+        /// HTTP status code.
+        status: reqwest::StatusCode,
+        /// Response body.
+        body: String,
+    },
+    /// Delivery failed after retries.
     #[error("Delivery failed: {0}")]
     Delivery(String),
+    /// Invalid HTTP header value.
     #[error("Invalid header value: {0}")]
     InvalidHeader(#[from] axum::http::header::InvalidHeaderValue),
+    /// JSON serialization error.
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 }
@@ -309,7 +347,7 @@ pub async fn process_webhook_job(
 }
 
 /// Execute the actual job operation.
-async fn execute_job(job: &WebhookJob) -> (Result<(), String>, Option<Vec<u8>>) {
+async fn execute_job(_job: &WebhookJob) -> (Result<(), String>, Option<Vec<u8>>) {
     // This would integrate with the engine functions
     // For now, return a placeholder that always succeeds
     (Ok(()), None)

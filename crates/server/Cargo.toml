@@ -52,6 +52,9 @@ humantime = { workspace = true }
 reqwest = { workspace = true, features = ["json", "multipart"] }
 url = { workspace = true }
 
+# PDF inspection (page counts for split expansion)
+lopdf = { workspace = true }
+
 # CLI
 clap = { workspace = true }
 
@@ -60,3 +63,17 @@ tower = { workspace = true, features = ["util"] }
 reqwest = { workspace = true }
 static_assertions = { workspace = true }
 lopdf = { workspace = true }
+zip = { workspace = true }
+
+# BDD testing
+cucumber = "0.21"
+http = "1"
+hyper = { version = "0.14", features = ["full"] }
+
+# Conditional Docker support for BDD tests
+# Note: Set FOLIO_BDD_SKIP_DOCKER=1 to skip Docker-based tests
+testcontainers = "0.22"
+
+[[test]]
+name = "bdd"
+harness = false

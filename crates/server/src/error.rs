@@ -42,6 +42,8 @@ pub enum ApiError {
     UnsupportedMediaType,
     /// Catch-all for unexpected internal failures.
     Internal(String),
+    /// Webhook configuration or delivery error.
+    Webhook(String),
 }
 
 impl ApiError {
@@ -59,6 +61,7 @@ impl ApiError {
                 (StatusCode::UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_MEDIA_TYPE")
             }
             ApiError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL"),
+            ApiError::Webhook(_) => (StatusCode::BAD_REQUEST, "WEBHOOK_ERROR"),
         }
     }
 
@@ -103,6 +106,7 @@ impl ApiError {
                 "code": code,
             }),
             ApiError::Internal(msg) => json!({ "error": msg, "code": code }),
+            ApiError::Webhook(msg) => json!({ "error": msg, "code": code }),
         }
     }
 }
@@ -119,6 +123,7 @@ impl std::fmt::Display for ApiError {
             ApiError::BodyTooLarge => write!(f, "request body too large"),
             ApiError::UnsupportedMediaType => write!(f, "unsupported media type"),
             ApiError::Internal(m) => write!(f, "internal: {m}"),
+            ApiError::Webhook(m) => write!(f, "webhook: {m}"),
         }
     }
 }
@@ -139,6 +144,12 @@ impl From<EngineError> for ApiError {
     }
 }
 
+impl From<crate::webhook::WebhookError> for ApiError {
+    fn from(e: crate::webhook::WebhookError) -> Self {
+        ApiError::Webhook(e.to_string())
+    }
+}
+
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, _) = self.status_and_code();
@@ -156,7 +167,7 @@ fn engine_status_and_code(e: &EngineError) -> (StatusCode, &'static str) {
         EngineError::ChromeNotFound { .. } | EngineError::ChromeLaunch(_) => {
             (StatusCode::INTERNAL_SERVER_ERROR, "ENGINE_UNAVAILABLE")
         }
-        EngineError::Cdp(_) | EngineError::Internal(_) | EngineError::Io(_) => {
+        EngineError::Cdp(_) | EngineError::Internal(_) | EngineError::Io(_) | EngineError::Pdf(_) => {
             (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL")
         }
     }

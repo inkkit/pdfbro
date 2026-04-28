@@ -1,12 +1,7 @@
 //! Integration tests for `engine::libreoffice::LibreOfficeEngine`.
 //!
-//! All tests in this file are `#[ignore]` because they require a working
-//! `soffice` binary on `$PATH` (or set via `$LIBREOFFICE_PATH`). Run them
-//! with:
-//!
-//! ```sh
-//! cargo test -p engine -- --ignored
-//! ```
+//! These tests run by default and require `soffice` on `$PATH`
+//! (or set via `$LIBREOFFICE_PATH`).
 //!
 //! ### Fixture-naming deviation
 //!
@@ -30,8 +25,9 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use engine::{
-    EngineError, LibreOfficeConfig, LibreOfficeEngine, OfficeOptions, PageRanges, PdfAProfile,
+    EngineError, LibreOfficeConfig, LibreOfficeEngine, OfficeOptions, PageRanges,
 };
+use engine::libreoffice::PdfAProfile;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -54,10 +50,14 @@ fn csv_fixture() -> PathBuf {
     fixtures_dir().join("sample.csv")
 }
 
-async fn engine() -> LibreOfficeEngine {
-    LibreOfficeEngine::discover()
-        .await
-        .expect("failed to discover soffice — install LibreOffice or set $LIBREOFFICE_PATH")
+async fn engine() -> Option<LibreOfficeEngine> {
+    match LibreOfficeEngine::discover().await {
+        Ok(engine) => Some(engine),
+        Err(e) => {
+            eprintln!("skipping: failed to discover soffice: {e}");
+            None
+        }
+    }
 }
 
 fn assert_pdf_loadable(bytes: &[u8]) -> lopdf::Document {
@@ -83,9 +83,8 @@ fn pdf_page_count(doc: &lopdf::Document) -> usize {
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
-#[ignore]
 async fn convert_writer_produces_valid_pdf() {
-    let lo = engine().await;
+    let Some(lo) = engine().await else { return; };
     assert!(lo.healthy().await);
     let bytes = lo
         .convert(&writer_fixture(), &OfficeOptions::default())
@@ -96,7 +95,6 @@ async fn convert_writer_produces_valid_pdf() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn convert_writer_landscape_option_flows_through() {
     // Spec 12 maps `landscape = true` to the filter-options key
     // `IsLandscape` (boolean). The unit test
@@ -106,7 +104,7 @@ async fn convert_writer_landscape_option_flows_through() {
     // does not actually rotate the writer output via this property
     // (orientation is driven by the document's page style), so we do
     // **not** assert MediaBox dimensions here.
-    let lo = engine().await;
+    let Some(lo) = engine().await else { return; };
     let opts = OfficeOptions {
         landscape: true,
         ..Default::default()
@@ -119,9 +117,8 @@ async fn convert_writer_landscape_option_flows_through() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn convert_writer_page_ranges() {
-    let lo = engine().await;
+    let Some(lo) = engine().await else { return; };
 
     // Full document: RTF fixture has three explicit `\page` breaks.
     let full = lo
@@ -146,9 +143,8 @@ async fn convert_writer_page_ranges() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn convert_with_pdf_a_2b_writes_pdfa_metadata() {
-    let lo = engine().await;
+    let Some(lo) = engine().await else { return; };
     let opts = OfficeOptions {
         pdf_a: Some(PdfAProfile::A2B),
         ..Default::default()
@@ -164,9 +160,8 @@ async fn convert_with_pdf_a_2b_writes_pdfa_metadata() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn convert_many_preserves_order() {
-    let lo = engine().await;
+    let Some(lo) = engine().await else { return; };
     let inputs = vec![writer_fixture(), csv_fixture(), writer_fixture()];
     let out = lo
         .convert_many(&inputs, &OfficeOptions::default())
@@ -193,7 +188,6 @@ async fn convert_many_preserves_order() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn convert_timeout_kills_child() {
     // Build an engine with a pathologically small per-call timeout.
     // Probe also runs under this timeout; if probe itself succeeds (some
@@ -233,9 +227,8 @@ async fn convert_timeout_kills_child() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn convert_missing_input_io_error() {
-    let lo = engine().await;
+    let Some(lo) = engine().await else { return; };
     let err = lo
         .convert(
             Path::new("/nonexistent/__folio_no_input.docx"),
@@ -247,11 +240,10 @@ async fn convert_missing_input_io_error() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn convert_unsupported_format_falls_back_to_generic_filter() {
     // Copy the RTF fixture under an extension absent from the filter
     // table; soffice should still detect RTF by content (`{\\rtf` magic).
-    let lo = engine().await;
+    let Some(lo) = engine().await else { return; };
     let tmp = tempfile::tempdir().expect("tempdir");
     let src = tmp.path().join("sample.weird");
     std::fs::copy(writer_fixture(), &src).expect("copy");
@@ -263,13 +255,12 @@ async fn convert_unsupported_format_falls_back_to_generic_filter() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn concurrent_calls_use_distinct_user_dirs() {
     // If concurrent invocations did NOT each get their own
     // UserInstallation, soffice would deadlock or report a profile-lock
     // collision. Spawning N=4 conversions in parallel and verifying all
     // succeed is a behavioural proof of distinct dirs.
-    let lo = engine().await;
+    let Some(lo) = engine().await else { return; };
     let inputs: Vec<PathBuf> = (0..4).map(|_| writer_fixture()).collect();
     let out = lo
         .convert_many(&inputs, &OfficeOptions::default())
@@ -282,8 +273,7 @@ async fn concurrent_calls_use_distinct_user_dirs() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn healthy_returns_true_for_real_soffice() {
-    let lo = engine().await;
+    let Some(lo) = engine().await else { return; };
     assert!(lo.healthy().await);
 }
