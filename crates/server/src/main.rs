@@ -81,9 +81,33 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Writer that silently drops `BrokenPipe` errors so `tracing` doesn't
+/// complain when its stdout pipe is closed (e.g. during test-harness
+/// shutdown).
+#[derive(Clone)]
+struct PipeSafeWriter;
+
+impl std::io::Write for PipeSafeWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match std::io::stdout().write(buf) {
+            Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => Ok(buf.len()),
+            other => other,
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        match std::io::stdout().flush() {
+            Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
+            other => other,
+        }
+    }
+}
+
 fn init_tracing(config: &ServerConfig) {
     let filter = EnvFilter::try_new(&config.log_level).unwrap_or_else(|_| EnvFilter::new("info"));
-    let builder = tracing_subscriber::fmt().with_env_filter(filter);
+    let builder = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_writer(|| PipeSafeWriter);
     match config.log_format {
         LogFormat::Json => {
             let _ = builder.json().try_init();
