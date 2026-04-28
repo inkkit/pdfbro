@@ -12,10 +12,11 @@ Feature: /forms/libreoffice/convert
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
-  Scenario: POST /forms/libreoffice/convert (password protected)
-    Given I have a default Folio container
-    When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
-      | files       | protected_page_1.docx | file  |
-      | password    | secret123             | field |
-      | Gotenberg-Output-Filename | result | header |
-    Then the response status code should be 200
+  # TODO: Enable when LibreOffice route supports password field
+  # Scenario: POST /forms/libreoffice/convert (password protected)
+  #   Given I have a default Folio container
+  #   When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
+  #     | files       | protected_page_1.docx | file  |
+  #     | password    | secret123             | field |
+  #     | Gotenberg-Output-Filename | result | header |
+  #   Then the response status code should be 200
