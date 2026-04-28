@@ -19,6 +19,9 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 which = "7"
 
+# Image processing for watermark
+image = { workspace = true }
+
 [dev-dependencies]
 axum = { workspace = true }
 proptest = { workspace = true }

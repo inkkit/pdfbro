@@ -17,6 +17,7 @@ use engine::Bookmark;
 use engine::PdfAProfile;
 use engine::bookmarks::{read_bookmarks, write_bookmarks};
 use engine::pdfa::convert_to_pdfa;
+use engine::pdfops::{WatermarkKind, WatermarkOptions, Position as WatermarkPosition, watermark};
 
 const SPAWN_BLOCKING_THRESHOLD: usize = 1024 * 1024;
 
@@ -453,6 +454,131 @@ pub async fn pdfengines_bookmarks_write(State(state): State<AppState>, mp: Multi
         .unwrap_or_else(|| "document.pdf".to_string());
 
     Ok(pdf_response(output, &filename))
+}
+
+// ---------------------------------------------------------------------------
+// /forms/pdfengines/watermark and /stamp
+// ---------------------------------------------------------------------------
+
+/// `POST /forms/pdfengines/watermark` - Apply watermark (behind content).
+pub async fn pdfengines_watermark(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+    let _permit = acquire_permit(&state).await?;
+    let form = FormFields::from_multipart(mp).await?;
+    let files = form.files_by_field("files");
+    if files.len() != 1 {
+        return Err(ApiError::InvalidField {
+            field: "files",
+            message: "watermark expects exactly one file".to_string(),
+        });
+    }
+    let pdf_bytes = read_one(files[0]).await?;
+
+    // Parse watermark text
+    let text = form.map.get("watermark")
+        .or_else(|| form.map.get("text"))
+        .ok_or(ApiError::MissingField("watermark"))?;
+
+    let opts = parse_watermark_options(&form.map, WatermarkKind::Text {
+        text: text.clone(),
+        font_size: 48.0,
+        color: [0.5, 0.5, 0.5, 0.5],
+    })?;
+
+    let output = tokio::task::spawn_blocking(move || watermark(&pdf_bytes, &opts))
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let filename = form
+        .map
+        .get(" Gotenberg-Output-Filename")
+        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
+        .unwrap_or_else(|| "result.pdf".to_string());
+
+    Ok(pdf_response(output, &filename))
+}
+
+/// `POST /forms/pdfengines/stamp` - Apply stamp (in front of content).
+pub async fn pdfengines_stamp(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+    let _permit = acquire_permit(&state).await?;
+    let form = FormFields::from_multipart(mp).await?;
+    let files = form.files_by_field("files");
+    if files.len() != 1 {
+        return Err(ApiError::InvalidField {
+            field: "files",
+            message: "stamp expects exactly one file".to_string(),
+        });
+    }
+    let pdf_bytes = read_one(files[0]).await?;
+
+    // Parse stamp text
+    let text = form.map.get("stamp")
+        .or_else(|| form.map.get("text"))
+        .ok_or(ApiError::MissingField("stamp"))?;
+
+    let opts = parse_watermark_options(&form.map, WatermarkKind::Text {
+        text: text.clone(),
+        font_size: 48.0,
+        color: [0.5, 0.5, 0.5, 0.5],
+    })?;
+
+    let output = tokio::task::spawn_blocking(move || watermark(&pdf_bytes, &opts))
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let filename = form
+        .map
+        .get(" Gotenberg-Output-Filename")
+        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
+        .unwrap_or_else(|| "result.pdf".to_string());
+
+    Ok(pdf_response(output, &filename))
+}
+
+fn parse_watermark_options(
+    form: &HashMap<String, String>,
+    kind: WatermarkKind,
+) -> Result<WatermarkOptions, ApiError> {
+    let opacity = form.get("opacity")
+        .and_then(|s| s.parse::<f32>().ok())
+        .unwrap_or(0.5);
+
+    let rotation = form.get("rotation")
+        .and_then(|s| s.parse::<f32>().ok())
+        .unwrap_or(0.0);
+
+    let position = form.get("position")
+        .and_then(|s| match s.as_str() {
+            "center" => Some(WatermarkPosition::Center),
+            "top-left" => Some(WatermarkPosition::TopLeft),
+            "top-center" => Some(WatermarkPosition::TopCenter),
+            "top-right" => Some(WatermarkPosition::TopRight),
+            "middle-left" => Some(WatermarkPosition::MiddleLeft),
+            "middle-right" => Some(WatermarkPosition::MiddleRight),
+            "bottom-left" => Some(WatermarkPosition::BottomLeft),
+            "bottom-center" => Some(WatermarkPosition::BottomCenter),
+            "bottom-right" => Some(WatermarkPosition::BottomRight),
+            _ => None,
+        })
+        .unwrap_or(WatermarkPosition::Center);
+
+    let all_pages = form.get("pages")
+        .map(|s| s == "all")
+        .unwrap_or(true);
+
+    let tiled = form.get("tiled")
+        .map(|s| s == "true")
+        .unwrap_or(false);
+
+    Ok(WatermarkOptions {
+        kind,
+        opacity,
+        rotation_deg: rotation,
+        position,
+        all_pages,
+        tiled,
+    })
 }
 
 #[cfg(test)]
