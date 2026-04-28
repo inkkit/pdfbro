@@ -13,7 +13,9 @@ use crate::multipart::{FormFields, UploadedFile};
 use crate::routes::chromium::{pdf_response, zip_response};
 use crate::routes::libreoffice::build_zip;
 use crate::state::AppState;
+use engine::Bookmark;
 use engine::PdfAProfile;
+use engine::bookmarks::{read_bookmarks, write_bookmarks};
 use engine::pdfa::convert_to_pdfa;
 
 const SPAWN_BLOCKING_THRESHOLD: usize = 1024 * 1024;
@@ -377,6 +379,80 @@ pub async fn pdfengines_convert(State(state): State<AppState>, mp: Multipart) ->
         .unwrap_or_else(|| "converted.pdf".to_string());
 
     Ok(pdf_response(converted, &filename))
+}
+
+// ---------------------------------------------------------------------------
+// /forms/pdfengines/bookmarks/read
+// ---------------------------------------------------------------------------
+
+/// `POST /forms/pdfengines/bookmarks/read`.
+/// Reads bookmarks from a PDF and returns them as JSON.
+pub async fn pdfengines_bookmarks_read(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+    let _permit = acquire_permit(&state).await?;
+    let form = FormFields::from_multipart(mp).await?;
+    let files = form.files_by_field("files");
+    if files.len() != 1 {
+        return Err(ApiError::InvalidField {
+            field: "files",
+            message: "bookmarks read expects exactly one file".to_string(),
+        });
+    }
+    let bytes = read_one(files[0]).await?;
+
+    let bookmarks = tokio::task::spawn_blocking(move || read_bookmarks(&bytes))
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let filename = files[0].filename.as_deref().unwrap_or("document.pdf");
+    let result = serde_json::json!({ filename: bookmarks });
+
+    let body = serde_json::to_string(&result).map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(body)
+        .unwrap())
+}
+
+// ---------------------------------------------------------------------------
+// /forms/pdfengines/bookmarks/write
+// ---------------------------------------------------------------------------
+
+/// `POST /forms/pdfengines/bookmarks/write`.
+/// Writes bookmarks to a PDF.
+pub async fn pdfengines_bookmarks_write(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+    let _permit = acquire_permit(&state).await?;
+    let form = FormFields::from_multipart(mp).await?;
+    let files = form.files_by_field("files");
+    if files.len() != 1 {
+        return Err(ApiError::InvalidField {
+            field: "files",
+            message: "bookmarks write expects exactly one file".to_string(),
+        });
+    }
+    let bytes = read_one(files[0]).await?;
+
+    // Parse bookmarks JSON
+    let bookmarks_json = form.map.get("bookmarks").ok_or(ApiError::MissingField("bookmarks"))?;
+    let bookmarks: Vec<Bookmark> = serde_json::from_str(bookmarks_json).map_err(|e| ApiError::InvalidField {
+        field: "bookmarks",
+        message: format!("Invalid bookmarks JSON: {}", e),
+    })?;
+
+    let output = tokio::task::spawn_blocking(move || write_bookmarks(&bytes, &bookmarks))
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let filename = form
+        .map
+        .get(" Gotenberg-Output-Filename")
+        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
+        .unwrap_or_else(|| "document.pdf".to_string());
+
+    Ok(pdf_response(output, &filename))
 }
 
 #[cfg(test)]

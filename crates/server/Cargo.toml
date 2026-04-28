@@ -48,6 +48,10 @@ tracing-subscriber = { workspace = true }
 # Time / duration parsing
 humantime = { workspace = true }
 
+# Webhook HTTP client
+reqwest = { workspace = true, features = ["json", "multipart"] }
+url = { workspace = true }
+
 # CLI
 clap = { workspace = true }
 
