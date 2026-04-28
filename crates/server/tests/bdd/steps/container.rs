@@ -23,13 +23,11 @@ pub async fn default_container(world: &mut FolioWorld) {
 pub async fn container_with_env(world: &mut FolioWorld, table: &Table) {
     let mut env = HashMap::new();
 
-    // Skip header row if present
-    let start_idx = if table.header.is_empty() { 0 } else { 0 };
-
-    for row in table.rows.iter().skip(start_idx) {
-        if row.cells.len() >= 2 {
-            let key = row.cells[0].value.clone();
-            let value = row.cells[1].value.clone();
+    // Table in cucumber 0.21 is Vec<Vec<String>>
+    for row in table.rows.iter() {
+        if row.len() >= 2 {
+            let key = row[0].clone();
+            let value = row[1].clone();
             env.insert(key, value);
         }
     }

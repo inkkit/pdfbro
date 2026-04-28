@@ -17,8 +17,8 @@ pub struct FolioWorld {
     /// HTTP client for requests
     pub client: Client,
 
-    /// Last HTTP response
-    pub response: Option<reqwest::Response>,
+    /// Last HTTP status code
+    pub status_code: Option<u16>,
 
     /// Response body bytes
     pub body: Option<Vec<u8>>,
@@ -38,7 +38,7 @@ impl FolioWorld {
     fn new() -> Self {
         Self {
             client: Client::new(),
-            response: None,
+            status_code: None,
             body: None,
             temp_dir: tempfile::tempdir().unwrap(),
             base_url: None,
