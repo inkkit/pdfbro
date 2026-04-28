@@ -44,6 +44,8 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
     let chromium = chromium.context("Chromium failed to launch")?;
     let libreoffice = libreoffice.context("LibreOffice failed to launch")?;
 
+    server::banner::print(&config, true, true);
+
     let chromium_handle = chromium.clone();
     let backend = ChromiumBackend::new(chromium);
 

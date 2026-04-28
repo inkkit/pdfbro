@@ -9,6 +9,7 @@
 //! error chain to pick a [`exit::ExitCode`].
 
 mod args;
+mod banner;
 mod commands;
 mod exit;
 mod io_helpers;
@@ -41,6 +42,7 @@ fn main() -> ProcExitCode {
         }
     };
 
+    banner::print(&cli.global);
     init_tracing(&cli.global);
 
     let runtime = match tokio::runtime::Builder::new_multi_thread()
