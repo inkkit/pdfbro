@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //! HTTP request/response step definitions.
 //!
 //! Maps Gotenberg's HTTP steps:

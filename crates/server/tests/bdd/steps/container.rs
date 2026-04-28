@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //! Container lifecycle step definitions.
 //!
 //! Maps Gotenberg's container steps:

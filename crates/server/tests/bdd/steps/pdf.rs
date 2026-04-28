@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //! PDF assertion step definitions.
 //!
 //! Maps Gotenberg's PDF assertions:

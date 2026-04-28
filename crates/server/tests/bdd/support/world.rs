@@ -24,6 +24,7 @@ pub struct FolioWorld {
     pub body: Option<Vec<u8>>,
 
     /// Temporary directory for test files
+    #[allow(dead_code)]
     pub temp_dir: tempfile::TempDir,
 
     /// Server base URL (e.g., "http://localhost:3000")
@@ -129,6 +130,7 @@ impl FolioWorld {
     }
 
     /// Stop server.
+    #[allow(dead_code)]
     pub async fn stop_container(&mut self) {
         if let Some(mut child) = self.server_process.take() {
             let _ = child.kill().await;
