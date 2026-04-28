@@ -28,7 +28,6 @@ use tower_http::trace::{
 use tracing::Level;
 
 use crate::error::ApiError;
-use crate::metrics::metrics_middleware;
 
 use crate::routes::{chromium, health, libreoffice, pdfengines};
 use crate::state::AppState;
@@ -192,8 +191,8 @@ pub fn build_router(state: AppState) -> Router {
                 )
                 .layer(SetRequestIdLayer::new(header_name.clone(), UuidRequestId))
                 .layer(PropagateRequestIdLayer::new(header_name))
-                .layer(CorsLayer::permissive())
-                .layer(axum::middleware::from_fn(metrics_middleware)),
+                .layer(CorsLayer::permissive()),
+                // metrics_middleware removed - handlers record metrics directly
         )
 }
 
