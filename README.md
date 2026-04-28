@@ -72,6 +72,10 @@
 | **Memory Safety** | ✅ Compile-time | GC | Runtime | Manual |
 | **Gotenberg API** | ✅ Compatible | ✅ Native | ❌ | ❌ |
 | **Screenshots** | ✅ Done | ✅ | ❌ | ❌ |
+| **Structured Logging** | ✅ Full (tracing) | ✅ (slog) | ❌ | ❌ |
+| **Prometheus Metrics** | ✅ `/prometheus/metrics` | ✅ | ❌ | ❌ |
+| **OpenTelemetry** | 🚧 In Progress | ✅ | ❌ | ❌ |
+| **Process Supervision** | 🚧 In Progress | ✅ | ❌ | ❌ |
 
 ### Architecture Pattern
 
@@ -261,12 +265,15 @@ const pdf = await engine.htmlToPdf('<h1>Hello</h1>');
 - **Concurrent Rendering**: Thread-safe browser instance sharing
 - **Screenshots**: URL/HTML/Markdown to PNG/JPEG/WebP
 - **BDD Testing**: Port Gotenberg's Gherkin scenarios to Rust
+- **Structured Logging**: Context-aware logs with request_id, engine type, duration (text/JSON formats)
+- **Prometheus Metrics**: `/prometheus/metrics` endpoint with conversion, queue, and engine metrics
 
 ### 🚧 In Progress (Phase 2)
 
-- **Prometheus Metrics**: `/prometheus/metrics` endpoint
-- **OpenTelemetry**: Distributed tracing and structured logging
-- **Process Supervision**: Auto-restart, idle shutdown, queue management
+- **OpenTelemetry**: Distributed tracing with OTLP export (spec 34)
+- **Process Supervision**: Auto-restart, idle shutdown, queue management (spec 31)
+- **Queue Management**: Async job queue with backpressure (spec 32)
+- **PDF/UA Compliance**: PDF/UA validation and conversion (spec 22)
 
 See [Roadmap](./docs/specs/20-missing-features-roadmap.md) for detailed phases.
 
@@ -450,29 +457,28 @@ See [BDD Testing Spec](./docs/specs/50-testing-bdd.md) for details.
 ### Phase 1: Core Features ✅
 - [x] HTML/URL/Markdown → PDF (Chromium)
 - [x] Office documents → PDF (LibreOffice)
-- [x] PDF operations (merge, split, flatten, rotate, metadata)
+- [x] PDF operations (merge, split, flatten, rotate, watermark, stamp, encrypt, bookmarks)
 - [x] Gotenberg-compatible API
 - [x] Screenshots (HTML/URL/Markdown → PNG/JPEG/WebP)
-- [x] BDD integration tests (port Gotenberg scenarios)
-- [x] Webhook support (async processing)
-- [x] Advanced PDF operations (bookmarks, encryption, watermark, stamp, PDF/A)
+- [x] Structured Logging (tracing with text/JSON formats)
+- [x] Prometheus Metrics (`/prometheus/metrics` endpoint)
 
-### Phase 2: Observability & Infrastructure 🚧
-- [ ] Prometheus metrics (`/prometheus/metrics` endpoint)
-- [ ] OpenTelemetry tracing
-- [ ] Process supervision (auto-restart, idle shutdown)
-- [ ] Health check enhancements
+### Phase 2: Advanced Features 🚧
+- [ ] OpenTelemetry tracing (spec 34)
+- [ ] Process supervision (auto-restart, idle shutdown) (spec 31)
+- [ ] Queue management (async job queue) (spec 32)
+- [ ] PDF/UA compliance (spec 22)
 
-### Phase 3: Distribution & CI/CD 📋
+### Phase 3: Bindings & Ecosystem 🚧
+- [ ] Python bindings (complete)
+- [ ] Node.js bindings (complete)
+
+### Phase 4: Distribution & CI/CD 🚧
 - [ ] GitHub Actions CI/CD
 - [ ] Docker Hub publication
 - [ ] Language binding packages (PyPI, npm)
 
-### Phase 4: Bindings & Ecosystem 📋
-- [ ] Python bindings (complete)
-- [ ] Node.js bindings (complete)
-
-See [Full Roadmap](./docs/specs/20-missing-features-roadmap.md) for detailed planning.
+See [Full Roadmap](./docs/specs/20-missing-features-roadmap.md) and detailed specs in [docs/specs/](./docs/specs/) for planning.
 
 ---
 
