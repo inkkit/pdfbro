@@ -4,7 +4,7 @@
 //! 1. Route table (handlers from [`crate::routes`]).
 //! 2. Per-route logic (e.g. timeout-bypass on `/health` and `/version`).
 //! 3. Outer cross-cutting middleware (request-id, body limit, CORS,
-//!    tracing).
+//!    tracing, metrics).
 
 use std::time::Duration;
 
@@ -26,6 +26,7 @@ use tower_http::trace::{DefaultMakeSpan, DefaultOnFailure, DefaultOnResponse, Tr
 use tracing::Level;
 
 use crate::error::ApiError;
+use crate::metrics::metrics_middleware;
 
 use crate::routes::{chromium, health, libreoffice, pdfengines};
 use crate::state::AppState;
@@ -143,7 +144,8 @@ pub fn build_router(state: AppState) -> Router {
 
     let untimed = Router::new()
         .route("/health", get(health::health))
-        .route("/version", get(health::version));
+        .route("/version", get(health::version))
+        .route("/prometheus/metrics", get(health::metrics_handler));
 
     let header_name = HeaderName::from_static(REQUEST_ID_HEADER);
 
@@ -165,7 +167,8 @@ pub fn build_router(state: AppState) -> Router {
                 )
                 .layer(SetRequestIdLayer::new(header_name.clone(), UuidRequestId))
                 .layer(PropagateRequestIdLayer::new(header_name))
-                .layer(CorsLayer::permissive()),
+                .layer(CorsLayer::permissive())
+                .layer(axum::middleware::from_fn(metrics_middleware)),
         )
 }
 
