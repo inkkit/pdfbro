@@ -57,6 +57,14 @@ pub async fn chromium_url(State(state): State<AppState>, mp: Multipart) -> ApiRe
     if url.trim().is_empty() {
         return Err(ApiError::MissingField("url"));
     }
+    // Reject syntactically invalid URLs before handing to the browser,
+    // so that malformed input yields 400 rather than 502 (navigation failure).
+    if url::Url::parse(&url).is_err() {
+        return Err(ApiError::InvalidField {
+            field: "url",
+            message: format!("`{url}` is not a valid URL"),
+        });
+    }
     let opts = parse_pdf_options(&form.map)?;
     opts.validate()?;
     let ctx = parse_request_context(&form.map)?;

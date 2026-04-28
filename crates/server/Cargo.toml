@@ -52,6 +52,9 @@ humantime = { workspace = true }
 reqwest = { workspace = true, features = ["json", "multipart"] }
 url = { workspace = true }
 
+# PDF inspection (page counts for split expansion)
+lopdf = { workspace = true }
+
 # CLI
 clap = { workspace = true }
 
@@ -60,6 +63,7 @@ tower = { workspace = true, features = ["util"] }
 reqwest = { workspace = true }
 static_assertions = { workspace = true }
 lopdf = { workspace = true }
+zip = { workspace = true }
 
 # BDD testing
 cucumber = "0.21"

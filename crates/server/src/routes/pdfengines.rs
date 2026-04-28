@@ -86,10 +86,28 @@ pub async fn pdfengines_split(State(state): State<AppState>, mp: Multipart) -> A
     }
     let bytes = read_one(files[0]).await?;
 
-    let mode = parse_split_mode(&form.map)?;
+    let mut mode = parse_split_mode(&form.map)?;
     let unify = parse_bool_field(&form.map, "splitUnify")?.unwrap_or(false);
     let mode_was_pages =
-        matches!(mode, SplitMode::ByRanges(_)) && form.map.contains_key("splitPages");
+        matches!(mode, SplitMode::ByRanges(_)) && form.map.contains_key("splitSpan");
+
+    // In Gotenberg's "pages" mode, each page in the specified range becomes
+    // its own output file (rather than one file per range chunk).
+    if mode_was_pages {
+        let total = lopdf::Document::load_mem(&bytes)
+            .map_err(|e| ApiError::Internal(e.to_string()))?
+            .get_pages()
+            .len() as u32;
+        if let SplitMode::ByRanges(ranges) = &mode {
+            let mut pages: Vec<u32> = Vec::new();
+            for r in ranges {
+                pages.extend(r.expand(total));
+            }
+            pages.sort_unstable();
+            pages.dedup();
+            mode = SplitMode::Pages(pages);
+        }
+    }
 
     let mut chunks = if bytes.len() > SPAWN_BLOCKING_THRESHOLD {
         let mode_clone = mode.clone();
@@ -151,8 +169,8 @@ fn parse_split_mode(map: &HashMap<String, String>) -> ApiResult<SplitMode> {
         }
         "pages" => {
             let pages_raw = map
-                .get("splitPages")
-                .ok_or(ApiError::MissingField("splitPages"))?;
+                .get("splitSpan")
+                .ok_or(ApiError::MissingField("splitSpan"))?;
             let mut ranges: Vec<PageRanges> = Vec::new();
             for chunk in pages_raw
                 .split(',')
@@ -163,7 +181,7 @@ fn parse_split_mode(map: &HashMap<String, String>) -> ApiResult<SplitMode> {
             }
             if ranges.is_empty() {
                 return Err(ApiError::InvalidField {
-                    field: "splitPages",
+                    field: "splitSpan",
                     message: "expected one or more page-range chunks".to_string(),
                 });
             }
@@ -302,6 +320,48 @@ pub async fn pdfengines_metadata_write(
     let names: Vec<String> = files.iter().map(|f| f.filename.clone()).collect();
     let zip = build_zip(&names, &outputs)?;
     Ok(zip_response(zip, "result.zip"))
+}
+
+// ---------------------------------------------------------------------------
+// /forms/pdfengines/rotate
+// ---------------------------------------------------------------------------
+
+/// `POST /forms/pdfengines/rotate`.
+/// Rotates selected pages by 90° increments.
+pub async fn pdfengines_rotate(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+    let _permit = acquire_permit(&state).await?;
+    let form = FormFields::from_multipart(mp).await?;
+    let files = form.files_by_field("files");
+    if files.len() != 1 {
+        return Err(ApiError::InvalidField {
+            field: "files",
+            message: "rotate expects exactly one PDF file".to_string(),
+        });
+    }
+    let bytes = read_one(files[0]).await?;
+
+    let angle_str = form.map.get("rotate").ok_or(ApiError::MissingField("rotate"))?;
+    let angle: i32 = angle_str.parse().map_err(|e| ApiError::InvalidField {
+        field: "rotate",
+        message: format!("expected integer angle: {e}"),
+    })?;
+
+    // Default to all pages ("1-" is open-ended, covers every page after clamping).
+    let pages = PageRanges::parse("1-").map_err(|e| ApiError::Internal(e.to_string()))?;
+    let rotated = tokio::task::spawn_blocking(move || {
+        pdfops::rotate(&bytes, &pages, angle)
+    })
+    .await
+    .map_err(|e| ApiError::Internal(e.to_string()))?
+    .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let filename = form
+        .map
+        .get(" Gotenberg-Output-Filename")
+        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
+        .unwrap_or_else(|| "rotated.pdf".to_string());
+
+    Ok(pdf_response(rotated, &filename))
 }
 
 // ---------------------------------------------------------------------------
@@ -681,7 +741,7 @@ mod tests {
     #[test]
     fn split_mode_pages_parses_multiple_chunks() {
         let m =
-            parse_split_mode(&fm(&[("splitMode", "pages"), ("splitPages", "1-2,5-7,9")])).unwrap();
+            parse_split_mode(&fm(&[("splitMode", "pages"), ("splitSpan", "1-2,5-7,9")])).unwrap();
         match m {
             SplitMode::ByRanges(rs) => assert_eq!(rs.len(), 3),
             _ => panic!("expected ByRanges"),

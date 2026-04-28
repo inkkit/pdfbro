@@ -74,6 +74,7 @@ walkdir = "2"
 
 # PDF manipulation
 lopdf = "0.34"
+zip = "2"
 
 # Bindings
 pyo3 = { version = "0.22", features = ["extension-module"] }
