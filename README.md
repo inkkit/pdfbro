@@ -71,7 +71,7 @@
 | **Usage Modes** | 4 (Server/CLI/Lib/Bindings) | Server only | Library only | CLI only |
 | **Memory Safety** | ✅ Compile-time | GC | Runtime | Manual |
 | **Gotenberg API** | ✅ Compatible | ✅ Native | ❌ | ❌ |
-| **Screenshots** | 🚧 In Progress | ✅ | ❌ | ❌ |
+| **Screenshots** | ✅ Done | ✅ | ❌ | ❌ |
 
 ### Architecture Pattern
 
@@ -230,7 +230,7 @@ let pdf = engine.markdown_to_pdf(markdown, &opts, &ctx).await?;
 
 ### 4. Language Bindings
 
-**Python** (🚧 In Progress):
+**Python** ([Planned]):
 ```python
 import folio
 
@@ -238,7 +238,7 @@ engine = folio.ChromiumEngine()
 pdf = engine.html_to_pdf("<h1>Hello</h1>")
 ```
 
-**Node.js** (🚧 In Progress):
+**Node.js** ([Planned]):
 ```javascript
 const folio = require('folio');
 const engine = new folio.ChromiumEngine();
@@ -259,17 +259,11 @@ const pdf = await engine.htmlToPdf('<h1>Hello</h1>');
 - **Gotenberg Compatibility**: Drop-in API replacement
 - **Health Checks**: `/health` endpoint with engine status
 - **Concurrent Rendering**: Thread-safe browser instance sharing
-
-### 🚧 In Progress (Phase 1)
-
 - **Screenshots**: URL/HTML/Markdown to PNG/JPEG/WebP
 - **BDD Testing**: Port Gotenberg's Gherkin scenarios to Rust
 
-### 📋 Planned (Phase 2-4)
+### 🚧 In Progress (Phase 2)
 
-- **Advanced PDF Operations**: Bookmarks, encryption, stamp, embed files
-- **PDF/A & PDF/UA**: Compliance conversion
-- **Webhook Support**: Async processing with retry logic
 - **Prometheus Metrics**: `/prometheus/metrics` endpoint
 - **OpenTelemetry**: Distributed tracing and structured logging
 - **Process Supervision**: Auto-restart, idle shutdown, queue management
@@ -297,8 +291,8 @@ See [Roadmap](./docs/specs/20-missing-features-roadmap.md) for detailed phases.
 | [spec-13-pdfops](./docs/specs/13-engine-pdfops.md) | PDF operations | ✅ Done |
 | [spec-20-cli](./docs/specs/20-cli.md) | CLI interface | ✅ Done |
 | [spec-30-server](./docs/specs/30-server.md) | HTTP server | ✅ Done |
+| [spec-50-bdd-tests](./docs/specs/50-testing-bdd.md) | BDD testing | ✅ Done |
 | [spec-20-roadmap](./docs/specs/20-missing-features-roadmap.md) | Feature roadmap | 🚧 New |
-| [spec-50-bdd-tests](./docs/specs/50-testing-bdd.md) | BDD testing | 🚧 New |
 
 ### API Reference
 
@@ -356,7 +350,7 @@ folio/
 │       ├── 20-missing-features-roadmap.md
 │       └── 50-testing-bdd.md
 │
-└── tests/                         # BDD integration tests (🚧)
+└── tests/                         # BDD integration tests
     └── integration/
 ```
 
@@ -426,14 +420,14 @@ tests/
 # Unit tests (no Chrome required)
 cargo test --lib
 
-# Integration tests (requires Chrome + LibreOffice)
-cargo test -p server --test integration -- --ignored
+# Integration tests (skip gracefully if deps missing)
+cargo test -p server --test bdd
 
-# Specific test scenario
-cargo test -p server --test integration chromium_convert_url
+# E2E tests (skip gracefully if deps missing)
+cargo test -p server --test e2e
 
-# E2E tests
-cargo test -p server --test e2e -- --ignored
+# All tests (skip gracefully if deps missing)
+cargo test -- --test-threads=1
 
 # All tests with Docker
 make docker-test
@@ -444,7 +438,7 @@ make docker-test
 We're porting Gotenberg's comprehensive BDD test suite:
 
 - ✅ Unit tests: 50+ test cases
-- 🚧 Integration tests: 20+ Gherkin scenarios (in progress)
+- ✅ Integration tests: 52 Gherkin scenarios
 - ✅ E2E tests: Server + CLI smoke tests
 
 See [BDD Testing Spec](./docs/specs/50-testing-bdd.md) for details.
@@ -453,34 +447,30 @@ See [BDD Testing Spec](./docs/specs/50-testing-bdd.md) for details.
 
 ## Roadmap
 
-### Phase 1: Core Features (Current)
+### Phase 1: Core Features ✅
 - [x] HTML/URL/Markdown → PDF (Chromium)
 - [x] Office documents → PDF (LibreOffice)
-- [x] PDF operations (merge, split, flatten)
+- [x] PDF operations (merge, split, flatten, rotate, metadata)
 - [x] Gotenberg-compatible API
-- [ ] Screenshots (HTML/URL/Markdown → PNG/JPEG/WebP)
-- [ ] BDD integration tests (port Gotenberg scenarios)
+- [x] Screenshots (HTML/URL/Markdown → PNG/JPEG/WebP)
+- [x] BDD integration tests (port Gotenberg scenarios)
+- [x] Webhook support (async processing)
+- [x] Advanced PDF operations (bookmarks, encryption, watermark, stamp, PDF/A)
 
-### Phase 2: Advanced PDF Operations
-- [ ] PDF bookmarks (read/write)
-- [ ] PDF encryption (password protection)
-- [ ] Watermark & stamp
-- [ ] PDF/A & PDF/UA compliance
-- [ ] Embed files in PDF
-
-### Phase 3: Infrastructure & Observability
-- [ ] Process supervision (auto-restart, idle shutdown)
-- [ ] Webhook support (async processing)
-- [ ] Prometheus metrics
+### Phase 2: Observability & Infrastructure 🚧
+- [ ] Prometheus metrics (`/prometheus/metrics` endpoint)
 - [ ] OpenTelemetry tracing
+- [ ] Process supervision (auto-restart, idle shutdown)
 - [ ] Health check enhancements
 
-### Phase 4: Bindings & Ecosystem
-- [ ] Python bindings (complete)
-- [ ] Node.js bindings (complete)
+### Phase 3: Distribution & CI/CD 📋
 - [ ] GitHub Actions CI/CD
 - [ ] Docker Hub publication
 - [ ] Language binding packages (PyPI, npm)
+
+### Phase 4: Bindings & Ecosystem 📋
+- [ ] Python bindings (complete)
+- [ ] Node.js bindings (complete)
 
 See [Full Roadmap](./docs/specs/20-missing-features-roadmap.md) for detailed planning.
 
