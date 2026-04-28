@@ -144,6 +144,10 @@ impl FolioWorld {
             let _ = server.child.wait().await;
         }
 
+        // Clean up any stale Chromium SingletonLock left by a crashed
+        // prior run so the fresh server can launch Chrome successfully.
+        Self::cleanup_chromium_lock();
+
         let port = Self::find_free_port();
         let base_url = format!("http://localhost:{}", port);
 
@@ -289,6 +293,17 @@ impl FolioWorld {
             .send()
             .await
             .map_or(false, |r| r.status().is_success())
+    }
+
+    /// Remove the `chromiumoxide-runner` directory that holds the
+    /// Chromium `SingletonLock`. Without this, a crashed prior run can
+    /// prevent the new server from launching Chrome.
+    fn cleanup_chromium_lock() {
+        let runner = std::env::temp_dir().join("chromiumoxide-runner");
+        if runner.exists() {
+            let _ = std::fs::remove_dir_all(&runner);
+            eprintln!("[BDD] Cleaned up stale Chromium lock at {}", runner.display());
+        }
     }
 }
 
