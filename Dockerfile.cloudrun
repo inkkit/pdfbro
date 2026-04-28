@@ -1,8 +1,9 @@
-# Folio - Standard Dockerfile (Full: Chromium + LibreOffice)
-# Tags: latest, 8, v0.1.0
+# Folio - Cloud Run Optimized Dockerfile (Full)
+# Tags: latest-cloudrun, 8-cloudrun
+# Optimized for Google Cloud Run (non-root, PORT env var)
 # Pushes to: docker push deesh2025/no-name:tagname
 
-# Stage 1: Chef (prepares dependency recipe)
+# Stage 1: Chef
 FROM rust:1.88 AS chef
 WORKDIR /app
 RUN cargo install cargo-chef --locked
@@ -41,7 +42,7 @@ RUN cargo build --release && \
     strip target/release/folio-server && \
     strip target/release/folio
 
-# Stage 4: Runtime - minimal
+# Stage 4: Runtime - Cloud Run optimized
 FROM debian:bookworm-slim
 
 WORKDIR /app
@@ -64,16 +65,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/cache/apt/*
 
+# Cloud Run specific: Use non-root user
+RUN groupadd -r folio && useradd -r -g folio folio
+RUN chown -R folio:folio /app
+USER folio
+
 ENV CHROME_PATH=/usr/bin/chromium
 ENV RUST_LOG=info
 
-# Copy binaries
-COPY --from=builder /app/target/release/folio-server /app/
-COPY --from=builder /app/target/release/folio /app/
+# Cloud Run specific: Use PORT env var (default 8080)
+ENV PORT=8080
 
-EXPOSE 3000
+# Copy binaries
+COPY --from=builder --chown=folio:folio /app/target/release/folio-server /app/
+COPY --from=builder --chown=folio:folio /app/target/release/folio /app/
+
+EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3000/health || exit 1
+    CMD curl -f http://localhost:${PORT}/health || exit 1
 
-CMD ["/app/folio-server", "serve"]
+# Use shell to expand PORT env var
+CMD ["sh", "-c", "/app/folio-server serve --port ${PORT}"]
