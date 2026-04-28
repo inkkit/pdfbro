@@ -8,6 +8,7 @@
 
 pub mod app;
 pub mod backend;
+pub mod banner;
 pub mod config;
 pub mod error;
 pub mod multipart;
