@@ -22,7 +22,9 @@ use tower_http::cors::CorsLayer;
 use tower_http::request_id::{
     MakeRequestId, PropagateRequestIdLayer, RequestId, SetRequestIdLayer,
 };
-use tower_http::trace::{DefaultMakeSpan, DefaultOnFailure, DefaultOnResponse, TraceLayer};
+use tower_http::trace::{
+    MakeSpan, TraceLayer,
+};
 use tracing::Level;
 
 use crate::error::ApiError;
@@ -42,6 +44,29 @@ impl MakeRequestId for UuidRequestId {
         let id = uuid::Uuid::new_v4().to_string();
         let header = id.parse::<axum::http::HeaderValue>().ok()?;
         Some(RequestId::new(header))
+    }
+}
+
+/// Custom [`MakeSpan`] that includes `request_id` (set by
+/// [`SetRequestIdLayer`]) as a structured field on every request span.
+#[derive(Clone)]
+struct RequestIdMakeSpan;
+
+impl<B> MakeSpan<B> for RequestIdMakeSpan {
+    fn make_span(&mut self, request: &Request<B>) -> tracing::Span {
+        let request_id = request
+            .headers()
+            .get(REQUEST_ID_HEADER)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("unknown")
+            .to_string();
+
+        tracing::info_span!(
+            "request",
+            request_id = %request_id,
+            method = %request.method(),
+            path = %request.uri().path(),
+        )
     }
 }
 
@@ -155,13 +180,13 @@ pub fn build_router(state: AppState) -> Router {
             ServiceBuilder::new()
                 .layer(
                     TraceLayer::new_for_http()
-                        .make_span_with(
-                            DefaultMakeSpan::new()
-                                .level(Level::INFO)
-                                .include_headers(false),
+                        .make_span_with(RequestIdMakeSpan)
+                        .on_response(
+                            tower_http::trace::DefaultOnResponse::new().level(Level::INFO),
                         )
-                        .on_response(DefaultOnResponse::new().level(Level::INFO))
-                        .on_failure(DefaultOnFailure::new().level(Level::WARN)),
+                        .on_failure(
+                            tower_http::trace::DefaultOnFailure::new().level(Level::WARN),
+                        ),
                 )
                 .layer(SetRequestIdLayer::new(header_name.clone(), UuidRequestId))
                 .layer(PropagateRequestIdLayer::new(header_name))
