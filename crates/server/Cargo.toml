@@ -60,3 +60,7 @@ tower = { workspace = true, features = ["util"] }
 reqwest = { workspace = true }
 static_assertions = { workspace = true }
 lopdf = { workspace = true }
+
+# BDD testing
+cucumber = "0.21"
+testcontainers = "0.22"
