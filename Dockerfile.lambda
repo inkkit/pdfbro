@@ -1,8 +1,9 @@
-# Folio - Standard Dockerfile (Full: Chromium + LibreOffice)
-# Tags: latest, 8, v0.1.0
+# Folio - AWS Lambda Optimized Dockerfile (Full)
+# Tags: latest-aws-lambda, 8-aws-lambda
+# Runs as Lambda extension or container image
 # Pushes to: docker push deesh2025/no-name:tagname
 
-# Stage 1: Chef (prepares dependency recipe)
+# Stage 1: Chef
 FROM rust:1.88 AS chef
 WORKDIR /app
 RUN cargo install cargo-chef --locked
@@ -17,7 +18,6 @@ FROM rust:1.88 AS builder
 
 WORKDIR /app
 
-# Install build dependencies
 RUN apt-get update && apt-get install -y \
     libgtk-3-0 libx11-xcb1 libxcomposite1 libxcursor1 \
     libxdamage1 libxi6 libxtst6 libnss3 libcups2 libxss1 \
@@ -31,49 +31,34 @@ RUN apt-get update && apt-get install -y \
 ENV CHROME_PATH=/usr/bin/chromium
 RUN cargo install cargo-chef --locked
 
-# Cache dependencies
 COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 
-# Build
 COPY . .
 RUN cargo build --release && \
     strip target/release/folio-server && \
     strip target/release/folio
 
-# Stage 4: Runtime - minimal
-FROM debian:bookworm-slim
+# Stage 4: Runtime - AWS Lambda
+FROM public.ecr.aws/lambda/provided:al2023
 
-WORKDIR /app
-
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
+# Install dependencies on AL2023
+RUN dnf install -y \
     chromium \
     libreoffice-writer \
     libreoffice-calc \
     libreoffice-impress \
-    fonts-liberation \
-    fontconfig \
-    libgtk-3-0 libx11-xcb1 libxcomposite1 libxcursor1 \
-    libxdamage1 libxi6 libxtst6 libnss3 libcups2 libxss1 \
-    libxrandr2 libasound2 libatk1.0-0 libatk-bridge2.0-0 \
-    libpangocairo-1.0-0 libpango-1.0-0 libcairo2 \
-    libgdk-pixbuf2.0-0 libglib2.0-0 libgl1-mesa-glx \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean \
-    && rm -rf /var/cache/apt/*
+    liberation-fonts \
+    && dnf clean all
 
 ENV CHROME_PATH=/usr/bin/chromium
 ENV RUST_LOG=info
+ENV AWS_LAMBDA_EXEC_WRAPPER=
 
-# Copy binaries
-COPY --from=builder /app/target/release/folio-server /app/
-COPY --from=builder /app/target/release/folio /app/
+# Copy binaries to Lambda runtime
+COPY --from=builder /app/target/release/folio-server ${LAMBDA_RUNTIME_DIR}/
+COPY --from=builder /app/target/release/folio ${LAMBDA_RUNTIME_DIR}/
 
-EXPOSE 3000
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3000/health || exit 1
-
-CMD ["/app/folio-server", "serve"]
+# Lambda entrypoint - wraps folio-server for Lambda runtime
+ENTRYPOINT ["/var/runtime/folio-server"]
+CMD ["lambda"]
