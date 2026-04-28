@@ -2950,6 +2950,7 @@ dependencies = [
  "hyper 0.14.32",
  "lopdf",
  "multer",
+ "once_cell",
  "prometheus",
  "pulldown-cmark",
  "reqwest 0.12.28",

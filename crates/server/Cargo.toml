@@ -60,6 +60,7 @@ clap = { workspace = true }
 
 # Prometheus metrics
 prometheus = { version = "0.13", default-features = false, features = ["protobuf"] }
+once_cell = "1.21.4"
 
 [dev-dependencies]
 tower = { workspace = true, features = ["util"] }
