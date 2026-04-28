@@ -1,16 +1,7 @@
 //! Spec 11 integration tests against a real Chrome / Chromium.
 //!
-//! Every test in this file is `#[ignore]` so the default
-//! `cargo test -p engine` run never starts a browser. To execute them:
-//!
-//! ```text
-//! cargo test -p engine --test chromium_html -- --ignored
-//! ```
-//!
-//! The browser executable is resolved per spec 11's discovery rules
-//! (explicit `BROWSER_PATH` env, then `$PATH`, then platform defaults).
-//! Override at the test level by setting `CHROME_PATH=/path/to/chrome`
-//! before invoking `cargo test`.
+//! These tests skip gracefully when Chrome/Chromium is not on PATH.
+//! Set `CHROME_PATH=/path/to/chrome` to override discovery.
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -34,26 +25,36 @@ use tokio::sync::oneshot;
 // ---------------------------------------------------------------------------
 
 /// Launch an engine for the test, honouring `CHROME_PATH` if set.
-async fn launch_engine() -> ChromiumEngine {
+/// Returns `None` when Chrome is not installed so the test can skip.
+async fn launch_engine() -> Option<ChromiumEngine> {
     let mut cfg = BrowserConfig::default();
     if let Ok(p) = std::env::var("CHROME_PATH") {
         cfg.executable = Some(PathBuf::from(p));
     }
-    ChromiumEngine::launch_with(cfg)
-        .await
-        .expect("failed to launch ChromiumEngine — set CHROME_PATH or install chrome")
+    match ChromiumEngine::launch_with(cfg).await {
+        Ok(engine) => Some(engine),
+        Err(e) => {
+            eprintln!("skipping: failed to launch Chrome: {e}");
+            None
+        }
+    }
 }
 
 /// Launch an engine with a tighter render timeout.
-async fn launch_engine_with_timeout(timeout: Duration) -> ChromiumEngine {
+/// Returns `None` when Chrome is not installed so the test can skip.
+async fn launch_engine_with_timeout(timeout: Duration) -> Option<ChromiumEngine> {
     let cfg = BrowserConfig {
         timeout,
         executable: std::env::var("CHROME_PATH").ok().map(PathBuf::from),
         ..BrowserConfig::default()
     };
-    ChromiumEngine::launch_with(cfg)
-        .await
-        .expect("failed to launch ChromiumEngine — set CHROME_PATH or install chrome")
+    match ChromiumEngine::launch_with(cfg).await {
+        Ok(engine) => Some(engine),
+        Err(e) => {
+            eprintln!("skipping: failed to launch Chrome: {e}");
+            None
+        }
+    }
 }
 
 /// Spawn a tiny axum server bound to `127.0.0.1:0` and return the
@@ -99,9 +100,8 @@ fn extract_all_text(doc: &lopdf::Document) -> String {
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
-#[ignore]
 async fn html_to_pdf_returns_valid_pdf_bytes() {
-    let engine = launch_engine().await;
+    let Some(engine) = launch_engine().await else { return; };
     let bytes = engine
         .html_to_pdf(
             "<h1>hello world</h1>",
@@ -119,9 +119,8 @@ async fn html_to_pdf_returns_valid_pdf_bytes() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn html_to_pdf_respects_paper_size() {
-    let engine = launch_engine().await;
+    let Some(engine) = launch_engine().await else { return; };
     let opts = PdfOptions {
         paper: PaperSize::new(2.0, 2.0).unwrap(),
         margin: Margins::ZERO,
@@ -176,7 +175,6 @@ async fn html_to_pdf_respects_paper_size() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn url_to_pdf_against_local_axum() {
     let router = Router::new().route(
         "/index.html",
@@ -184,7 +182,7 @@ async fn url_to_pdf_against_local_axum() {
     );
     let (addr, shutdown) = spawn_server(router).await;
 
-    let engine = launch_engine().await;
+    let Some(engine) = launch_engine().await else { return; };
     let bytes = engine
         .url_to_pdf(
             &format!("http://{addr}/index.html"),
@@ -202,9 +200,8 @@ async fn url_to_pdf_against_local_axum() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn wait_selector_completes_when_element_appears() {
-    let engine = launch_engine().await;
+    let Some(engine) = launch_engine().await else { return; };
     let html = r#"
         <!doctype html>
         <html><body>
@@ -235,9 +232,8 @@ async fn wait_selector_completes_when_element_appears() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn wait_selector_times_out_when_missing() {
-    let engine = launch_engine_with_timeout(Duration::from_millis(800)).await;
+    let Some(engine) = launch_engine_with_timeout(Duration::from_millis(800)).await else { return; };
     let opts = PdfOptions {
         wait: WaitCondition::Selector {
             selector: "#never".into(),
@@ -261,7 +257,6 @@ async fn wait_selector_times_out_when_missing() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn cookies_and_headers_round_trip() {
     type SharedSeen = Arc<tokio::sync::Mutex<Option<EchoState>>>;
 
@@ -308,7 +303,7 @@ async fn cookies_and_headers_round_trip() {
         .with_state(state.clone());
     let (addr, shutdown) = spawn_server(router).await;
 
-    let engine = launch_engine().await;
+    let Some(engine) = launch_engine().await else { return; };
 
     let mut extra_headers = HashMap::new();
     extra_headers.insert("X-Test".into(), "marker-value".into());
@@ -353,9 +348,8 @@ async fn cookies_and_headers_round_trip() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn concurrent_renders_do_not_deadlock() {
-    let engine = launch_engine().await;
+    let Some(engine) = launch_engine().await else { return; };
     let mut handles = Vec::new();
     for i in 0..8 {
         let e = engine.clone();
@@ -377,9 +371,8 @@ async fn concurrent_renders_do_not_deadlock() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn markdown_to_pdf_renders_table() {
-    let engine = launch_engine().await;
+    let Some(engine) = launch_engine().await else { return; };
     let md = "\
 | Name | Score |\n\
 |------|------:|\n\
@@ -427,9 +420,8 @@ async fn markdown_to_pdf_renders_table() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn shutdown_is_idempotent() {
-    let engine = launch_engine().await;
+    let Some(engine) = launch_engine().await else { return; };
     let clone = engine.clone();
     engine.shutdown().await.expect("first shutdown failed");
     // Second shutdown on a different clone must succeed without
@@ -441,9 +433,8 @@ async fn shutdown_is_idempotent() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn shutdown_cancels_in_flight_render() {
-    let engine = launch_engine().await;
+    let Some(engine) = launch_engine().await else { return; };
 
     // Kick off a render that waits on a selector that never appears.
     let opts = PdfOptions {
