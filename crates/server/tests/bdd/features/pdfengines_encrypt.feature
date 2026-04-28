@@ -22,6 +22,6 @@ Feature: /forms/pdfengines/encrypt
   Scenario: POST /forms/pdfengines/decrypt
     Given I have a default Folio container
     When I make a "POST" request to "/forms/pdfengines/decrypt" with the following form data and header(s):
-      | files    | protected_page_1.docx | file  |
-      | password | secret123             | field |
+      | files    | encrypted_page_1.pdf | file  |
+      | password | secret123            | field |
     Then the response status code should be 200

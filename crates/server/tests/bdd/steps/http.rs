@@ -50,10 +50,11 @@ pub async fn make_request(world: &mut FolioWorld, method: String, endpoint: Stri
 /// Step: Then the response status code should be 200
 pub async fn check_status_code(world: &mut FolioWorld, expected: u16) {
     let actual = world.status_code.expect("No status code available");
+    let body = String::from_utf8_lossy(world.body.as_deref().unwrap_or(&[]));
     assert_eq!(
         actual, expected,
-        "Expected status code {}, got {}",
-        expected, actual
+        "Expected status code {}, got {}. Body: {}",
+        expected, actual, body
     );
 }
 
