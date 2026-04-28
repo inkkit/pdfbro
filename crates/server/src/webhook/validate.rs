@@ -1,26 +1,34 @@
 //! Webhook URL validation (SSRF protection).
 
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{Ipv4Addr, Ipv6Addr};
 
 use url::Url;
 
 /// Validation errors.
 #[derive(Debug, thiserror::Error)]
 pub enum ValidationError {
+    /// Invalid URL format.
     #[error("Invalid URL: {0}")]
     InvalidUrl(String),
+    /// URL scheme is not http or https.
     #[error("URL scheme must be https or http: {0}")]
     InvalidScheme(String),
+    /// Private IP address (RFC 1918) not allowed.
     #[error("Private IP addresses not allowed: {0}")]
     PrivateIp(String),
+    /// Loopback address not allowed.
     #[error("Loopback addresses not allowed: {0}")]
     Loopback(String),
+    /// Link-local address not allowed.
     #[error("Link-local addresses not allowed: {0}")]
     LinkLocal(String),
+    /// Multicast address not allowed.
     #[error("Multicast addresses not allowed: {0}")]
     Multicast(String),
+    /// Broadcast address not allowed.
     #[error("Broadcast addresses not allowed: {0}")]
     Broadcast(String),
+    /// Hostname resolved to a blocked IP.
     #[error("Hostname resolved to blocked IP: {0}")]
     BlockedHost(String),
 }

@@ -130,6 +130,10 @@ pub fn build_router(state: AppState) -> Router {
             "/forms/pdfengines/decrypt",
             post(pdfengines::pdfengines_decrypt),
         )
+        .route(
+            "/forms/pdfengines/rotate",
+            post(pdfengines::pdfengines_rotate),
+        )
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(handle_timeout_error))

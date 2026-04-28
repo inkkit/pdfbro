@@ -1,9 +1,10 @@
 # LibreOffice integration-test fixtures
 
-The non-ignored unit tests for `engine::libreoffice` need no fixtures.
-The `#[ignore]`d integration tests under `crates/engine/tests/libreoffice.rs`
+The unit tests for `engine::libreoffice` need no fixtures.
+The integration tests under `crates/engine/tests/libreoffice.rs`
 read the documents in this directory to exercise an end-to-end conversion
-through a system `soffice` binary.
+through a system `soffice` binary. They skip gracefully when LibreOffice
+is not installed.
 
 ## Files
 

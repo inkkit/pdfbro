@@ -1,9 +1,8 @@
 //! `assert_cmd`-driven integration tests for the `folio` binary.
 //!
-//! Tests that need real Chrome / `soffice` are gated by `#[ignore]` and
-//! the suite documented at `crates/cli/tests/README.md`. The non-ignored
-//! tests cover usage / clap error paths and pure pdfops over canned
-//! in-memory fixtures.
+//! Tests that need real Chrome / `soffice` skip gracefully when the
+//! dependency is missing. The non-gated tests cover usage / clap error
+//! paths and pure pdfops over canned in-memory fixtures.
 
 use std::path::Path;
 
@@ -70,6 +69,36 @@ fn page_count(pdf: &[u8]) -> usize {
         .expect("parse pdf")
         .get_pages()
         .len()
+}
+
+/// Return true if a Chrome binary is available (via `$CHROME_PATH` or `$PATH`).
+fn have_chrome() -> bool {
+    if std::env::var("CHROME_PATH").is_ok() {
+        return true;
+    }
+    for name in ["google-chrome", "chromium", "chromium-browser", "chrome"] {
+        if std::process::Command::new(name)
+            .arg("--version")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+        {
+            return true;
+        }
+    }
+    false
+}
+
+/// Return true if a LibreOffice (`soffice`) binary is available.
+fn have_soffice() -> bool {
+    if std::env::var("LIBREOFFICE_PATH").is_ok() {
+        return true;
+    }
+    std::process::Command::new("soffice")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
 }
 
 // ---------------------------------------------------------------------------
@@ -531,8 +560,11 @@ fn log_format_text_does_not_emit_color_when_piped() {
 // ---------------------------------------------------------------------------
 
 #[test]
-#[ignore = "requires Chrome"]
 fn convert_html_to_stdout_pipes_bytes() {
+    if !have_chrome() {
+        eprintln!("skipping: chrome not found");
+        return;
+    }
     let dir = tempdir().unwrap();
     let html = dir.path().join("in.html");
     std::fs::write(&html, "<p>hi</p>").unwrap();
@@ -546,8 +578,11 @@ fn convert_html_to_stdout_pipes_bytes() {
 }
 
 #[test]
-#[ignore = "requires Chrome"]
 fn convert_markdown_to_pdf_via_cli() {
+    if !have_chrome() {
+        eprintln!("skipping: chrome not found");
+        return;
+    }
     let dir = tempdir().unwrap();
     let md = dir.path().join("in.md");
     std::fs::write(&md, "# Hello\n\nWorld").unwrap();
@@ -570,8 +605,11 @@ fn convert_markdown_to_pdf_via_cli() {
 }
 
 #[test]
-#[ignore = "requires Chrome"]
 fn batch_smoke_two_files_into_two_pdfs() {
+    if !have_chrome() {
+        eprintln!("skipping: chrome not found");
+        return;
+    }
     let dir = tempdir().unwrap();
     let in_dir = dir.path().join("in");
     let out_dir = dir.path().join("out");
@@ -597,8 +635,11 @@ fn batch_smoke_two_files_into_two_pdfs() {
 }
 
 #[test]
-#[ignore = "requires Chrome"]
 fn batch_skip_on_error_exits_6_with_summary() {
+    if !have_chrome() {
+        eprintln!("skipping: chrome not found");
+        return;
+    }
     // One real file, plus one whose extension matches but file content
     // is unreadable HTML for Chrome. We force on-error=skip so the run
     // surfaces exit code 6 (BatchPartial).
@@ -628,8 +669,11 @@ fn batch_skip_on_error_exits_6_with_summary() {
 }
 
 #[test]
-#[ignore = "requires LibreOffice (soffice)"]
 fn convert_office_writer_doc() {
+    if !have_soffice() {
+        eprintln!("skipping: soffice not found");
+        return;
+    }
     let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/sample.docx");
     if !fixture.exists() {
         eprintln!("skipping: fixture {} missing", fixture.display());
@@ -652,8 +696,11 @@ fn convert_office_writer_doc() {
 }
 
 #[test]
-#[ignore = "requires LibreOffice (soffice)"]
 fn convert_office_with_pdf_a_2b() {
+    if !have_soffice() {
+        eprintln!("skipping: soffice not found");
+        return;
+    }
     let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/sample.docx");
     if !fixture.exists() {
         eprintln!("skipping: fixture {} missing", fixture.display());

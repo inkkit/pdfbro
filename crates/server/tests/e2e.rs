@@ -1,11 +1,8 @@
 //! End-to-end integration tests against real engines.
 //!
-//! All tests in this file are `#[ignore]`'d because they require Chrome
-//! and/or `soffice` to be installed on the host. Run them locally with:
-//!
-//! ```bash
-//! cargo test -p server -- --ignored
-//! ```
+//! These tests skip gracefully when dependencies are missing:
+//! - Chrome on PATH (or via $CHROME_PATH) for Chromium tests
+//! - soffice on PATH (or via $LIBREOFFICE_PATH) for LibreOffice tests
 //!
 //! Each test spawns an instance of the full `folio-server` router on a
 //! dynamically-allocated localhost port, performs HTTP requests against it
@@ -22,6 +19,36 @@ use server::config::{LogFormat, ServerConfig};
 use server::{AppState, build_router};
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
+
+/// Return true if a Chrome binary is available (via `$CHROME_PATH` or `$PATH`).
+fn have_chrome() -> bool {
+    if std::env::var("CHROME_PATH").is_ok() {
+        return true;
+    }
+    for name in ["google-chrome", "chromium", "chromium-browser", "chrome"] {
+        if std::process::Command::new(name)
+            .arg("--version")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+        {
+            return true;
+        }
+    }
+    false
+}
+
+/// Return true if a LibreOffice (`soffice`) binary is available.
+fn have_soffice() -> bool {
+    if std::env::var("LIBREOFFICE_PATH").is_ok() {
+        return true;
+    }
+    std::process::Command::new("soffice")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
 
 struct TestServer {
     addr: SocketAddr,
@@ -125,8 +152,11 @@ async fn spawn_server(with_libreoffice: bool) -> TestServer {
 // ---------------------------------------------------------------------------
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires Chrome on PATH or via $CHROME_PATH"]
 async fn e2e_chromium_html() {
+    if !have_chrome() {
+        eprintln!("skipping: chrome not found");
+        return;
+    }
     let srv = spawn_server(false).await;
 
     let form = Form::new().part(
@@ -160,8 +190,11 @@ async fn e2e_chromium_html() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires Chrome and a local network namespace"]
 async fn e2e_chromium_url_against_local_axum_app() {
+    if !have_chrome() {
+        eprintln!("skipping: chrome not found");
+        return;
+    }
     use axum::Router;
     use axum::routing::get;
     let inner = Router::new().route(
@@ -191,8 +224,15 @@ async fn e2e_chromium_url_against_local_axum_app() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires soffice on PATH or via $LIBREOFFICE_PATH"]
 async fn e2e_libreoffice_docx() {
+    if !have_chrome() {
+        eprintln!("skipping: chrome not found");
+        return;
+    }
+    if !have_soffice() {
+        eprintln!("skipping: soffice not found");
+        return;
+    }
     let srv = spawn_server(true).await;
 
     // A trivial RTF qualifies as a `writer` LibreOffice input. We emit
@@ -229,8 +269,11 @@ async fn e2e_libreoffice_docx() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires Chrome (used to source three small PDF inputs)"]
 async fn e2e_pdfengines_merge_split_round_trip() {
+    if !have_chrome() {
+        eprintln!("skipping: chrome not found");
+        return;
+    }
     let srv = spawn_server(false).await;
 
     // Render three trivial PDFs via the chromium endpoint, then merge,
@@ -306,8 +349,11 @@ async fn e2e_pdfengines_merge_split_round_trip() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires Chrome; exercises the graceful-shutdown drain path"]
 async fn graceful_shutdown_drains_inflight() {
+    if !have_chrome() {
+        eprintln!("skipping: chrome not found");
+        return;
+    }
     let srv = spawn_server(false).await;
 
     // Issue a render in the background.

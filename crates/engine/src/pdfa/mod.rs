@@ -105,16 +105,15 @@ async fn run_ghostscript(
     let color_model = profile.color_model();
 
     let mut cmd = tokio::process::Command::new("gs");
-    cmd.arg("-dPDFA=".to_string() + policy)
+    cmd.arg("-dSAFER=false")
+        .arg("-dPDFA=".to_string() + policy)
         .arg("-dBATCH")
         .arg("-dNOPAUSE")
         .arg("-dNOOUTERSAVE")
         .arg(format!("-sProcessColorModel={}", color_model))
         .arg("-sDEVICE=pdfwrite")
-        .arg("-sPDFACompatibilityPolicy=1")
+        .arg("-dPDFACompatibilityPolicy=1")
         .arg(format!("-sOutputFile={}", output.display()))
-        .arg("-c")
-        .arg(".setpdfwrite")
         .arg("-f")
         .arg(input)
         .kill_on_drop(true)

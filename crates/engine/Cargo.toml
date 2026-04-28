@@ -22,6 +22,9 @@ which = "7"
 # Image processing for watermark
 image = { workspace = true }
 
+# URL encoding for screenshot data URLs
+urlencoding = "2"
+
 [dev-dependencies]
 axum = { workspace = true }
 proptest = { workspace = true }

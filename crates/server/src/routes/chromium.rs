@@ -12,7 +12,6 @@ use axum::extract::{Multipart, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use engine::{Cookie, MediaType, PageRanges, PdfOptions, RequestContext, WaitCondition, CaptureMode, ScreenshotFormat, ScreenshotOptions};
-use engine::chromium::screenshot::{html_to_screenshot, url_to_screenshot};
 
 use crate::error::{ApiError, ApiResult};
 use crate::multipart::FormFields;
@@ -57,6 +56,14 @@ pub async fn chromium_url(State(state): State<AppState>, mp: Multipart) -> ApiRe
         .clone();
     if url.trim().is_empty() {
         return Err(ApiError::MissingField("url"));
+    }
+    // Reject syntactically invalid URLs before handing to the browser,
+    // so that malformed input yields 400 rather than 502 (navigation failure).
+    if url::Url::parse(&url).is_err() {
+        return Err(ApiError::InvalidField {
+            field: "url",
+            message: format!("`{url}` is not a valid URL"),
+        });
     }
     let opts = parse_pdf_options(&form.map)?;
     opts.validate()?;

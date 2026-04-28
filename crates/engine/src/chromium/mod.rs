@@ -12,7 +12,7 @@ mod launch;
 mod markdown;
 mod pdf_params;
 mod render;
-mod screenshot;
+pub mod screenshot;
 mod wait;
 
 use std::collections::HashMap;

@@ -4,6 +4,8 @@
 
 use std::time::Duration;
 
+use lopdf::Object;
+
 use crate::types::{EngineError, EngineResult};
 
 /// Encryption algorithm.
@@ -152,7 +154,7 @@ pub async fn encrypt_pdf(
     let owner_pass = owner_password.unwrap_or(user_pass);
 
     if user_pass.is_empty() && owner_pass.is_empty() {
-        return Err(EngineError::InvalidInput(
+        return Err(EngineError::InvalidOption(
             "At least one password must be provided for encryption".into(),
         ));
     }
@@ -251,7 +253,7 @@ pub async fn decrypt_pdf(pdf: &[u8], password: &str) -> EngineResult<Vec<u8>> {
         let stderr = String::from_utf8_lossy(&output.stderr);
         // Check for wrong password
         if stderr.contains("invalid password") || stderr.contains("Incorrect password") {
-            return Err(EngineError::InvalidInput("Incorrect password".into()));
+            return Err(EngineError::InvalidOption("Incorrect password".into()));
         }
         return Err(EngineError::Internal(format!(
             "qpdf decryption failed: {}",
@@ -268,14 +270,16 @@ pub async fn decrypt_pdf(pdf: &[u8], password: &str) -> EngineResult<Vec<u8>> {
 pub fn is_encrypted(pdf: &[u8]) -> EngineResult<bool> {
     use lopdf::Document;
 
-    let doc = Document::load_mem(pdf)?;
+    let doc = Document::load_mem(pdf).map_err(|e| {
+        EngineError::InvalidOption(format!("Failed to load PDF: {}", e))
+    })?;
 
     // Check trailer for encryption dictionary
-    if let Ok(Object::Dictionary(trailer)) = doc.trailer.get(b"Encrypt") {
-        return Ok(!trailer.is_empty());
+    match doc.trailer.get(b"Encrypt") {
+        Ok(Object::Dictionary(dict)) => Ok(!dict.is_empty()),
+        Ok(_) => Ok(false), // Not a dictionary
+        Err(_) => Ok(false), // No Encrypt entry
     }
-
-    Ok(false)
 }
 
 /// Check if qpdf is available.

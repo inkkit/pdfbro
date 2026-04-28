@@ -5,7 +5,8 @@ use std::path::PathBuf;
 
 use axum::extract::{Multipart, State};
 use axum::response::Response;
-use engine::{OfficeOptions, PageRanges, PdfAProfile};
+use engine::{OfficeOptions, PageRanges};
+use engine::libreoffice::PdfAProfile;
 
 use crate::error::{ApiError, ApiResult};
 use crate::multipart::FormFields;

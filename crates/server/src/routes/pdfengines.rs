@@ -27,7 +27,11 @@ const SPAWN_BLOCKING_THRESHOLD: usize = 1024 * 1024;
 // ---------------------------------------------------------------------------
 
 /// `POST /forms/pdfengines/merge`.
-pub async fn pdfengines_merge(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_merge(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -37,6 +41,43 @@ pub async fn pdfengines_merge(State(state): State<AppState>, mp: Multipart) -> A
             message: "merge requires at least two files".to_string(),
         });
     }
+
+    // Check for async webhook mode before processing.
+    tracing::info!("pdfengines_merge: extracting webhook config from headers");
+    match crate::webhook::extract_webhook_config(&headers) {
+        Ok(Some(config)) => {
+            tracing::info!("pdfengines_merge: webhook config found, sync_mode={}", config.sync_mode);
+            if !config.sync_mode {
+                let blobs = read_all(&files).await?;
+                if let Some(queue) = &state.webhook_queue {
+                    let job_id = crate::webhook::spawn_job(
+                        queue,
+                        crate::webhook::WebhookOperation::PdfMerge,
+                        config,
+                        crate::webhook::JobData::PdfMerge { files: blobs },
+                    )
+                    .await?;
+
+                    let body = serde_json::json!({ "job_id": job_id });
+                    let mut resp_headers = HeaderMap::new();
+                    resp_headers.insert(
+                        header::CONTENT_TYPE,
+                        HeaderValue::from_static("application/json"),
+                    );
+                    return Ok((StatusCode::ACCEPTED, resp_headers, axum::body::Body::from(body.to_string())).into_response());
+                }
+                tracing::warn!("pdfengines_merge: webhook config but no queue available");
+            }
+        }
+        Ok(None) => {
+            tracing::info!("pdfengines_merge: no webhook config");
+        }
+        Err(e) => {
+            tracing::warn!("pdfengines_merge: webhook config extraction failed: {}", e);
+            return Err(ApiError::Webhook(e.to_string()));
+        }
+    }
+
     let blobs = read_all(&files).await?;
     let total: usize = blobs.iter().map(Vec::len).sum();
     let merged = if total > SPAWN_BLOCKING_THRESHOLD {
@@ -86,10 +127,28 @@ pub async fn pdfengines_split(State(state): State<AppState>, mp: Multipart) -> A
     }
     let bytes = read_one(files[0]).await?;
 
-    let mode = parse_split_mode(&form.map)?;
+    let mut mode = parse_split_mode(&form.map)?;
     let unify = parse_bool_field(&form.map, "splitUnify")?.unwrap_or(false);
     let mode_was_pages =
-        matches!(mode, SplitMode::ByRanges(_)) && form.map.contains_key("splitPages");
+        matches!(mode, SplitMode::ByRanges(_)) && form.map.contains_key("splitSpan");
+
+    // In Gotenberg's "pages" mode, each page in the specified range becomes
+    // its own output file (rather than one file per range chunk).
+    if mode_was_pages {
+        let total = lopdf::Document::load_mem(&bytes)
+            .map_err(|e| ApiError::Internal(e.to_string()))?
+            .get_pages()
+            .len() as u32;
+        if let SplitMode::ByRanges(ranges) = &mode {
+            let mut pages: Vec<u32> = Vec::new();
+            for r in ranges {
+                pages.extend(r.expand(total));
+            }
+            pages.sort_unstable();
+            pages.dedup();
+            mode = SplitMode::Pages(pages);
+        }
+    }
 
     let mut chunks = if bytes.len() > SPAWN_BLOCKING_THRESHOLD {
         let mode_clone = mode.clone();
@@ -151,8 +210,8 @@ fn parse_split_mode(map: &HashMap<String, String>) -> ApiResult<SplitMode> {
         }
         "pages" => {
             let pages_raw = map
-                .get("splitPages")
-                .ok_or(ApiError::MissingField("splitPages"))?;
+                .get("splitSpan")
+                .ok_or(ApiError::MissingField("splitSpan"))?;
             let mut ranges: Vec<PageRanges> = Vec::new();
             for chunk in pages_raw
                 .split(',')
@@ -163,7 +222,7 @@ fn parse_split_mode(map: &HashMap<String, String>) -> ApiResult<SplitMode> {
             }
             if ranges.is_empty() {
                 return Err(ApiError::InvalidField {
-                    field: "splitPages",
+                    field: "splitSpan",
                     message: "expected one or more page-range chunks".to_string(),
                 });
             }
@@ -305,6 +364,48 @@ pub async fn pdfengines_metadata_write(
 }
 
 // ---------------------------------------------------------------------------
+// /forms/pdfengines/rotate
+// ---------------------------------------------------------------------------
+
+/// `POST /forms/pdfengines/rotate`.
+/// Rotates selected pages by 90° increments.
+pub async fn pdfengines_rotate(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+    let _permit = acquire_permit(&state).await?;
+    let form = FormFields::from_multipart(mp).await?;
+    let files = form.files_by_field("files");
+    if files.len() != 1 {
+        return Err(ApiError::InvalidField {
+            field: "files",
+            message: "rotate expects exactly one PDF file".to_string(),
+        });
+    }
+    let bytes = read_one(files[0]).await?;
+
+    let angle_str = form.map.get("rotate").ok_or(ApiError::MissingField("rotate"))?;
+    let angle: i32 = angle_str.parse().map_err(|e| ApiError::InvalidField {
+        field: "rotate",
+        message: format!("expected integer angle: {e}"),
+    })?;
+
+    // Default to all pages ("1-" is open-ended, covers every page after clamping).
+    let pages = PageRanges::parse("1-").map_err(|e| ApiError::Internal(e.to_string()))?;
+    let rotated = tokio::task::spawn_blocking(move || {
+        pdfops::rotate(&bytes, &pages, angle)
+    })
+    .await
+    .map_err(|e| ApiError::Internal(e.to_string()))?
+    .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let filename = form
+        .map
+        .get(" Gotenberg-Output-Filename")
+        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
+        .unwrap_or_else(|| "rotated.pdf".to_string());
+
+    Ok(pdf_response(rotated, &filename))
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -406,7 +507,7 @@ pub async fn pdfengines_bookmarks_read(State(state): State<AppState>, mp: Multip
         .map_err(|e| ApiError::Internal(e.to_string()))?
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let filename = files[0].filename.as_deref().unwrap_or("document.pdf");
+    let filename = files[0].filename.as_str();
     let result = serde_json::json!({ filename: bookmarks });
 
     let body = serde_json::to_string(&result).map_err(|e| ApiError::Internal(e.to_string()))?;
@@ -414,7 +515,7 @@ pub async fn pdfengines_bookmarks_read(State(state): State<AppState>, mp: Multip
     Ok(Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/json")
-        .body(body)
+        .body(axum::body::Body::from(body))
         .unwrap())
 }
 
@@ -481,6 +582,7 @@ pub async fn pdfengines_watermark(State(state): State<AppState>, mp: Multipart) 
 
     let opts = parse_watermark_options(&form.map, WatermarkKind::Text {
         text: text.clone(),
+        font: None, // Use default Helvetica
         font_size: 48.0,
         color: [0.5, 0.5, 0.5, 0.5],
     })?;
@@ -519,6 +621,7 @@ pub async fn pdfengines_stamp(State(state): State<AppState>, mp: Multipart) -> A
 
     let opts = parse_watermark_options(&form.map, WatermarkKind::Text {
         text: text.clone(),
+        font: None, // Use default Helvetica
         font_size: 48.0,
         color: [0.5, 0.5, 0.5, 0.5],
     })?;
@@ -679,7 +782,7 @@ mod tests {
     #[test]
     fn split_mode_pages_parses_multiple_chunks() {
         let m =
-            parse_split_mode(&fm(&[("splitMode", "pages"), ("splitPages", "1-2,5-7,9")])).unwrap();
+            parse_split_mode(&fm(&[("splitMode", "pages"), ("splitSpan", "1-2,5-7,9")])).unwrap();
         match m {
             SplitMode::ByRanges(rs) => assert_eq!(rs.len(), 3),
             _ => panic!("expected ByRanges"),

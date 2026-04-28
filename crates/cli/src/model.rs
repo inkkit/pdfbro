@@ -6,8 +6,9 @@
 
 use anyhow::Context;
 use engine::{
-    BrowserConfig, Cookie, MediaType, OfficeOptions, PdfAProfile, PdfOptions, RequestContext,
+    BrowserConfig, Cookie, MediaType, OfficeOptions, PdfOptions, RequestContext,
 };
+use engine::libreoffice::PdfAProfile;
 
 use crate::args::{EmulateMedia, GlobalOpts, OfficeFlags, PdfAFlag, PdfFlags, RequestFlags};
 
