@@ -9,7 +9,7 @@ use engine::{BrowserConfig, ChromiumEngine, LibreOfficeConfig, LibreOfficeEngine
 use server::config::{Cli, Command};
 use server::logging::init_logging;
 use server::webhook::{WebhookClient, WebhookQueue, start_workers};
-use server::{AppState, ChromiumBackend, ServerArgs, ServerConfig, build_router, shutdown};
+use server::{AppState, ChromiumBackend, ServerArgs, ServerConfig, banner, build_router, shutdown};
 use tokio::net::TcpListener;
 
 #[tokio::main]
@@ -44,7 +44,9 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
     let chromium = chromium.context("Chromium failed to launch")?;
     let libreoffice = libreoffice.context("LibreOffice failed to launch")?;
 
-    server::banner::print(&config, true, true);
+    let chromium_ready = chromium.healthy().await;
+    let libreoffice_ready = libreoffice.healthy().await;
+    banner::print(&config, chromium_ready, libreoffice_ready);
 
     let chromium_handle = chromium.clone();
     let backend = ChromiumBackend::new(chromium);
