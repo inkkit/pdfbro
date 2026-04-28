@@ -2,14 +2,11 @@
 //!
 //! Implements spec 15 — Webhook System.
 
-use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use axum::http::{HeaderMap, HeaderValue, header};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{Mutex, mpsc};
 use tracing::{error, info, warn};
 
 mod config;
@@ -104,6 +101,7 @@ pub struct WebhookJob {
 
 /// Job data types.
 #[derive(Debug, Clone)]
+#[allow(missing_docs)]
 pub enum JobData {
     ChromiumHtml {
         html: Vec<u8>,
@@ -223,7 +221,7 @@ impl WebhookClient {
         request = request.headers(headers);
 
         // Build body
-        let body = if let Some(pdf) = pdf_data {
+        let _body = if let Some(pdf) = pdf_data {
             // Multipart with JSON metadata and PDF file
             let form = reqwest::multipart::Form::new()
                 .text("metadata", serde_json::to_string(result)?)
@@ -253,6 +251,7 @@ impl WebhookClient {
 
 /// Webhook errors.
 #[derive(Debug, thiserror::Error)]
+#[allow(missing_docs)]
 pub enum WebhookError {
     #[error("Invalid webhook URL: {0}")]
     InvalidUrl(String),
@@ -309,7 +308,7 @@ pub async fn process_webhook_job(
 }
 
 /// Execute the actual job operation.
-async fn execute_job(job: &WebhookJob) -> (Result<(), String>, Option<Vec<u8>>) {
+async fn execute_job(_job: &WebhookJob) -> (Result<(), String>, Option<Vec<u8>>) {
     // This would integrate with the engine functions
     // For now, return a placeholder that always succeeds
     (Ok(()), None)
