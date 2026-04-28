@@ -62,6 +62,28 @@ pub fn steps() -> Steps<FolioWorld> {
         },
     );
 
+    // Special content type checks
+    steps.then(
+        "the response header \"Content-Type\" should be \"application/zip\"",
+        |world: &mut FolioWorld| {
+            http::check_header(world, "Content-Type".to_string(), "application/zip".to_string())
+        },
+    );
+
+    steps.then(
+        "the response header \"Content-Type\" should be \"image/png\"",
+        |world: &mut FolioWorld| {
+            http::check_header(world, "Content-Type".to_string(), "image/png".to_string())
+        },
+    );
+
+    steps.then(
+        "the response header \"Content-Type\" should be \"image/jpeg\"",
+        |world: &mut FolioWorld| {
+            http::check_header(world, "Content-Type".to_string(), "image/jpeg".to_string())
+        },
+    );
+
     steps.then_regex(
         r#"the response body should match JSON:"#,
         |world: &mut FolioWorld, expected: String| {

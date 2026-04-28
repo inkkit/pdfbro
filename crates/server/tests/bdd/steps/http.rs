@@ -112,7 +112,7 @@ pub async fn make_request_with_form(
 
 /// Build multipart form from Gherkin table
 async fn build_form_from_table(
-    world: &mut FolioWorld,
+    _world: &mut FolioWorld,
     table: &Table,
 ) -> reqwest::multipart::Form {
     let mut form = reqwest::multipart::Form::new();
@@ -134,18 +134,25 @@ async fn build_form_from_table(
                         .await
                         .expect(&format!("Failed to read file: {}", file_path));
 
+                    // Guess mime type from extension
+                    let mime = guess_mime_type(field_value);
+
                     let part = reqwest::multipart::Part::bytes(content)
                         .file_name(field_value.clone())
-                        .mime_str("application/pdf")
+                        .mime_str(&mime)
                         .unwrap();
 
                     form = form.part(field_name.clone(), part);
+                }
+                "field" => {
+                    // Regular form field (same as text)
+                    form = form.text(field_name.clone(), field_value.clone());
                 }
                 "header" => {
                     // Headers are handled separately
                 }
                 _ => {
-                    // Regular form field
+                    // Default: treat as text field
                     form = form.text(field_name.clone(), field_value.clone());
                 }
             }
@@ -153,6 +160,27 @@ async fn build_form_from_table(
     }
 
     form
+}
+
+/// Guess MIME type from file extension
+fn guess_mime_type(filename: &str) -> String {
+    if filename.ends_with(".pdf") {
+        "application/pdf".to_string()
+    } else if filename.ends_with(".html") || filename.ends_with(".htm") {
+        "text/html".to_string()
+    } else if filename.ends_with(".md") {
+        "text/markdown".to_string()
+    } else if filename.ends_with(".docx") {
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document".to_string()
+    } else if filename.ends_with(".xml") {
+        "application/xml".to_string()
+    } else if filename.ends_with(".png") {
+        "image/png".to_string()
+    } else if filename.ends_with(".jpg") || filename.ends_with(".jpeg") {
+        "image/jpeg".to_string()
+    } else {
+        "application/octet-stream".to_string()
+    }
 }
 
 /// Compare JSON values, handling "ignore" placeholder

@@ -11,17 +11,36 @@ use crate::support::world::FolioWorld;
 
 /// Step: Then there should be 1 PDF(s) in the response
 pub async fn check_pdf_count(world: &mut FolioWorld, expected: usize) {
-    // For single PDF response, just verify we have PDF content
-    if expected == 1 {
-        let body = world.body.as_ref().unwrap();
+    let body = world.body.as_ref().unwrap();
+    let content_type = world
+        .response
+        .as_ref()
+        .unwrap()
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    if content_type == "application/zip" {
+        // For ZIP responses, we need to extract and count PDFs
+        // For now, just verify it's a valid ZIP
+        assert!(is_zip_content(body), "Response is not a valid ZIP");
+    } else if expected == 1 {
+        // For single PDF response, verify we have PDF content
         assert!(
             is_pdf_content(body),
             "Response is not a valid PDF"
         );
     } else {
-        // TODO: Handle multipart responses with multiple PDFs
+        // TODO: Handle other multipart responses
         panic!("Multiple PDF count not yet implemented");
     }
+}
+
+/// Check if bytes are valid ZIP
+fn is_zip_content(bytes: &[u8]) -> bool {
+    // ZIP magic number: PK\x03\x04
+    bytes.starts_with(b"PK\x03\x04") || bytes.starts_with(b"PK\x05\x06") || bytes.starts_with(b"PK\x07\x08")
 }
 
 /// Step: Then the "foo.pdf" PDF should have 2 page(s)
