@@ -1,4 +1,5 @@
-#![deny(rust_2018_idioms, missing_docs)]
+#![deny(rust_2018_idioms)]
+#![warn(missing_docs)]
 //! Folio HTTP server — Gotenberg-compatible facade over the [`engine`] crate.
 //!
 //! See `docs/specs/30-server.md` for the wire contract. Public entry points

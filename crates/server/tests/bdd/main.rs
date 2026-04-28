@@ -9,23 +9,18 @@
 
 use std::path::PathBuf;
 
-use cucumber::Cucumber;
+use cucumber::World;
 
 mod steps;
 mod support;
 
-use steps::steps;
 use support::world::FolioWorld;
 
-fn main() {
-    // Use tokio runtime
-    let rt = tokio::runtime::Runtime::new().unwrap();
-
-    rt.block_on(async {
-        Cucumber::<FolioWorld>::new()
-            .features(&[PathBuf::from("tests/bdd/features")])
-            .steps(steps())
-            .run_and_exit()
-            .await;
-    });
+#[tokio::main]
+async fn main() {
+    // Run cucumber with default config
+    FolioWorld::cucumber()
+        .features(&[PathBuf::from("tests/bdd/features")])
+        .run_and_exit()
+        .await;
 }

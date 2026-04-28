@@ -406,7 +406,7 @@ pub async fn pdfengines_bookmarks_read(State(state): State<AppState>, mp: Multip
         .map_err(|e| ApiError::Internal(e.to_string()))?
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let filename = files[0].filename.as_deref().unwrap_or("document.pdf");
+    let filename = files[0].filename.as_str();
     let result = serde_json::json!({ filename: bookmarks });
 
     let body = serde_json::to_string(&result).map_err(|e| ApiError::Internal(e.to_string()))?;
@@ -414,7 +414,7 @@ pub async fn pdfengines_bookmarks_read(State(state): State<AppState>, mp: Multip
     Ok(Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/json")
-        .body(body)
+        .body(axum::body::Body::from(body))
         .unwrap())
 }
 
@@ -481,6 +481,7 @@ pub async fn pdfengines_watermark(State(state): State<AppState>, mp: Multipart) 
 
     let opts = parse_watermark_options(&form.map, WatermarkKind::Text {
         text: text.clone(),
+        font: None, // Use default Helvetica
         font_size: 48.0,
         color: [0.5, 0.5, 0.5, 0.5],
     })?;
@@ -519,6 +520,7 @@ pub async fn pdfengines_stamp(State(state): State<AppState>, mp: Multipart) -> A
 
     let opts = parse_watermark_options(&form.map, WatermarkKind::Text {
         text: text.clone(),
+        font: None, // Use default Helvetica
         font_size: 48.0,
         color: [0.5, 0.5, 0.5, 0.5],
     })?;

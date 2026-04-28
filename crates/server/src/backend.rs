@@ -11,7 +11,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use engine::{ChromiumEngine, EngineResult, PdfOptions, RequestContext};
+use engine::{ChromiumEngine, EngineResult, PdfOptions, RequestContext, ScreenshotOptions};
 
 /// Minimal trait surface mirroring the parts of [`ChromiumEngine`] that
 /// the server invokes from request handlers.
@@ -44,6 +44,12 @@ pub trait PdfBackend: Send + Sync + 'static {
 
     /// Liveness probe.
     async fn healthy(&self) -> bool;
+
+    /// Render HTML to screenshot image.
+    async fn html_to_screenshot(&self, html: &str, opts: &ScreenshotOptions) -> EngineResult<Vec<u8>>;
+
+    /// Navigate to URL and capture screenshot.
+    async fn url_to_screenshot(&self, url: &str, opts: &ScreenshotOptions) -> EngineResult<Vec<u8>>;
 }
 
 /// Production [`PdfBackend`] backed by the real Chromium engine.
@@ -98,5 +104,15 @@ impl PdfBackend for ChromiumBackend {
 
     async fn healthy(&self) -> bool {
         self.inner.healthy().await
+    }
+
+    async fn html_to_screenshot(&self, html: &str, opts: &ScreenshotOptions) -> EngineResult<Vec<u8>> {
+        use engine::chromium::screenshot::html_to_screenshot;
+        html_to_screenshot(&self.inner, html, opts).await
+    }
+
+    async fn url_to_screenshot(&self, url: &str, opts: &ScreenshotOptions) -> EngineResult<Vec<u8>> {
+        use engine::chromium::screenshot::url_to_screenshot;
+        url_to_screenshot(&self.inner, url, opts).await
     }
 }

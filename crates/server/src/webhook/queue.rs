@@ -42,6 +42,7 @@ pub async fn spawn_job(
 ) -> Result<String, WebhookError> {
     let job_id = Uuid::new_v4().to_string();
 
+    let operation_str = operation.as_str();
     let job = WebhookJob {
         id: job_id.clone(),
         operation,
@@ -50,27 +51,41 @@ pub async fn spawn_job(
     };
 
     queue.send(job).await?;
-    info!(job_id = %job_id, operation = %operation.as_str(), "Webhook job spawned");
+    info!(job_id = %job_id, operation = %operation_str, "Webhook job spawned");
 
     Ok(job_id)
 }
 
 /// Start worker tasks to process webhook jobs.
 pub fn start_workers(
-    mut receiver: mpsc::Receiver<WebhookJob>,
+    receiver: mpsc::Receiver<WebhookJob>,
     num_workers: usize,
     client: WebhookClient,
 ) {
     let client = Arc::new(client);
+    let receiver = Arc::new(Mutex::new(receiver));
 
     for worker_id in 0..num_workers {
         let client = Arc::clone(&client);
-        let mut rx = receiver.resubscribe();
+        let rx = Arc::clone(&receiver);
 
         tokio::spawn(async move {
             info!(worker_id, "Webhook worker started");
 
-            while let Some(job) = rx.recv().await {
+            loop {
+                let job = {
+                    let mut rx_guard = rx.lock().await;
+                    rx_guard.recv().await
+                };
+
+                let job = match job {
+                    Some(j) => j,
+                    None => {
+                        warn!(worker_id, "Webhook worker shutting down (channel closed)");
+                        break;
+                    }
+                };
+
                 let start_time = Instant::now();
                 let job_id = job.id.clone();
 
@@ -81,12 +96,12 @@ pub fn start_workers(
                         info!(worker_id, job_id = %job_id, "Webhook job completed");
                     }
                     Err(e) => {
-                        error!(worker_id, job_id = %job_id, error = %e, "Webhook job failed permanently");
+                        error!(worker_id, job_id = %job_id, error = %e, "Webhook job failed");
                     }
                 }
             }
 
-            warn!(worker_id, "Webhook worker shutting down (channel closed)");
+            warn!(worker_id, "Webhook worker shutting down");
         });
     }
 }

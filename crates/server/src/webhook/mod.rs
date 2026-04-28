@@ -60,7 +60,7 @@ impl WebhookOperation {
 }
 
 /// Job status.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum JobStatus {
     /// Job completed successfully.
@@ -211,7 +211,7 @@ impl WebhookClient {
         let mut headers = HeaderMap::new();
         headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
         headers.insert(
-            HeaderValue::from_static("gotenberg-trace"),
+            "gotenberg-trace",
             HeaderValue::from_str(&result.job_id)?,
         );
 

@@ -156,7 +156,7 @@ fn engine_status_and_code(e: &EngineError) -> (StatusCode, &'static str) {
         EngineError::ChromeNotFound { .. } | EngineError::ChromeLaunch(_) => {
             (StatusCode::INTERNAL_SERVER_ERROR, "ENGINE_UNAVAILABLE")
         }
-        EngineError::Cdp(_) | EngineError::Internal(_) | EngineError::Io(_) => {
+        EngineError::Cdp(_) | EngineError::Internal(_) | EngineError::Io(_) | EngineError::Pdf(_) => {
             (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL")
         }
     }
