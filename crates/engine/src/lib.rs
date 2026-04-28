@@ -6,11 +6,13 @@
 
 pub mod chromium;
 pub mod libreoffice;
+pub mod pdfa;
 pub mod pdfops;
 pub mod types;
 
 pub use chromium::{ChromiumEngine, Cookie, RequestContext};
-pub use libreoffice::{LibreOfficeConfig, LibreOfficeEngine, OfficeOptions, PdfAProfile};
+pub use libreoffice::{LibreOfficeConfig, LibreOfficeEngine, OfficeOptions};
+pub use pdfa::{PdfAProfile, convert_to_pdfa, ghostscript_available, qpdf_available};
 pub use pdfops::{
     Metadata, Position, SplitMode, WatermarkKind, WatermarkOptions, flatten, merge, read_metadata,
     rotate, split, watermark, write_metadata,

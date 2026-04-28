@@ -17,6 +17,7 @@ tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+which = "7"
 
 [dev-dependencies]
 axum = { workspace = true }
