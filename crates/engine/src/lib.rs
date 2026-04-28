@@ -4,12 +4,14 @@
 //! This crate hosts the engine layer used by the `cli`, `server`, `py`, and
 //! `js` crates. See `docs/specs/` for per-module specifications.
 
+pub mod bookmarks;
 pub mod chromium;
 pub mod libreoffice;
 pub mod pdfa;
 pub mod pdfops;
 pub mod types;
 
+pub use bookmarks::{Bookmark, read_bookmarks, write_bookmarks, flatten_bookmarks};
 pub use chromium::{ChromiumEngine, Cookie, RequestContext};
 pub use libreoffice::{LibreOfficeConfig, LibreOfficeEngine, OfficeOptions};
 pub use pdfa::{PdfAProfile, convert_to_pdfa, ghostscript_available, qpdf_available};

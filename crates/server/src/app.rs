@@ -94,6 +94,14 @@ pub fn build_router(state: AppState) -> Router {
             "/forms/pdfengines/convert",
             post(pdfengines::pdfengines_convert),
         )
+        .route(
+            "/forms/pdfengines/bookmarks/read",
+            post(pdfengines::pdfengines_bookmarks_read),
+        )
+        .route(
+            "/forms/pdfengines/bookmarks/write",
+            post(pdfengines::pdfengines_bookmarks_write),
+        )
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(handle_timeout_error))

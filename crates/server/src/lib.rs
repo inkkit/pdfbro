@@ -13,6 +13,7 @@ pub mod multipart;
 pub mod routes;
 pub mod shutdown;
 pub mod state;
+pub mod webhook;
 
 pub use app::build_router;
 pub use backend::{ChromiumBackend, PdfBackend};
