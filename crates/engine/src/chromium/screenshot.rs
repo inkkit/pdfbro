@@ -16,7 +16,10 @@ pub enum ScreenshotFormat {
     /// PNG format (lossless).
     Png,
     /// JPEG format with quality 0-100.
-    Jpeg { quality: u8 },
+    Jpeg { 
+        /// JPEG quality (0-100).
+        quality: u8 
+    },
 }
 
 impl ScreenshotFormat {
@@ -236,11 +239,20 @@ async fn wait_for_condition(page: &Page, condition: &WaitCondition) -> EngineRes
             tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
             Ok(())
         }
-        WaitCondition::Expression { expression, timeout } => {
+        WaitCondition::Expression { expression } => {
             // Wait for JavaScript expression
             let _ = page.evaluate(expression.as_str()).await
                 .map_err(|e| EngineError::ChromeLaunch(format!("Wait expression failed: {}", e)))?;
-            let _ = timeout; // TODO: use timeout
+            Ok(())
+        }
+        WaitCondition::Selector { selector } => {
+            // Poll for selector (simplified - just wait fixed time)
+            let _ = selector;
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            Ok(())
+        }
+        WaitCondition::Delay { duration } => {
+            tokio::time::sleep(*duration).await;
             Ok(())
         }
     }
@@ -262,8 +274,8 @@ async fn capture_viewport_screenshot(page: &Page, opts: &ScreenshotOptions) -> E
     let result = page.execute(params).await
         .map_err(|e| EngineError::ChromeLaunch(format!("Screenshot failed: {}", e)))?;
 
-    // Decode base64 data
-    let data = base64::decode(&result.data)
+    // Decode base64 data - Binary is a wrapper around base64 string
+    let data = base64::decode(result.data.as_ref())
         .map_err(|e| EngineError::Internal(format!("Base64 decode failed: {}", e)))?;
 
     Ok(data)
@@ -277,9 +289,10 @@ async fn capture_fullpage_screenshot(page: &Page, opts: &ScreenshotOptions) -> E
     let metrics = page.execute(GetLayoutMetricsParams::default()).await
         .map_err(|e| EngineError::ChromeLaunch(format!("Failed to get layout metrics: {}", e)))?;
 
-    let content_size = metrics.content_size;
-    let full_width = content_size.width as u32;
-    let full_height = content_size.height as u32;
+    // Use css_layout_viewport for full page dimensions
+    let css_viewport = &metrics.css_layout_viewport;
+    let full_width = css_viewport.client_width as u32;
+    let full_height = css_viewport.client_height as u32;
 
     // Temporarily expand viewport to full page
     let orig_width = opts.width;

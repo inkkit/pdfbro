@@ -1,6 +1,7 @@
 //! PDF bookmarks (document outlines) read/write operations.
 //!
 //! Implements spec 16 — PDF Bookmarks.
+//! Updated for lopdf 0.34+ API.
 
 use std::collections::HashMap;
 
@@ -33,23 +34,26 @@ pub fn read_bookmarks(pdf: &[u8]) -> EngineResult<Vec<Bookmark>> {
     let catalog_id = doc
         .trailer
         .get(b"Root")
-        .and_then(Object::as_reference)
+        .ok()
+        .and_then(|o| o.as_reference().ok())
         .ok_or_else(|| EngineError::InvalidOption("PDF has no catalog".into()))?;
 
     let catalog = doc
         .get_object(catalog_id)
-        .and_then(Object::as_dict)
+        .ok()
+        .and_then(|o| o.as_dict().ok())
         .ok_or_else(|| EngineError::InvalidOption("PDF catalog not found".into()))?;
 
     let outlines_ref = match catalog.get(b"Outlines") {
-        Some(Object::Reference(id)) => *id,
-        Some(_) => return Err(EngineError::InvalidOption("Invalid Outlines entry".into())),
-        None => return Ok(Vec::new()), // No outline
+        Ok(Object::Reference(id)) => *id,
+        Ok(_) => return Err(EngineError::InvalidOption("Invalid Outlines entry".into())),
+        Err(_) => return Ok(Vec::new()), // No outline
     };
 
     let outlines = doc
         .get_object(outlines_ref)
-        .and_then(Object::as_dict)
+        .ok()
+        .and_then(|o| o.as_dict().ok())
         .ok_or_else(|| EngineError::InvalidOption("Outlines dictionary not found".into()))?;
 
     // Build page number mapping (ObjectId -> page number)
@@ -57,7 +61,7 @@ pub fn read_bookmarks(pdf: &[u8]) -> EngineResult<Vec<Bookmark>> {
 
     // Get first outline item
     let first_ref = match outlines.get(b"First") {
-        Some(Object::Reference(id)) => *id,
+        Ok(Object::Reference(id)) => *id,
         _ => return Ok(Vec::new()), // Empty outline
     };
 
@@ -85,7 +89,8 @@ pub fn write_bookmarks(pdf: &[u8], bookmarks: &[Bookmark]) -> EngineResult<Vec<u
     let catalog_id = doc
         .trailer
         .get(b"Root")
-        .and_then(Object::as_reference)
+        .ok()
+        .and_then(|o| o.as_reference().ok())
         .ok_or_else(|| EngineError::InvalidOption("PDF has no catalog".into()))?;
 
     // Create outline structure
@@ -138,7 +143,9 @@ fn build_page_map(doc: &Document) -> EngineResult<HashMap<ObjectId, u32>> {
     let mut map = HashMap::with_capacity(pages.len());
 
     for (page_num, (page_id, _)) in pages.iter().enumerate() {
-        map.insert(*page_id, (page_num + 1) as u32);
+        // page_id is u32 in newer lopdf, convert to ObjectId tuple
+        let object_id = (*page_id, 0u16);
+        map.insert(object_id, (page_num + 1) as u32);
     }
 
     Ok(map)
@@ -182,6 +189,7 @@ fn parse_outline_item(
     // Get title
     let title = item
         .get(b"Title")
+        .ok()
         .and_then(|o| match o {
             Object::String(s, _) => Some(String::from_utf8_lossy(s).to_string()),
             _ => None,
@@ -190,21 +198,22 @@ fn parse_outline_item(
 
     // Get destination page
     let page = match item.get(b"Dest") {
-        Some(Object::Array(dest)) if !dest.is_empty() => {
+        Ok(Object::Array(dest)) if !dest.is_empty() => {
             // First element is page reference
             dest[0]
                 .as_reference()
+                .ok()
                 .and_then(|page_id| page_map.get(&page_id).copied())
                 .unwrap_or(1)
         }
-        Some(Object::Reference(page_id)) => {
-            page_map.get(page_id).copied().unwrap_or(1)
+        Ok(Object::Reference(page_id)) => {
+            page_map.get(&page_id).copied().unwrap_or(1)
         }
         _ => 1,
     };
 
     // Get children
-    let children = if let Some(Object::Reference(first_child)) = item.get(b"First") {
+    let children = if let Ok(Object::Reference(first_child)) = item.get(b"First") {
         traverse_outlines(doc, *first_child, page_map)?
     } else {
         Vec::new()
@@ -281,7 +290,7 @@ fn create_outline_items(
         // Get page ObjectId from page number
         let page_id = page_map
             .iter()
-            .find(|(_, &page)| page == bookmark.page)
+            .find(|(_, page)| **page == bookmark.page)
             .map(|(id, _)| *id)
             .ok_or_else(|| EngineError::InvalidOption(format!(
                 "Cannot find page {} for bookmark '{}'",
@@ -311,19 +320,12 @@ fn create_outline_items(
             item.set("Prev", Object::Reference(prev));
         }
 
-        if let Some(next) = bookmarks.get(i + 1) {
-            // Next will be set when we create it
-        }
-
         if let Some(first_child) = child_first {
             item.set("First", Object::Reference(first_child));
             item.set("Last", Object::Reference(child_last.unwrap()));
             item.set("Count", Object::Integer(child_count as i64));
             total_count += child_count;
         }
-
-        // Set parent reference (use outlines as parent for top level)
-        // This will be fixed up after outlines dictionary is created
 
         doc.objects.insert(item_id, Object::Dictionary(item));
 
@@ -339,33 +341,6 @@ fn create_outline_items(
     }
 
     Ok((first_id, prev_id, total_count))
-}
-
-// Fix up parent references after outlines dictionary is created
-fn fix_parent_references(
-    doc: &mut Document,
-    outlines_id: ObjectId,
-    first_item_id: ObjectId,
-) -> EngineResult<()> {
-    // This would need to traverse the tree and set Parent correctly
-    // Simplified: just set top-level items to point to outlines
-    let mut current_id = Some(first_item_id);
-
-    while let Some(id) = current_id {
-        if let Ok(Object::Dictionary(item)) = doc.get_object_mut(id) {
-            item.set("Parent", Object::Reference(outlines_id));
-        }
-
-        // Get next sibling
-        current_id = doc
-            .get_object(id)
-            .ok()
-            .and_then(|o| o.as_dict().ok())
-            .and_then(|d| d.get(b"Next").ok())
-            .and_then(|o| o.as_reference().ok());
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]

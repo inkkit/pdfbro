@@ -4,6 +4,8 @@
 
 use std::time::Duration;
 
+use lopdf::Object;
+
 use crate::types::{EngineError, EngineResult};
 
 /// Encryption algorithm.
@@ -273,11 +275,11 @@ pub fn is_encrypted(pdf: &[u8]) -> EngineResult<bool> {
     })?;
 
     // Check trailer for encryption dictionary
-    if let Some(Object::Dictionary(trailer)) = doc.trailer.get(b"Encrypt") {
-        return Ok(!trailer.is_empty());
+    match doc.trailer.get(b"Encrypt") {
+        Ok(Object::Dictionary(dict)) => Ok(!dict.is_empty()),
+        Ok(_) => Ok(false), // Not a dictionary
+        Err(_) => Ok(false), // No Encrypt entry
     }
-
-    Ok(false)
 }
 
 /// Check if qpdf is available.

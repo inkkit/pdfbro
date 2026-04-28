@@ -60,9 +60,19 @@ pub enum EngineError {
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// A PDF parsing/manipulation error.
+    #[error("pdf error: {0}")]
+    Pdf(String),
+
     /// A bug or unhandled internal condition.
     #[error("internal error: {0}")]
     Internal(String),
+}
+
+impl From<lopdf::Error> for EngineError {
+    fn from(e: lopdf::Error) -> Self {
+        EngineError::Pdf(e.to_string())
+    }
 }
 
 /// Convenience alias for results returned by engine operations.
