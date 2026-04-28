@@ -102,6 +102,14 @@ pub fn build_router(state: AppState) -> Router {
             "/forms/pdfengines/bookmarks/write",
             post(pdfengines::pdfengines_bookmarks_write),
         )
+        .route(
+            "/forms/pdfengines/watermark",
+            post(pdfengines::pdfengines_watermark),
+        )
+        .route(
+            "/forms/pdfengines/stamp",
+            post(pdfengines::pdfengines_stamp),
+        )
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(handle_timeout_error))
