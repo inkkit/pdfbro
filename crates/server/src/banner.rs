@@ -78,7 +78,7 @@ pub fn print(config: &ServerConfig, chromium_ready: bool, libreoffice_ready: boo
         .join("\n");
 
     println!(
-        "\n{}\n\n{}  {}\n  {}: {}\n  {}\n\n{}\n{}\n\n{}\n{}\n\n{}\n  http://{}:{}\n",
+        "\n{}\n\n{LEFT_MARGIN}{}  {}\n{LEFT_MARGIN}{}: {}\n{LEFT_MARGIN}{}\n\n{LEFT_MARGIN}{}\n{}\n\n{LEFT_MARGIN}{}\n{}\n\n{LEFT_MARGIN}{}\n{LEFT_MARGIN}http://{}:{}\n",
         ascii_logo(),
         color("Folio", "36;1", c),      // cyan bold
         color("— A Rust-powered document-to-PDF API", "0", c),
@@ -102,9 +102,12 @@ fn compute_width(rows: &[Row<'_>]) -> usize {
     rows.iter().map(|r| r.label.len()).max().unwrap_or(0)
 }
 
+/// Left margin applied to every banner line.
+const LEFT_MARGIN: &str = "    ";
+
 /// Render one row: plain left-aligned label, already-colored value.
 fn format_row(label: &str, value: &str, width: usize) -> String {
-    format!("  {:<width$} {}", label, value, width = width)
+    format!("{LEFT_MARGIN}{:<width$} {}", label, value, width = width)
 }
 
 /// `true` when stdout is a TTY **and** `NO_COLOR` is absent.
@@ -142,14 +145,15 @@ fn rw_check(c: bool) -> String {
     format!("{}  {}", color("[OK]", "32", c), color("(read / write)", "2", c))
 }
 
-/// Pixel-art FOLIO logo.
-fn ascii_logo() -> &'static str {
-    r#"  ███████╗  ██████╗  ██╗      ██╗  ██████╗
+/// Pixel-art FOLIO logo with left margin baked in.
+fn ascii_logo() -> String {
+    const LOGO: &str = r#"  ███████╗  ██████╗  ██╗      ██╗  ██████╗
   ██╔════╝ ██╔═══██╗ ██║      ██║ ██╔═══██╗
   █████╗   ██║   ██║ ██║      ██║ ██║   ██║
   ██╔══╝   ██║   ██║ ██║      ██║ ██║   ██║
   ██║      ╚██████╔╝ ███████╗ ██║ ╚██████╔╝
-  ╚═╝       ╚═════╝  ╚══════╝ ╚═╝  ╚═════╝"#
+  ╚═╝       ╚═════╝  ╚══════╝ ╚═╝  ╚═════╝"#;
+    LOGO.lines().map(|l| format!("{LEFT_MARGIN}{l}")).collect::<Vec<_>>().join("\n")
 }
 
 #[cfg(test)]
