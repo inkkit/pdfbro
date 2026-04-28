@@ -20,6 +20,8 @@ pub enum SplitMode {
     EveryN(u32),
     /// One output PDF per single page.
     OnePagePerFile,
+    /// One output PDF per single page, but only for the specified pages.
+    Pages(Vec<u32>),
 }
 
 /// Split `pdf` according to `mode`, returning one byte vector per output
@@ -45,6 +47,11 @@ pub fn split(pdf: &[u8], mode: &SplitMode) -> EngineResult<Vec<Vec<u8>>> {
             .collect(),
         SplitMode::EveryN(n) => every_n_chunks(total, *n),
         SplitMode::OnePagePerFile => (1..=total).map(|p| vec![p]).collect(),
+        SplitMode::Pages(pages) => pages
+            .iter()
+            .filter(|&&p| (1..=total).contains(&p))
+            .map(|&p| vec![p])
+            .collect(),
     };
 
     let mut out = Vec::with_capacity(chunks.len());
