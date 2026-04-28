@@ -61,6 +61,12 @@ reqwest = { workspace = true }
 static_assertions = { workspace = true }
 lopdf = { workspace = true }
 
-# BDD testing
+# BDD testing (always included)
 cucumber = "0.21"
-testcontainers = "0.22"
+
+# Docker support for BDD tests (optional, for CI)
+testcontainers = { version = "0.22", optional = true }
+
+[features]
+default = []
+docker = ["testcontainers"]  # Enable for Docker-based BDD tests in CI
