@@ -101,45 +101,73 @@ pub struct WebhookJob {
 
 /// Job data types.
 #[derive(Debug, Clone)]
-#[allow(missing_docs)]
 pub enum JobData {
+    /// Chromium HTML conversion job.
     ChromiumHtml {
+        /// Raw HTML bytes.
         html: Vec<u8>,
+        /// Conversion options (JSON).
         options: serde_json::Value,
     },
+    /// Chromium URL conversion job.
     ChromiumUrl {
+        /// Target URL.
         url: String,
+        /// Conversion options (JSON).
         options: serde_json::Value,
     },
+    /// Chromium Markdown conversion job.
     ChromiumMarkdown {
+        /// Raw Markdown bytes.
         markdown: Vec<u8>,
+        /// Conversion options (JSON).
         options: serde_json::Value,
     },
+    /// LibreOffice conversion job.
     LibreOffice {
+        /// Source file bytes.
         file: Vec<u8>,
+        /// Conversion options (JSON).
         options: serde_json::Value,
+        /// Original filename.
         filename: String,
     },
+    /// PDF merge job.
     PdfMerge {
+        /// Files to merge.
         files: Vec<Vec<u8>>,
     },
+    /// PDF split job.
     PdfSplit {
+        /// Source file bytes.
         file: Vec<u8>,
+        /// Split mode (e.g. "pages").
         mode: String,
+        /// Page span expression.
         span: Option<String>,
     },
+    /// PDF flatten job.
     PdfFlatten {
+        /// Source file bytes.
         file: Vec<u8>,
     },
+    /// PDF metadata read job.
     PdfMetadataRead {
+        /// Source file bytes.
         file: Vec<u8>,
     },
+    /// PDF metadata write job.
     PdfMetadataWrite {
+        /// Source file bytes.
         file: Vec<u8>,
+        /// Metadata to write (JSON).
         metadata: serde_json::Value,
     },
+    /// PDF/A conversion job.
     PdfConvert {
+        /// Source file bytes.
         file: Vec<u8>,
+        /// Target PDF/A profile string.
         profile: String,
     },
 }
@@ -251,20 +279,31 @@ impl WebhookClient {
 
 /// Webhook errors.
 #[derive(Debug, thiserror::Error)]
-#[allow(missing_docs)]
 pub enum WebhookError {
+    /// Invalid webhook URL.
     #[error("Invalid webhook URL: {0}")]
     InvalidUrl(String),
+    /// SSRF protection blocked the URL.
     #[error("SSRF protection: URL not allowed: {0}")]
     SsrfProtection(String),
+    /// HTTP client error.
     #[error("HTTP error: {0}")]
     Http(#[from] reqwest::Error),
+    /// Non-success HTTP status.
     #[error("HTTP error status {status}: {body}")]
-    HttpStatus { status: reqwest::StatusCode, body: String },
+    HttpStatus {
+        /// HTTP status code.
+        status: reqwest::StatusCode,
+        /// Response body.
+        body: String,
+    },
+    /// Delivery failed after retries.
     #[error("Delivery failed: {0}")]
     Delivery(String),
+    /// Invalid HTTP header value.
     #[error("Invalid header value: {0}")]
     InvalidHeader(#[from] axum::http::header::InvalidHeaderValue),
+    /// JSON serialization error.
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 }

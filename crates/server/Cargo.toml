@@ -69,3 +69,7 @@ hyper = { version = "0.14", features = ["full"] }
 # Conditional Docker support for BDD tests
 # Note: Set FOLIO_BDD_SKIP_DOCKER=1 to skip Docker-based tests
 testcontainers = "0.22"
+
+[[test]]
+name = "bdd"
+harness = false
