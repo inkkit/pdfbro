@@ -12,7 +12,9 @@ use tokio::sync::Semaphore;
 
 use crate::ServerConfig;
 use crate::backend::PdfBackend;
+use crate::metrics::FolioMetrics;
 use crate::webhook::WebhookQueue;
+use prometheus;
 
 /// Per-process server state.
 #[derive(Clone)]
@@ -29,6 +31,8 @@ pub struct AppState {
     pub started_at: Instant,
     /// Webhook job queue; `None` when webhook workers are not started.
     pub webhook_queue: Option<WebhookQueue>,
+    /// Prometheus metrics for monitoring.
+    pub metrics: Arc<FolioMetrics>,
 }
 
 impl AppState {
@@ -37,16 +41,19 @@ impl AppState {
         chromium: Arc<dyn PdfBackend>,
         libreoffice: Option<Arc<LibreOfficeEngine>>,
         config: ServerConfig,
-    ) -> Self {
+    ) -> Result<Self, prometheus::Error> {
         let sem = Arc::new(Semaphore::new(config.concurrency));
-        Self {
+        let metrics = Arc::new(FolioMetrics::new()?);
+        metrics.init();
+        Ok(Self {
             chromium,
             libreoffice,
             sem,
             config: Arc::new(config),
             started_at: Instant::now(),
             webhook_queue: None,
-        }
+            metrics,
+        })
     }
 
     /// Attach a webhook queue for async processing.
