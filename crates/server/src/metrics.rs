@@ -3,9 +3,6 @@
 //! Exposes conversion counts, latencies, error rates, queue depths,
 //! and engine health metrics in Prometheus text format.
 
-use axum::extract::State;
-use axum::middleware::Next;
-use axum::response::Response;
 use prometheus::{self, CounterVec, Encoder, Gauge, HistogramOpts, HistogramVec, TextEncoder, register};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -330,35 +327,5 @@ pub fn export_metrics() -> String {
     let metric_families = prometheus::gather();
     let mut buffer = Vec::new();
     encoder.encode(&metric_families, &mut buffer).unwrap();
-    String::from_utf8(buffer).unwrap()
-}
-
-/// Metrics middleware for Axum that records HTTP request duration and counts.
-pub async fn metrics_middleware(
-    State(state): State<crate::AppState>,
-    request: axum::extract::Request,
-    next: Next,
-) -> Response {
-    use std::time::Instant;
-
-    let start = Instant::now();
-    let method = request.method().clone();
-    let uri = request.uri().clone();
-
-    state.metrics.http_active_requests.inc();
-
-    let response = next.run(request).await;
-
-    let duration = start.elapsed().as_secs_f64();
-    let status = response.status().as_u16();
-
-    state.metrics.record_http_request(
-        method.as_str(),
-        uri.path(),
-        status,
-        duration,
-    );
-    state.metrics.http_active_requests.dec();
-
-    response
+     String::from_utf8(buffer).unwrap()
 }
