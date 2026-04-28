@@ -27,17 +27,24 @@ pub async fn make_request(world: &mut FolioWorld, method: String, endpoint: Stri
 
     let response = response.expect("Failed to make HTTP request");
     let status = response.status().as_u16();
-    
+
+    // Collect headers
+    let mut headers = std::collections::HashMap::new();
+    for (name, value) in response.headers() {
+        headers.insert(name.as_str().to_string(), value.to_str().unwrap_or("").to_string());
+    }
+
     // Read body - need to take ownership
     let body = response
         .bytes()
         .await
         .expect("Failed to read response body")
         .to_vec();
-    
-    // Store body and status
+
+    // Store body, status, and headers
     world.body = Some(body);
     world.status_code = Some(status);
+    world.response_headers = Some(headers);
 }
 
 /// Step: Then the response status code should be 200
@@ -51,10 +58,21 @@ pub async fn check_status_code(world: &mut FolioWorld, expected: u16) {
 }
 
 /// Step: Then the response header "Content-Type" should be "application/json"
-pub async fn check_header(world: &mut FolioWorld, _header_name: String, _expected: String) {
-    // Header checks require storing headers - skip for now
-    // We could store headers in the World struct if needed
-    let _ = world.status_code; // just to silence unused warning temporarily
+pub async fn check_header(world: &mut FolioWorld, header_name: String, expected: String) {
+    let headers = world.response_headers.as_ref().expect("No response headers available");
+    let lower_name = header_name.to_lowercase();
+    let actual = headers.get(&lower_name).unwrap_or_else(|| {
+        panic!(
+            "Header '{}' (lowercase: '{}') not found in response. Available headers: {:?}",
+            header_name, lower_name,
+            headers.keys().collect::<Vec<_>>()
+        )
+    });
+    assert_eq!(
+        actual, &expected,
+        "Expected header '{}' to be '{}', got '{}'",
+        header_name, expected, actual
+    );
 }
 
 /// Step: Then the response body should match JSON:
@@ -77,41 +95,50 @@ pub async fn check_json_body(world: &mut FolioWorld, expected: String) {
 /// Step: When I make a POST request with form data
 pub async fn make_request_with_form(
     world: &mut FolioWorld,
-    method: String,
+    _method: String,
     endpoint: String,
     table: &Table,
 ) {
     let url = format!("{}{}", world.base_url.as_ref().unwrap(), endpoint);
 
-    // Build multipart form
-    let form = build_form_from_table(world, table).await;
+    // Build multipart form and collect headers from table
+    let (form, headers) = build_form_and_headers_from_table(world, table).await;
 
-    let response = match method.as_str() {
-        "POST" => world.client.post(&url).multipart(form).send().await,
-        _ => panic!("Only POST supported for form data"),
-    };
+    let mut req = world.client.post(&url).multipart(form);
+    for (name, value) in headers {
+        req = req.header(name, value);
+    }
+    let response = req.send().await;
 
     let response = response.expect("Failed to make HTTP request");
     let status = response.status().as_u16();
-    
+
+    // Collect response headers
+    let mut resp_headers = std::collections::HashMap::new();
+    for (name, value) in response.headers() {
+        resp_headers.insert(name.as_str().to_string(), value.to_str().unwrap_or("").to_string());
+    }
+
     // Read body - need to take ownership
     let body = response
         .bytes()
         .await
         .expect("Failed to read response body")
         .to_vec();
-    
-    // Store body and status
+
+    // Store body, status, and headers
     world.body = Some(body);
     world.status_code = Some(status);
+    world.response_headers = Some(resp_headers);
 }
 
-/// Build multipart form from Gherkin table
-async fn build_form_from_table(
+/// Build multipart form from Gherkin table, also extracting headers.
+async fn build_form_and_headers_from_table(
     _world: &mut FolioWorld,
     table: &Table,
-) -> reqwest::multipart::Form {
+) -> (reqwest::multipart::Form, Vec<(String, String)>) {
     let mut form = reqwest::multipart::Form::new();
+    let mut headers = Vec::new();
 
     // Table in cucumber 0.21 is Vec<Vec<String>>
     for row in table.rows.iter() {
@@ -146,7 +173,7 @@ async fn build_form_from_table(
                     form = form.text(field_name.clone(), field_value.clone());
                 }
                 "header" => {
-                    // Headers are handled separately
+                    headers.push((field_name.clone(), field_value.clone()));
                 }
                 _ => {
                     // Default: treat as text field
@@ -156,7 +183,7 @@ async fn build_form_from_table(
         }
     }
 
-    form
+    (form, headers)
 }
 
 /// Guess MIME type from file extension

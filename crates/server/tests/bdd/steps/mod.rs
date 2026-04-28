@@ -20,28 +20,29 @@ async fn default_container(world: &mut FolioWorld) {
 }
 
 #[given(regex = r#"I have a Folio container with the following environment variable\(s\):"#)]
-async fn container_with_env(world: &mut FolioWorld) {
-    // Use empty env - Table handling would need cucumber's attribute macro approach
-    container::default_container(world).await;
+async fn container_with_env(world: &mut FolioWorld, step: &cucumber::gherkin::Step) {
+    let table = step.table.as_ref().expect("Expected environment variables table");
+    container::container_with_env(world, table).await;
 }
 
 // =================================================================
 // HTTP steps (When)
 // =================================================================
 
-#[when(regex = r#"I make a "(GET|POST|PUT|DELETE)" request to "(.+)""#)]
+#[when(regex = r#"^I make a "(GET|POST|PUT|DELETE)" request to "(.+)"$"#)]
 async fn make_request(world: &mut FolioWorld, method: String, endpoint: String) {
     http::make_request(world, method, endpoint).await;
 }
 
-#[when(regex = r#"I make a "(POST)" request to "(.+)" with the following form data and header\(s\):"#)]
+#[when(regex = r#"^I make a "(POST)" request to "(.+)" with the following form data and header\(s\):$"#)]
 async fn make_request_with_form(
     world: &mut FolioWorld,
     method: String,
     endpoint: String,
+    step: &cucumber::gherkin::Step,
 ) {
-    // Table handling would need different approach - make simple POST for now
-    http::make_request(world, method, endpoint).await;
+    let table = step.table.as_ref().expect("Expected form data table");
+    http::make_request_with_form(world, method, endpoint, table).await;
 }
 
 // =================================================================
@@ -58,23 +59,9 @@ async fn check_header(world: &mut FolioWorld, name: String, value: String) {
     http::check_header(world, name, value).await;
 }
 
-#[then("the response header \"Content-Type\" should be \"application/zip\"")]
-async fn check_zip_header(world: &mut FolioWorld) {
-    http::check_header(world, "Content-Type".to_string(), "application/zip".to_string()).await;
-}
-
-#[then("the response header \"Content-Type\" should be \"image/png\"")]
-async fn check_png_header(world: &mut FolioWorld) {
-    http::check_header(world, "Content-Type".to_string(), "image/png".to_string()).await;
-}
-
-#[then("the response header \"Content-Type\" should be \"image/jpeg\"")]
-async fn check_jpeg_header(world: &mut FolioWorld) {
-    http::check_header(world, "Content-Type".to_string(), "image/jpeg".to_string()).await;
-}
-
 #[then(regex = r#"the response body should match JSON:"#)]
-async fn check_json_body(world: &mut FolioWorld, expected: String) {
+async fn check_json_body(world: &mut FolioWorld, step: &cucumber::gherkin::Step) {
+    let expected = step.docstring.clone().unwrap_or_default();
     http::check_json_body(world, expected).await;
 }
 
@@ -88,9 +75,10 @@ async fn check_pdf_count(world: &mut FolioWorld, count: usize) {
 }
 
 #[then(regex = r#"there should be the following file\(s\) in the response:"#)]
-async fn check_files_in_response(world: &mut FolioWorld) {
-    // For now, just verify we have a body
-    assert!(world.body.is_some(), "No response body available");
+async fn check_files_in_response(world: &mut FolioWorld, step: &cucumber::gherkin::Step) {
+    let table = step.table.as_ref().expect("Expected files table");
+    let files: Vec<String> = table.rows.iter().map(|row| row[0].clone()).collect();
+    pdf::check_files_in_response(world, files).await;
 }
 
 #[then(regex = r#"the "(.+)" PDF should have (\d+) page\(s\)"#)]
@@ -99,6 +87,7 @@ async fn check_page_count(world: &mut FolioWorld, filename: String, pages: usize
 }
 
 #[then(regex = r#"the "(.+)" PDF should have the following content at page (\d+):"#)]
-async fn check_page_content(world: &mut FolioWorld, filename: String, page: usize, content: String) {
+async fn check_page_content(world: &mut FolioWorld, filename: String, page: usize, step: &cucumber::gherkin::Step) {
+    let content = step.docstring.clone().unwrap_or_default();
     pdf::check_page_content(world, filename, page, content).await;
 }

@@ -22,9 +22,29 @@ pub async fn check_pdf_count(world: &mut FolioWorld, expected: usize) {
             "Response is not a valid PDF"
         );
     } else {
-        // TODO: Handle other multipart responses
-        panic!("Multiple PDF count not yet implemented");
+        // For ZIP responses, count how many entries are PDFs
+        let count = count_pdfs_in_zip(body);
+        assert_eq!(
+            count, expected,
+            "Expected {} PDF(s) in ZIP response, found {}",
+            expected, count
+        );
     }
+}
+
+/// Count PDF entries in a ZIP archive.
+fn count_pdfs_in_zip(bytes: &[u8]) -> usize {
+    use std::io::Cursor;
+    let cursor = Cursor::new(bytes);
+    let mut archive = zip::ZipArchive::new(cursor).expect("Response is not a valid ZIP archive");
+    let mut count = 0;
+    for i in 0..archive.len() {
+        let file = archive.by_index(i).expect("Failed to read ZIP entry");
+        if file.name().ends_with(".pdf") {
+            count += 1;
+        }
+    }
+    count
 }
 
 /// Check if bytes are valid ZIP
