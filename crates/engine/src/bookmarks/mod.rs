@@ -34,23 +34,23 @@ pub fn read_bookmarks(pdf: &[u8]) -> EngineResult<Vec<Bookmark>> {
         .trailer
         .get(b"Root")
         .and_then(Object::as_reference)
-        .ok_or_else(|| EngineError::InvalidInput("PDF has no catalog".into()))?;
+        .ok_or_else(|| EngineError::InvalidOption("PDF has no catalog".into()))?;
 
     let catalog = doc
         .get_object(catalog_id)
         .and_then(Object::as_dict)
-        .ok_or_else(|| EngineError::InvalidInput("PDF catalog not found".into()))?;
+        .ok_or_else(|| EngineError::InvalidOption("PDF catalog not found".into()))?;
 
     let outlines_ref = match catalog.get(b"Outlines") {
         Some(Object::Reference(id)) => *id,
-        Some(_) => return Err(EngineError::InvalidInput("Invalid Outlines entry".into())),
+        Some(_) => return Err(EngineError::InvalidOption("Invalid Outlines entry".into())),
         None => return Ok(Vec::new()), // No outline
     };
 
     let outlines = doc
         .get_object(outlines_ref)
         .and_then(Object::as_dict)
-        .ok_or_else(|| EngineError::InvalidInput("Outlines dictionary not found".into()))?;
+        .ok_or_else(|| EngineError::InvalidOption("Outlines dictionary not found".into()))?;
 
     // Build page number mapping (ObjectId -> page number)
     let page_map = build_page_map(&doc)?;
@@ -86,7 +86,7 @@ pub fn write_bookmarks(pdf: &[u8], bookmarks: &[Bookmark]) -> EngineResult<Vec<u
         .trailer
         .get(b"Root")
         .and_then(Object::as_reference)
-        .ok_or_else(|| EngineError::InvalidInput("PDF has no catalog".into()))?;
+        .ok_or_else(|| EngineError::InvalidOption("PDF has no catalog".into()))?;
 
     // Create outline structure
     let (outlines_id, count) = create_outlines(&mut doc, bookmarks, &page_map)?;
@@ -154,18 +154,20 @@ fn traverse_outlines(
     let mut current_id = Some(first_id);
 
     while let Some(id) = current_id {
-        let item = doc
+        // Parse current item
+        if let Ok(item) = doc.get_object(id).and_then(Object::as_dict) {
+            if let Some(bookmark) = parse_outline_item(doc, item, page_map).ok() {
+                bookmarks.push(bookmark);
+            }
+        }
+
+        // Get next sibling
+        current_id = doc
             .get_object(id)
-            .and_then(Object::as_dict)
-            .ok_or_else(|| EngineError::InvalidInput(format!("Outline item {:?} not found", id)))?;
-
-        let bookmark = parse_outline_item(doc, item, page_map)?;
-        bookmarks.push(bookmark);
-
-        // Move to next sibling
-        current_id = item
-            .get(b"Next")
-            .and_then(Object::as_reference);
+            .ok()
+            .and_then(|o| o.as_dict().ok())
+            .and_then(|d| d.get(b"Next").ok())
+            .and_then(|o| o.as_reference().ok());
     }
 
     Ok(bookmarks)
@@ -216,7 +218,7 @@ fn validate_bookmark_pages(bookmarks: &[Bookmark], page_count: u32) -> EngineRes
     fn check(bookmarks: &[Bookmark], page_count: u32) -> EngineResult<()> {
         for bookmark in bookmarks {
             if bookmark.page == 0 || bookmark.page > page_count {
-                return Err(EngineError::InvalidInput(format!(
+                return Err(EngineError::InvalidOption(format!(
                     "Bookmark '{}' references invalid page {} (document has {} pages)",
                     bookmark.title, bookmark.page, page_count
                 )));
@@ -281,7 +283,7 @@ fn create_outline_items(
             .iter()
             .find(|(_, &page)| page == bookmark.page)
             .map(|(id, _)| *id)
-            .ok_or_else(|| EngineError::InvalidInput(format!(
+            .ok_or_else(|| EngineError::InvalidOption(format!(
                 "Cannot find page {} for bookmark '{}'",
                 bookmark.page, bookmark.title
             )))?;
@@ -357,9 +359,10 @@ fn fix_parent_references(
         // Get next sibling
         current_id = doc
             .get_object(id)
+            .ok()
             .and_then(|o| o.as_dict().ok())
-            .and_then(|d| d.get(b"Next"))
-            .and_then(Object::as_reference);
+            .and_then(|d| d.get(b"Next").ok())
+            .and_then(|o| o.as_reference().ok());
     }
 
     Ok(())

@@ -27,10 +27,10 @@ impl ScreenshotFormat {
         }
     }
 
-    fn quality(&self) -> Option<u8> {
+    fn quality(&self) -> Option<i64> {
         match self {
             ScreenshotFormat::Png => None,
-            ScreenshotFormat::Jpeg { quality } => Some(*quality),
+            ScreenshotFormat::Jpeg { quality } => Some(*quality as i64),
         }
     }
 
@@ -115,8 +115,10 @@ pub async fn html_to_screenshot(
     let page = browser.new_page("about:blank").await
         .map_err(|e| EngineError::ChromeLaunch(format!("Failed to create page: {}", e)))?;
 
-    // Set HTML content
-    page.set_html(html).await
+    // Set HTML content using data URL
+    let data_url = format!("data:text/html;charset=utf-8,{}"
+        , urlencoding::encode(html));
+    page.goto(&data_url).await
         .map_err(|e| EngineError::ChromeLaunch(format!("Failed to set HTML: {}", e)))?;
 
     // Capture screenshot
@@ -200,9 +202,9 @@ async fn set_background_color(page: &Page, color: &str) -> EngineResult<()> {
     use chromiumoxide::cdp::browser_protocol::emulation::SetDefaultBackgroundColorOverrideParams;
 
     let color_param = chromiumoxide::cdp::browser_protocol::dom::Rgba {
-        r: rgba.0,
-        g: rgba.1,
-        b: rgba.2,
+        r: rgba.0 as i64,
+        g: rgba.1 as i64,
+        b: rgba.2 as i64,
         a: Some(rgba.3),
     };
 
@@ -236,7 +238,7 @@ async fn wait_for_condition(page: &Page, condition: &WaitCondition) -> EngineRes
         }
         WaitCondition::Expression { expression, timeout } => {
             // Wait for JavaScript expression
-            let _ = page.evaluate(expression).await
+            let _ = page.evaluate(expression.as_str()).await
                 .map_err(|e| EngineError::ChromeLaunch(format!("Wait expression failed: {}", e)))?;
             let _ = timeout; // TODO: use timeout
             Ok(())
@@ -247,10 +249,15 @@ async fn wait_for_condition(page: &Page, condition: &WaitCondition) -> EngineRes
 /// Capture viewport screenshot.
 async fn capture_viewport_screenshot(page: &Page, opts: &ScreenshotOptions) -> EngineResult<Vec<u8>> {
     let params = CaptureScreenshotParams::builder()
-        .format(opts.format.to_cdp_format())
-        .quality(opts.format.quality())
-        .from_surface(true)
-        .build();
+        .format(opts.format.to_cdp_format());
+        
+    let params = if let Some(q) = opts.format.quality() {
+        params.quality(q)
+    } else {
+        params
+    }
+    .from_surface(true)
+    .build();
 
     let result = page.execute(params).await
         .map_err(|e| EngineError::ChromeLaunch(format!("Screenshot failed: {}", e)))?;

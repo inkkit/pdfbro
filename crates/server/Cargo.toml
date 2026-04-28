@@ -61,12 +61,9 @@ reqwest = { workspace = true }
 static_assertions = { workspace = true }
 lopdf = { workspace = true }
 
-# BDD testing (always included)
+# BDD testing
 cucumber = "0.21"
 
-# Docker support for BDD tests (optional, for CI)
-testcontainers = { version = "0.22", optional = true }
-
-[features]
-default = []
-docker = ["testcontainers"]  # Enable for Docker-based BDD tests in CI
+# Conditional Docker support for BDD tests
+# Note: Set FOLIO_BDD_SKIP_DOCKER=1 to skip Docker-based tests
+testcontainers = "0.22"
