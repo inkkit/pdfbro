@@ -6,6 +6,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use axum::body::Bytes;
 use axum::extract::{Multipart, State};
@@ -38,10 +39,39 @@ pub async fn chromium_html(State(state): State<AppState>, mp: Multipart) -> ApiR
     let ctx = parse_request_context(&form.map)?;
 
     let base_url = file_url_for(&index.path);
-    let pdf = state
+    let start = Instant::now();
+    let result = state
         .chromium
         .html_to_pdf(&html, Some(&base_url), &opts, &ctx)
-        .await?;
+        .await;
+    let duration = start.elapsed().as_secs_f64();
+
+    match &result {
+        Ok(pdf) => {
+            state.metrics.record_conversion(
+                "chromium",
+                "/forms/chromium/convert/html",
+                true,
+                duration,
+                pdf.len() as u64,
+            );
+            state.metrics.record_engine_conversion(
+                "chromium",
+                "/forms/chromium/convert/html",
+            );
+        }
+        Err(_) => {
+            state.metrics.record_conversion(
+                "chromium",
+                "/forms/chromium/convert/html",
+                false,
+                duration,
+                0,
+            );
+        }
+    }
+
+    let pdf = result?;
     Ok(pdf_response(pdf, "result.pdf"))
 }
 
@@ -69,7 +99,36 @@ pub async fn chromium_url(State(state): State<AppState>, mp: Multipart) -> ApiRe
     opts.validate()?;
     let ctx = parse_request_context(&form.map)?;
 
-    let pdf = state.chromium.url_to_pdf(&url, &opts, &ctx).await?;
+    let start = Instant::now();
+    let result = state.chromium.url_to_pdf(&url, &opts, &ctx).await;
+    let duration = start.elapsed().as_secs_f64();
+
+    match &result {
+        Ok(pdf) => {
+            state.metrics.record_conversion(
+                "chromium",
+                "/forms/chromium/convert/url",
+                true,
+                duration,
+                pdf.len() as u64,
+            );
+            state.metrics.record_engine_conversion(
+                "chromium",
+                "/forms/chromium/convert/url",
+            );
+        }
+        Err(_) => {
+            state.metrics.record_conversion(
+                "chromium",
+                "/forms/chromium/convert/url",
+                false,
+                duration,
+                0,
+            );
+        }
+    }
+
+    let pdf = result?;
     Ok(pdf_response(pdf, "result.pdf"))
 }
 
@@ -99,10 +158,39 @@ pub async fn chromium_markdown(
             .map_err(|e| ApiError::Internal(e.to_string()))?;
         let inlined = inline_markdown_links(&wrapper, &form).await?;
         let base_url = file_url_for(&index.path);
-        let pdf = state
+        let start = Instant::now();
+        let result = state
             .chromium
             .html_to_pdf(&inlined, Some(&base_url), &opts, &ctx)
-            .await?;
+            .await;
+        let duration = start.elapsed().as_secs_f64();
+
+        match &result {
+            Ok(pdf) => {
+                state.metrics.record_conversion(
+                    "chromium",
+                    "/forms/chromium/convert/markdown",
+                    true,
+                    duration,
+                    pdf.len() as u64,
+                );
+                state.metrics.record_engine_conversion(
+                    "chromium",
+                    "/forms/chromium/convert/markdown",
+                );
+            }
+            Err(_) => {
+                state.metrics.record_conversion(
+                    "chromium",
+                    "/forms/chromium/convert/markdown",
+                    false,
+                    duration,
+                    0,
+                );
+            }
+        }
+
+        let pdf = result?;
         return Ok(pdf_response(pdf, "result.pdf"));
     }
 
@@ -118,10 +206,40 @@ pub async fn chromium_markdown(
                     .unwrap_or(false)
         })
         .ok_or_else(|| ApiError::MissingFile("*.md".to_string()))?;
+
     let md = tokio::fs::read_to_string(&md_file.path)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    let pdf = state.chromium.markdown_to_pdf(&md, &opts, &ctx).await?;
+    let start = Instant::now();
+    let result = state.chromium.markdown_to_pdf(&md, &opts, &ctx).await;
+    let duration = start.elapsed().as_secs_f64();
+
+    match &result {
+        Ok(pdf) => {
+            state.metrics.record_conversion(
+                "chromium",
+                "/forms/chromium/convert/markdown",
+                true,
+                duration,
+                pdf.len() as u64,
+            );
+            state.metrics.record_engine_conversion(
+                "chromium",
+                "/forms/chromium/convert/markdown",
+            );
+        }
+        Err(_) => {
+            state.metrics.record_conversion(
+                "chromium",
+                "/forms/chromium/convert/markdown",
+                false,
+                duration,
+                0,
+            );
+        }
+    }
+
+    let pdf = result?;
     Ok(pdf_response(pdf, "result.pdf"))
 }
 
@@ -490,13 +608,41 @@ pub async fn chromium_screenshot_html(State(state): State<AppState>, mp: Multipa
     let html = tokio::fs::read_to_string(&index.path)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    
+
     let opts = parse_screenshot_options(&form.map)?;
-    let image = state.chromium.html_to_screenshot(&html, &opts).await?;
-    
+    let start = Instant::now();
+    let result = state.chromium.html_to_screenshot(&html, &opts).await;
+    let duration = start.elapsed().as_secs_f64();
+
+    match &result {
+        Ok(image) => {
+            state.metrics.record_conversion(
+                "chromium",
+                "/forms/chromium/screenshot/html",
+                true,
+                duration,
+                image.len() as u64,
+            );
+            state.metrics.record_engine_conversion(
+                "chromium",
+                "/forms/chromium/screenshot/html",
+            );
+        }
+        Err(_) => {
+            state.metrics.record_conversion(
+                "chromium",
+                "/forms/chromium/screenshot/html",
+                false,
+                duration,
+                0,
+            );
+        }
+    }
+
+    let image = result?;
     let ext = opts.format.extension();
     let filename = format!("screenshot.{}", ext);
-    
+
     Ok(image_response(image, &filename, opts.format.content_type()))
 }
 
@@ -505,13 +651,41 @@ pub async fn chromium_screenshot_url(State(state): State<AppState>, mp: Multipar
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let url = form.map.get("url").ok_or(ApiError::MissingField("url"))?;
-    
+
     let opts = parse_screenshot_options(&form.map)?;
-    let image = state.chromium.url_to_screenshot(url, &opts).await?;
-    
+    let start = Instant::now();
+    let result = state.chromium.url_to_screenshot(url, &opts).await;
+    let duration = start.elapsed().as_secs_f64();
+
+    match &result {
+        Ok(image) => {
+            state.metrics.record_conversion(
+                "chromium",
+                "/forms/chromium/screenshot/url",
+                true,
+                duration,
+                image.len() as u64,
+            );
+            state.metrics.record_engine_conversion(
+                "chromium",
+                "/forms/chromium/screenshot/url",
+            );
+        }
+        Err(_) => {
+            state.metrics.record_conversion(
+                "chromium",
+                "/forms/chromium/screenshot/url",
+                false,
+                duration,
+                0,
+            );
+        }
+    }
+
+    let image = result?;
     let ext = opts.format.extension();
     let filename = format!("screenshot.{}", ext);
-    
+
     Ok(image_response(image, &filename, opts.format.content_type()))
 }
 
