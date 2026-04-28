@@ -18,6 +18,7 @@ use engine::PdfAProfile;
 use engine::bookmarks::{read_bookmarks, write_bookmarks};
 use engine::pdfa::convert_to_pdfa;
 use engine::pdfops::{WatermarkKind, WatermarkOptions, Position as WatermarkPosition, watermark};
+use engine::encrypt::{EncryptionAlgorithm, Permissions, encrypt_pdf, decrypt_pdf};
 
 const SPAWN_BLOCKING_THRESHOLD: usize = 1024 * 1024;
 
@@ -579,6 +580,80 @@ fn parse_watermark_options(
         all_pages,
         tiled,
     })
+}
+
+// ---------------------------------------------------------------------------
+// /forms/pdfengines/encrypt and /decrypt
+// ---------------------------------------------------------------------------
+
+/// `POST /forms/pdfengines/encrypt` - Encrypt PDF with password.
+pub async fn pdfengines_encrypt(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+    let _permit = acquire_permit(&state).await?;
+    let form = FormFields::from_multipart(mp).await?;
+    let files = form.files_by_field("files");
+    if files.len() != 1 {
+        return Err(ApiError::InvalidField {
+            field: "files",
+            message: "encrypt expects exactly one file".to_string(),
+        });
+    }
+    let pdf_bytes = read_one(files[0]).await?;
+
+    // Get passwords
+    let user_password = form.map.get("userPassword").map(|s| s.as_str());
+    let owner_password = form.map.get("ownerPassword").map(|s| s.as_str());
+
+    // Parse algorithm
+    let algorithm = match form.map.get("algorithm").map(|s| s.as_str()) {
+        Some("aes128") => EncryptionAlgorithm::Aes128,
+        _ => EncryptionAlgorithm::Aes256,
+    };
+
+    // Parse permissions
+    let permissions = form.map.get("permissions")
+        .map(|s| Permissions::from_string(s))
+        .unwrap_or_else(Permissions::allow_all);
+
+    let output = encrypt_pdf(&pdf_bytes, user_password, owner_password, algorithm, permissions)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let filename = form
+        .map
+        .get(" Gotenberg-Output-Filename")
+        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
+        .unwrap_or_else(|| "encrypted.pdf".to_string());
+
+    Ok(pdf_response(output, &filename))
+}
+
+/// `POST /forms/pdfengines/decrypt` - Remove encryption from PDF.
+pub async fn pdfengines_decrypt(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+    let _permit = acquire_permit(&state).await?;
+    let form = FormFields::from_multipart(mp).await?;
+    let files = form.files_by_field("files");
+    if files.len() != 1 {
+        return Err(ApiError::InvalidField {
+            field: "files",
+            message: "decrypt expects exactly one file".to_string(),
+        });
+    }
+    let pdf_bytes = read_one(files[0]).await?;
+
+    // Get password
+    let password = form.map.get("password").ok_or(ApiError::MissingField("password"))?;
+
+    let output = decrypt_pdf(&pdf_bytes, password)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let filename = form
+        .map
+        .get(" Gotenberg-Output-Filename")
+        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
+        .unwrap_or_else(|| "decrypted.pdf".to_string());
+
+    Ok(pdf_response(output, &filename))
 }
 
 #[cfg(test)]
