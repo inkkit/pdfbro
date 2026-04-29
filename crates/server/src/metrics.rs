@@ -303,11 +303,11 @@ impl FolioMetrics {
             for line in status.lines() {
                 if line.starts_with("VmRSS:") {
                     if let Some(kb) = extract_kb_value(line) {
-                        self.process_resident_memory.set(kb * 1024);
+                        self.process_resident_memory.set((kb * 1024) as f64);
                     }
                 } else if line.starts_with("VmSize:") {
                     if let Some(kb) = extract_kb_value(line) {
-                        self.process_virtual_memory.set(kb * 1024);
+                        self.process_virtual_memory.set((kb * 1024) as f64);
                     }
                 }
             }
