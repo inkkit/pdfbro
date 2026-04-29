@@ -29,7 +29,11 @@ use tracing::Level;
 
 use crate::error::ApiError;
 
-use crate::routes::{chromium, health, libreoffice, pdfengines};
+use crate::routes::{health, pdfengines};
+#[cfg(feature = "chromium")]
+use crate::routes::chromium;
+#[cfg(feature = "libreoffice")]
+use crate::routes::libreoffice;
 use crate::state::AppState;
 
 const REQUEST_ID_HEADER: &str = "x-request-id";
@@ -81,33 +85,43 @@ pub fn build_router(state: AppState) -> Router {
     let max_body = state.config.max_body_bytes;
     let request_timeout = state.config.request_timeout;
 
-    let timed = Router::new()
-        .route(
-            "/forms/chromium/convert/html",
-            post(chromium::chromium_html),
-        )
-        .route("/forms/chromium/convert/url", post(chromium::chromium_url))
-        .route(
-            "/forms/chromium/convert/markdown",
-            post(chromium::chromium_markdown),
-        )
-        .route(
-            "/forms/chromium/screenshot/html",
-            post(chromium::chromium_screenshot_html),
-        )
-        .route(
-            "/forms/chromium/screenshot/url",
-            post(chromium::chromium_screenshot_url),
-        )
-        .route(
-            "/forms/chromium/screenshot/markdown",
-            post(chromium::chromium_screenshot_markdown),
-        )
-        .route(
+    let mut timed = Router::new();
+
+    #[cfg(feature = "chromium")]
+    {
+        timed = timed
+            .route(
+                "/forms/chromium/convert/html",
+                post(chromium::chromium_html),
+            )
+            .route("/forms/chromium/convert/url", post(chromium::chromium_url))
+            .route(
+                "/forms/chromium/convert/markdown",
+                post(chromium::chromium_markdown),
+            )
+            .route(
+                "/forms/chromium/screenshot/html",
+                post(chromium::chromium_screenshot_html),
+            )
+            .route(
+                "/forms/chromium/screenshot/url",
+                post(chromium::chromium_screenshot_url),
+            )
+            .route(
+                "/forms/chromium/screenshot/markdown",
+                post(chromium::chromium_screenshot_markdown),
+            );
+    }
+
+    #[cfg(feature = "libreoffice")]
+    {
+        timed = timed.route(
             "/forms/libreoffice/convert",
             post(libreoffice::libreoffice_convert),
-        )
-        .route(
+        );
+    }
+
+    timed = timed.route(
             "/forms/pdfengines/merge",
             post(pdfengines::pdfengines_merge),
         )

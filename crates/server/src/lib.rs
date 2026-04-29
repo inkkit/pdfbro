@@ -20,7 +20,9 @@ pub mod state;
 pub mod webhook;
 
 pub use app::build_router;
-pub use backend::{ChromiumBackend, PdfBackend};
 pub use config::{LogFormat, ServerArgs, ServerConfig};
 pub use error::{ApiError, ApiResult};
 pub use state::AppState;
+
+#[cfg(feature = "chromium")]
+pub use backend::{ChromiumBackend, PdfBackend};
