@@ -26,7 +26,11 @@ const INDEX_HTML: &str = "index.html";
 // ---------------------------------------------------------------------------
 
 /// `POST /forms/chromium/convert/html`.
-pub async fn chromium_html(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn chromium_html(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let index = form
@@ -38,6 +42,19 @@ pub async fn chromium_html(State(state): State<AppState>, mp: Multipart) -> ApiR
     let opts = parse_pdf_options(&form.map)?;
     opts.validate()?;
     let ctx = parse_request_context(&form.map)?;
+
+    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+        &headers,
+        &state,
+        crate::webhook::WebhookOperation::ChromiumConvertHtml,
+        crate::webhook::JobData::ChromiumHtml {
+            html: html.clone().into_bytes(),
+            options: opts.clone(),
+            ctx: ctx.clone(),
+        },
+    ).await? {
+        return Ok(resp);
+    }
 
     let base_url = file_url_for(&index.path);
     let start = Instant::now();
@@ -79,7 +96,11 @@ pub async fn chromium_html(State(state): State<AppState>, mp: Multipart) -> ApiR
 }
 
 /// `POST /forms/chromium/convert/url`.
-pub async fn chromium_url(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn chromium_url(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let url = form
@@ -101,6 +122,19 @@ pub async fn chromium_url(State(state): State<AppState>, mp: Multipart) -> ApiRe
     let opts = parse_pdf_options(&form.map)?;
     opts.validate()?;
     let ctx = parse_request_context(&form.map)?;
+
+    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+        &headers,
+        &state,
+        crate::webhook::WebhookOperation::ChromiumConvertUrl,
+        crate::webhook::JobData::ChromiumUrl {
+            url: url.clone(),
+            options: opts.clone(),
+            ctx: ctx.clone(),
+        },
+    ).await? {
+        return Ok(resp);
+    }
 
     let start = Instant::now();
     let result = state.chromium.as_ref().unwrap().url_to_pdf(&url, &opts, &ctx).await;
@@ -147,6 +181,7 @@ pub async fn chromium_url(State(state): State<AppState>, mp: Multipart) -> ApiRe
 /// The wrapper takes precedence when both shapes are present.
 pub async fn chromium_markdown(
     State(state): State<AppState>,
+    headers: HeaderMap,
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
@@ -160,6 +195,20 @@ pub async fn chromium_markdown(
             .await
             .map_err(|e| ApiError::Internal(e.to_string()))?;
         let inlined = inline_markdown_links(&wrapper, &form).await?;
+
+        if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+            &headers,
+            &state,
+            crate::webhook::WebhookOperation::ChromiumConvertMarkdown,
+            crate::webhook::JobData::ChromiumMarkdown {
+                html: inlined.clone().into_bytes(),
+                options: opts.clone(),
+                ctx: ctx.clone(),
+            },
+        ).await? {
+            return Ok(resp);
+        }
+
         let base_url = file_url_for(&index.path);
         let start = Instant::now();
         let result = state
@@ -215,6 +264,21 @@ pub async fn chromium_markdown(
     let md = tokio::fs::read_to_string(&md_file.path)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let html = render_markdown_to_html(&md);
+    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+        &headers,
+        &state,
+        crate::webhook::WebhookOperation::ChromiumConvertMarkdown,
+        crate::webhook::JobData::ChromiumMarkdown {
+            html: html.into_bytes(),
+            options: opts.clone(),
+            ctx: ctx.clone(),
+        },
+    ).await? {
+        return Ok(resp);
+    }
+
     let start = Instant::now();
     let result = state.chromium.as_ref().unwrap().markdown_to_pdf(&md, &opts, &ctx).await;
     let duration = start.elapsed().as_secs_f64();
@@ -579,7 +643,11 @@ fn file_url_for(path: &Path) -> String {
 // ---------------------------------------------------------------------------
 
 /// `POST /forms/chromium/screenshot/html`.
-pub async fn chromium_screenshot_html(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn chromium_screenshot_html(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let index = form
@@ -590,6 +658,19 @@ pub async fn chromium_screenshot_html(State(state): State<AppState>, mp: Multipa
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let opts = parse_screenshot_options(&form.map)?;
+
+    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+        &headers,
+        &state,
+        crate::webhook::WebhookOperation::ChromiumScreenshotHtml,
+        crate::webhook::JobData::ChromiumScreenshotHtml {
+            html: html.clone().into_bytes(),
+            options: opts.clone(),
+        },
+    ).await? {
+        return Ok(resp);
+    }
+
     let start = Instant::now();
     let result = state.chromium.as_ref().unwrap().html_to_screenshot(&html, &opts).await;
     let duration = start.elapsed().as_secs_f64();
@@ -627,12 +708,29 @@ pub async fn chromium_screenshot_html(State(state): State<AppState>, mp: Multipa
 }
 
 /// `POST /forms/chromium/screenshot/url`.
-pub async fn chromium_screenshot_url(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn chromium_screenshot_url(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let url = form.map.get("url").ok_or(ApiError::MissingField("url"))?;
 
     let opts = parse_screenshot_options(&form.map)?;
+
+    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+        &headers,
+        &state,
+        crate::webhook::WebhookOperation::ChromiumScreenshotUrl,
+        crate::webhook::JobData::ChromiumScreenshotUrl {
+            url: url.clone(),
+            options: opts.clone(),
+        },
+    ).await? {
+        return Ok(resp);
+    }
+
     let start = Instant::now();
     let result = state.chromium.as_ref().unwrap().url_to_screenshot(url, &opts).await;
     let duration = start.elapsed().as_secs_f64();
@@ -670,7 +768,11 @@ pub async fn chromium_screenshot_url(State(state): State<AppState>, mp: Multipar
 }
 
 /// `POST /forms/chromium/screenshot/markdown`.
-pub async fn chromium_screenshot_markdown(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn chromium_screenshot_markdown(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let index = form
@@ -679,16 +781,29 @@ pub async fn chromium_screenshot_markdown(State(state): State<AppState>, mp: Mul
     let md = tokio::fs::read_to_string(&index.path)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    
+
     // Convert markdown to HTML
     let html = render_markdown_to_html(&md);
-    
+
     let opts = parse_screenshot_options(&form.map)?;
+
+    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+        &headers,
+        &state,
+        crate::webhook::WebhookOperation::ChromiumScreenshotMarkdown,
+        crate::webhook::JobData::ChromiumScreenshotMarkdown {
+            html: html.clone().into_bytes(),
+            options: opts.clone(),
+        },
+    ).await? {
+        return Ok(resp);
+    }
+
     let image = state.chromium.as_ref().unwrap().html_to_screenshot(&html, &opts).await?;
-    
+
     let ext = opts.format.extension();
     let filename = format!("screenshot.{}", ext);
-    
+
     Ok(image_response(image, &filename, opts.format.content_type()))
 }
 
