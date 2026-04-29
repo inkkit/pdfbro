@@ -5,12 +5,17 @@ edition.workspace = true
 license.workspace = true
 description = "Folio core engine: ChromiumEngine, LibreOfficeEngine, PdfOperations"
 
+[features]
+default = ["chromium", "libreoffice"]
+chromium = ["dep:chromiumoxide", "dep:futures-util", "dep:pulldown-cmark", "dep:urlencoding"]
+libreoffice = []
+
 [dependencies]
-chromiumoxide = { workspace = true }
-futures-util = { workspace = true }
+chromiumoxide = { workspace = true, optional = true }
+futures-util = { workspace = true, optional = true }
 humantime-serde = { workspace = true }
 lopdf = { workspace = true }
-pulldown-cmark = { workspace = true }
+pulldown-cmark = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
@@ -23,7 +28,7 @@ which = "7"
 image = { workspace = true }
 
 # URL encoding for screenshot data URLs
-urlencoding = "2"
+urlencoding = { version = "2", optional = true }
 
 [dev-dependencies]
 axum = { workspace = true }
