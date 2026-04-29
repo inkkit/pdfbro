@@ -21,6 +21,8 @@ use server::ChromiumBackend;
 use engine::LibreOfficeConfig;
 use tokio::net::TcpListener;
 
+use axum_server::tls_rustls::RustlsConfig;
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -106,15 +108,46 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
 
     let router = build_router(state, &config);
     let addr: SocketAddr = SocketAddr::new(config.host, config.port);
-    let listener = TcpListener::bind(addr)
-        .await
-        .with_context(|| format!("binding {addr}"))?;
-    tracing::info!(%addr, "listening");
 
-    axum::serve(listener, router.into_make_service())
-        .with_graceful_shutdown(shutdown::shutdown_signal())
-        .await
-        .context("axum serve")?;
+    // Check if TLS is configured
+    let tls_enabled = config.api_tls_cert_file.is_some() && config.api_tls_key_file.is_some();
+
+    if tls_enabled {
+        let cert_file = config.api_tls_cert_file.as_ref().unwrap();
+        let key_file = config.api_tls_key_file.as_ref().unwrap();
+
+        tracing::info!(%addr, cert = %cert_file.display(), key = %key_file.display(), "starting HTTPS server");
+
+        let tls_config = RustlsConfig::from_pem_file(cert_file, key_file)
+            .await
+            .context("loading TLS certificates")?;
+
+        let handle = axum_server::Handle::new();
+        let shutdown_handle = handle.clone();
+
+        // Spawn graceful shutdown signal handler
+        tokio::spawn(async move {
+            shutdown::shutdown_signal().await;
+            shutdown_handle.shutdown();
+        });
+
+        axum_server::bind_rustls(addr, tls_config)
+            .handle(handle)
+            .serve(router.into_make_service())
+            .await
+            .context("axum TLS serve")?;
+    } else {
+        tracing::info!(%addr, "starting HTTP server");
+
+        let listener = TcpListener::bind(addr)
+            .await
+            .with_context(|| format!("binding {addr}"))?;
+
+        axum::serve(listener, router.into_make_service())
+            .with_graceful_shutdown(shutdown::shutdown_signal())
+            .await
+            .context("axum serve")?;
+    }
 
     tracing::info!("server stopped accepting connections; closing engines");
 
