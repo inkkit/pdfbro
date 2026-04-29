@@ -176,6 +176,11 @@ mod tests {
             soffice_path: None,
             log_level: "info".to_string(),
             log_format: LogFormat::Text,
+            batch_max_items: 50,
+            batch_concurrency: 4,
+            batch_max_active: 10,
+            batch_retention_minutes: 60,
+            batch_storage_path: std::path::PathBuf::from("/tmp/folio-batches"),
         }
     }
 

@@ -290,6 +290,17 @@ impl BatchItemType {
     pub fn uses_libreoffice(&self) -> bool {
         matches!(self, BatchItemType::LibreOffice)
     }
+
+    /// Returns true if this type produces PDF output.
+    pub fn produces_pdf(&self) -> bool {
+        matches!(
+            self,
+            BatchItemType::ChromiumHtml
+                | BatchItemType::ChromiumUrl
+                | BatchItemType::ChromiumMarkdown
+                | BatchItemType::LibreOffice
+        )
+    }
 }
 
 /// Per-item override options.
@@ -414,6 +425,13 @@ pub enum ItemStatus {
     Success,
     /// Failed.
     Error,
+}
+
+impl ItemStatus {
+    /// Returns true if status is Success.
+    pub fn is_success(&self) -> bool {
+        matches!(self, ItemStatus::Success)
+    }
 }
 
 /// Batch results summary (present when complete).
@@ -544,5 +562,255 @@ mod tests {
         assert!(BatchItemType::ChromiumScreenshotHtml.uses_chromium());
         assert!(!BatchItemType::LibreOffice.uses_chromium());
         assert!(BatchItemType::LibreOffice.uses_libreoffice());
+    }
+
+    #[test]
+    fn batch_item_produces_pdf() {
+        let item = BatchItem {
+            item_type: BatchItemType::ChromiumHtml,
+            file: "test.html".to_string(),
+            options: ItemOptions::default(),
+        };
+        assert!(item.produces_pdf());
+
+        let screenshot = BatchItem {
+            item_type: BatchItemType::ChromiumScreenshotHtml,
+            file: "test.html".to_string(),
+            options: ItemOptions::default(),
+        };
+        assert!(!screenshot.produces_pdf());
+    }
+
+    #[test]
+    fn batch_item_output_extension() {
+        let pdf_item = BatchItem {
+            item_type: BatchItemType::ChromiumHtml,
+            file: "test.html".to_string(),
+            options: ItemOptions::default(),
+        };
+        assert_eq!(pdf_item.output_extension(), "pdf");
+
+        let png_item = BatchItem {
+            item_type: BatchItemType::ChromiumScreenshotHtml,
+            file: "test.html".to_string(),
+            options: ItemOptions::default(),
+        };
+        assert_eq!(png_item.output_extension(), "png");
+    }
+
+    #[test]
+    fn batch_request_validation_empty_items() {
+        let request = BatchRequest {
+            items: vec![],
+            output_mode: OutputMode::Zip,
+            global_options: GlobalOptions::default(),
+            merge_options: MergeOptions::default(),
+        };
+        let result = request.validate(&[]);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("at least one item"));
+    }
+
+    #[test]
+    fn batch_request_validation_too_many_items() {
+        let items: Vec<BatchItem> = (0..60)
+            .map(|i| BatchItem {
+                item_type: BatchItemType::ChromiumHtml,
+                file: format!("test{}.html", i),
+                options: ItemOptions::default(),
+            })
+            .collect();
+        let request = BatchRequest {
+            items,
+            output_mode: OutputMode::Zip,
+            global_options: GlobalOptions::default(),
+            merge_options: MergeOptions::default(),
+        };
+        let result = request.validate(&[]);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("exceeds maximum"));
+    }
+
+    #[test]
+    fn batch_request_validation_missing_file() {
+        let request = BatchRequest {
+            items: vec![BatchItem {
+                item_type: BatchItemType::ChromiumHtml,
+                file: "missing.html".to_string(),
+                options: ItemOptions::default(),
+            }],
+            output_mode: OutputMode::Zip,
+            global_options: GlobalOptions::default(),
+            merge_options: MergeOptions::default(),
+        };
+        // No uploaded files provided
+        let result = request.validate(&[]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn batch_request_validation_merge_requires_pdf() {
+        let request = BatchRequest {
+            items: vec![BatchItem {
+                item_type: BatchItemType::ChromiumScreenshotHtml, // Screenshot produces PNG
+                file: "test.html".to_string(),
+                options: ItemOptions::default(),
+            }],
+            output_mode: OutputMode::Merge,
+            global_options: GlobalOptions::default(),
+            merge_options: MergeOptions::default(),
+        };
+        let uploaded = crate::multipart::UploadedFile {
+            filename: "test.html".to_string(),
+            field_name: "files".to_string(),
+            path: std::path::PathBuf::from("/tmp/test.html"),
+            content_type: None,
+            size: 0,
+        };
+        let result = request.validate(&[uploaded]);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("merge"));
+    }
+
+    #[test]
+    fn batch_request_validation_url_type_no_file_needed() {
+        let request = BatchRequest {
+            items: vec![BatchItem {
+                item_type: BatchItemType::ChromiumUrl,
+                file: "https://example.com".to_string(),
+                options: ItemOptions::default(),
+            }],
+            output_mode: OutputMode::Zip,
+            global_options: GlobalOptions::default(),
+            merge_options: MergeOptions::default(),
+        };
+        // URLs don't need uploaded files
+        let result = request.validate(&[]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn batch_request_validation_invalid_url() {
+        let request = BatchRequest {
+            items: vec![BatchItem {
+                item_type: BatchItemType::ChromiumUrl,
+                file: "not-a-valid-url".to_string(),
+                options: ItemOptions::default(),
+            }],
+            output_mode: OutputMode::Zip,
+            global_options: GlobalOptions::default(),
+            merge_options: MergeOptions::default(),
+        };
+        let result = request.validate(&[]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn batch_submit_response_serialization() {
+        use std::time::SystemTime;
+        let response = BatchSubmitResponse {
+            batch_id: BatchId::new(),
+            status: BatchStatus::Queued,
+            expires_at: SystemTime::now(),
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("batchId"));
+        assert!(json.contains("queued"));
+    }
+
+    #[test]
+    fn batch_status_response_serialization_success() {
+        use std::time::SystemTime;
+        let response = BatchStatusResponse {
+            batch_id: BatchId::new(),
+            status: BatchStatus::Completed,
+            submitted_at: SystemTime::now(),
+            started_at: Some(SystemTime::now()),
+            completed_at: Some(SystemTime::now()),
+            progress: BatchProgress {
+                total: 3,
+                completed: 3,
+                failed: 0,
+                pending: 0,
+            },
+            items: vec![
+                ItemResult {
+                    index: 0,
+                    file: "test.html".to_string(),
+                    status: ItemStatus::Success,
+                    output_type: Some("pdf".to_string()),
+                    pages: Some(2),
+                    bytes: Some(1024),
+                    error: None,
+                    error_code: None,
+                }
+            ],
+            results: Some(BatchResultsSummary {
+                succeeded: 3,
+                failed: 0,
+                total_bytes: 3072,
+                output_ready: true,
+            }),
+            download_url: Some("/forms/batch/batch_123/download".to_string()),
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("completed"));
+        assert!(json.contains("batchId"));
+    }
+
+    #[test]
+    fn batch_status_response_serialization_failed() {
+        use std::time::SystemTime;
+        let response = BatchStatusResponse {
+            batch_id: BatchId::new(),
+            status: BatchStatus::Failed,
+            submitted_at: SystemTime::now(),
+            started_at: Some(SystemTime::now()),
+            completed_at: Some(SystemTime::now()),
+            progress: BatchProgress {
+                total: 1,
+                completed: 0,
+                failed: 1,
+                pending: 0,
+            },
+            items: vec![
+                ItemResult {
+                    index: 0,
+                    file: "test.html".to_string(),
+                    status: ItemStatus::Error,
+                    output_type: None,
+                    pages: None,
+                    bytes: None,
+                    error: Some("Conversion failed".to_string()),
+                    error_code: Some(ErrorCode::ConversionFailed),
+                }
+            ],
+            results: None,
+            download_url: None,
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("failed"));
+    }
+
+    #[test]
+    fn error_code_serialization() {
+        let code = ErrorCode::InvalidOptions;
+        let json = serde_json::to_string(&code).unwrap();
+        assert_eq!(json, "\"INVALID_OPTIONS\"");
+    }
+
+    #[test]
+    fn batch_id_from_raw() {
+        let raw = "batch_abc123".to_string();
+        let id = BatchId::from_raw(raw.clone());
+        assert_eq!(id.to_string(), raw);
+    }
+
+    #[test]
+    fn item_status_is_success() {
+        assert!(ItemStatus::Success.is_success());
+        assert!(!ItemStatus::Error.is_success());
+        assert!(!ItemStatus::Pending.is_success());
+        assert!(!ItemStatus::Processing.is_success());
     }
 }

@@ -175,8 +175,8 @@ pub fn build_router(state: AppState) -> Router {
         )
         // Batch API routes
         .route("/forms/batch/submit", post(batch::batch_submit))
-        .route("/forms/batch/:id/status", get(batch::batch_status))
-        .route("/forms/batch/:id/download", get(batch::batch_download))
+        .route("/forms/batch/{id}/status", get(batch::batch_status))
+        .route("/forms/batch/{id}/download", get(batch::batch_download))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(handle_timeout_error))
