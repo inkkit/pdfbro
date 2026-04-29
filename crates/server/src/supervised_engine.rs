@@ -319,4 +319,18 @@ impl SupervisedLibreOfficeEngine {
             None => Err(EngineError::Internal("LibreOffice engine not available".into())),
         }
     }
+
+    /// Convert many files to PDFs in parallel.
+    pub async fn convert_many(
+        &self,
+        inputs: &[std::path::PathBuf],
+        opts: &engine::OfficeOptions,
+    ) -> EngineResult<Vec<Vec<u8>>> {
+        self.update_activity();
+        let guard = self.get_engine().await?;
+        match guard.as_ref() {
+            Some(engine) => engine.convert_many(inputs, opts).await,
+            None => Err(EngineError::Internal("LibreOffice engine not available".into())),
+        }
+    }
 }

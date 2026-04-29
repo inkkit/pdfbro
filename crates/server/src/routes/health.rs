@@ -57,3 +57,29 @@ pub async fn metrics_handler() -> impl IntoResponse {
         .body(metrics)
         .unwrap()
 }
+
+/// Debug endpoint - exposes server configuration and state.
+/// Only available when --api-enable-debug-route is set.
+pub async fn debug(State(state): State<AppState>) -> impl IntoResponse {
+    let uptime_secs = state.started_at.elapsed().as_secs();
+    
+    Json(json!({
+        "version": env!("CARGO_PKG_VERSION"),
+        "uptime_secs": uptime_secs,
+        "config": {
+            "host": state.config.host.to_string(),
+            "port": state.config.port,
+            "concurrency": state.config.concurrency,
+            "max_body_bytes": state.config.max_body_bytes,
+            "request_timeout_secs": state.config.request_timeout.as_secs(),
+            "chromium_auto_start": state.config.chromium_auto_start,
+            "chromium_idle_shutdown_timeout_secs": state.config.chromium_idle_shutdown_timeout.map(|d| d.as_secs()),
+            "libreoffice_auto_start": state.config.libreoffice_auto_start,
+            "libreoffice_idle_shutdown_timeout_secs": state.config.libreoffice_idle_shutdown_timeout.map(|d| d.as_secs()),
+        },
+        "features": {
+            "chromium": cfg!(feature = "chromium"),
+            "libreoffice": cfg!(feature = "libreoffice"),
+        }
+    }))
+}
