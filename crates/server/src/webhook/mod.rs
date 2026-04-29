@@ -62,7 +62,7 @@ pub struct WebhookEngineContext {
     pub chromium: Option<Arc<()>>,
     /// LibreOffice engine (if feature enabled).
     #[cfg(feature = "libreoffice")]
-    pub libreoffice: Option<Arc<engine::LibreOfficeEngine>>,
+    pub libreoffice: Option<Arc<crate::supervised_engine::SupervisedLibreOfficeEngine>>,
     #[cfg(not(feature = "libreoffice"))]
     pub libreoffice: Option<Arc<()>>,
 }

@@ -104,7 +104,7 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
     #[cfg(feature = "libreoffice")]
     let state = state.with_libreoffice(Some(Arc::new(libreoffice)));
 
-    let router = build_router(state);
+    let router = build_router(state, &config);
     let addr: SocketAddr = SocketAddr::new(config.host, config.port);
     let listener = TcpListener::bind(addr)
         .await
@@ -121,7 +121,7 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
     // Best-effort engine shutdown with a bounded budget.
     #[cfg(feature = "chromium")]
     {
-        let shutdown = tokio::time::timeout(shutdown::DEFAULT_DRAIN, chromium_handle.shutdown());
+        let shutdown = tokio::time::timeout(shutdown::DEFAULT_DRAIN, chromium.shutdown());
         if let Err(_e) = shutdown.await {
             tracing::warn!("Chromium shutdown exceeded drain budget");
         }
