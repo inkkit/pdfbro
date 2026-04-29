@@ -31,8 +31,13 @@ async fn main() -> anyhow::Result<()> {
 
 async fn serve(args: ServerArgs) -> anyhow::Result<()> {
     let config = ServerConfig::from_args(&args).context("config resolution")?;
-    init_logging(config.log_format.as_str(), &config.log_level)
-        .context("logging initialization")?;
+    init_logging(
+        config.log_format.as_str(),
+        &config.log_level,
+        config.otel_enabled,
+        &config.otel_endpoint,
+    )
+    .context("logging initialization")?;
 
     tracing::info!(
         host = %config.host,
@@ -40,6 +45,8 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
         concurrency = config.concurrency,
         max_body_bytes = config.max_body_bytes,
         request_timeout = ?config.request_timeout,
+        otel_enabled = config.otel_enabled,
+        otel_endpoint = %config.otel_endpoint,
         "starting folio-server",
     );
 
@@ -143,6 +150,11 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
         if let Err(_e) = shutdown.await {
             tracing::warn!("Chromium shutdown exceeded drain budget");
         }
+    }
+
+    if config.otel_enabled {
+        opentelemetry::global::shutdown_tracer_provider();
+        tracing::info!("OpenTelemetry tracer provider shut down");
     }
 
     tracing::info!("folio-server exited cleanly");

@@ -74,7 +74,7 @@
 | **Screenshots** | ✅ Done | ✅ | ❌ | ❌ |
 | **Structured Logging** | ✅ Full (tracing) | ✅ (slog) | ❌ | ❌ |
 | **Prometheus Metrics** | ✅ `/prometheus/metrics` | ✅ | ❌ | ❌ |
-| **OpenTelemetry** | ❌ Not Started | ✅ | ❌ | ❌ |
+| **OpenTelemetry** | ✅ OTLP HTTP | ✅ | ❌ | ❌ |
 | **Process Supervision** | 🚧 In Progress | ✅ | ❌ | ❌ |
 
 ### Architecture Pattern
@@ -441,6 +441,8 @@ cargo run -p server -- serve --help
 | `RUST_LOG` | Log level (trace, debug, info, warn, error) | `info` |
 | `FOLIO_PORT` | Server port | `3000` |
 | `FOLIO_CONCURRENCY` | Max concurrent renders | CPU count |
+| `FOLIO_OTEL_ENABLED` | Enable OpenTelemetry trace export | `false` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP HTTP trace endpoint | `http://localhost:4318/v1/traces` |
 
 ---
 
@@ -500,6 +502,7 @@ See [BDD Testing Spec](./docs/specs/50-testing-bdd.md) for details.
 - [x] Screenshots (HTML/URL/Markdown → PNG/JPEG/WebP) — spec 11 / 18
 - [x] Structured Logging (tracing with text/JSON formats)
 - [x] Prometheus Metrics (`/prometheus/metrics` endpoint)
+- [x] OpenTelemetry Traces (OTLP HTTP exporter)
 - [x] CLI (`folio` binary) — spec 20
 
 ### Phase 2: Advanced Engine Features 🚧
