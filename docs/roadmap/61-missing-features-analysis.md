@@ -28,7 +28,7 @@ Comparing Folio MVP (v0.1.0) against Gotenberg v8 feature set.
 | `POST /forms/pdfengines/bookmarks/*` | ✅ | ❌ | Missing |
 | `POST /forms/pdfengines/watermark` | ✅ | ❌ | Missing |
 | `POST /forms/pdfengines/stamp` | ✅ | ❌ | Missing |
-| `POST /forms/pdfengines/encrypt` | ✅ | ❌ | Missing |
+| `POST /forms/pdfengines/encrypt` | ✅ | ✅ | Done |
 | `POST /forms/pdfengines/embed` | ✅ | ❌ | Missing |
 
 ### Form Fields / Parameters
@@ -44,7 +44,7 @@ Comparing Folio MVP (v0.1.0) against Gotenberg v8 feature set.
 | `splitMode` | ✅ | ✅ | `intervals` or `pages` |
 | `splitSpan` | ✅ | ✅ | Split configuration |
 | `rotate` | ✅ | ✅ | Rotation degrees |
-| `password` | ✅ | ❌ | Encryption password |
+| `password` | ✅ | ✅ | Encryption password |
 | `metadata` | ✅ | ⚠️ | Basic support only |
 | `paperWidth` | ✅ | ✅ | Custom paper size |
 | `paperHeight` | ✅ | ✅ | Custom paper size |
@@ -182,14 +182,18 @@ Comparing Folio MVP (v0.1.0) against Gotenberg v8 feature set.
 - Format options: PNG, JPEG
 - Full page vs viewport
 
-### 6. PDF Encryption (Medium Priority)
+### 6. PDF Encryption ✅ Done
 
 **Gotenberg endpoint:** `POST /forms/pdfengines/encrypt`
 
 **Implementation:**
-- Use `qpdf --encrypt`
-- Password protection
-- Permission flags (print, copy, modify)
+- ✅ `qpdf --encrypt` / `--decrypt`
+- ✅ Password protection (user + owner)
+- ✅ Permission flags (print, print-hq, modify, annotate, fill-forms, extract, assemble)
+- ✅ AES-128 / AES-256
+- ✅ CLI: `folio encrypt` / `folio decrypt`
+- ✅ Server: `/forms/pdfengines/encrypt` / `/forms/pdfengines/decrypt`
+- ✅ BDD + integration tests
 
 ## File Structure Differences
 
@@ -227,7 +231,7 @@ crates/
 
 **Phase 1 (Immediate):** PDF/A conversion, Webhook system
 **Phase 2 (Next):** Bookmarks, Watermark, Screenshot API
-**Phase 3 (Later):** Encryption, File embedding, Advanced metrics
+**Phase 3 (Later):** File embedding, Advanced metrics
 
-The core PDF operations (merge, split, flatten, rotate) are at feature parity.
+The core PDF operations (merge, split, flatten, rotate, encrypt, decrypt) are at feature parity.
 The main gaps are in **compliance conversion** (PDF/A) and **async processing** (webhooks).
