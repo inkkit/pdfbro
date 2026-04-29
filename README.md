@@ -268,14 +268,34 @@ const pdf = await engine.htmlToPdf('<h1>Hello</h1>');
 - **Structured Logging**: Context-aware logs with request_id, engine type, duration (text/JSON formats)
 - **Prometheus Metrics**: `/prometheus/metrics` endpoint with conversion, queue, and engine metrics
 
-### 🚧 In Progress (Phase 2)
+### 🚧 In Progress / Partially Done
 
-- **OpenTelemetry**: Distributed tracing with OTLP export (spec 34)
-- **Process Supervision**: Auto-restart, idle shutdown, queue management (spec 31)
-- **Queue Management**: Async job queue with backpressure (spec 32)
-- **PDF/UA Compliance**: PDF/UA validation and conversion (spec 22)
+- **Webhook System**: Async callbacks with retry (spec 15)
+- **Advanced Wait Conditions**: `skipNetworkIdleEvent`, `failOnResourceLoadingFailed`, etc. (spec 36)
+- **Advanced LibreOffice Fields**: 30+ missing export options (spec 37)
+- **Full CLI Flag Parity**: Many Gotenberg flags still missing (spec 39)
+- **Actionable Errors**: Structured error responses, room for enhancement (spec 44)
+- **BDD Test Suite**: Framework exists, scenario coverage incomplete (spec 50)
+- **Batch API**: CLI batch works; server-side bulk endpoint pending (spec 50-batch)
+- **Health Dashboard**: JSON `/health` works; visual HTML dashboard pending (spec 51)
 
-See [Roadmap](./docs/specs/20-missing-features-roadmap.md) for detailed phases.
+### ❌ Not Started (Spec-Only)
+
+- **PDF/A & PDF/UA Conformance**: Archival compliance conversion (spec 14)
+- **PDF Bookmarks**: Outline read/write (spec 16)
+- **PDF Encryption**: Password protection & permissions (spec 19)
+- **Python / Node.js Bindings**: Empty placeholders only (specs 40, 41)
+- **Multi-Backend PDF Engines**: qpdf, pdfcpu, pdftk backends (spec 38)
+- **Special Features**: TLS, auth, cloud-run, remote URL download (spec 40-special)
+- **Smart PDF Optimiser**: Automatic bloat detection & compression (spec 42)
+- **Font Doctor**: Font rendering diagnostics (spec 43)
+- **Live Preview**: HTML→image debug preview (spec 45)
+- **PDF Size Estimator**: Pre-flight size prediction (spec 46)
+- **One-Command Install**: `curl | bash` installer (spec 47)
+- **Interactive Docs**: Built-in `/docs` API explorer (spec 48)
+- **Template Library**: Pre-built document templates (spec 49)
+
+See [Full Roadmap](./docs/specs/20-missing-features-roadmap.md) for detailed phases.
 
 ---
 
@@ -293,13 +313,42 @@ See [Roadmap](./docs/specs/20-missing-features-roadmap.md) for detailed phases.
 
 | Spec | Description | Status |
 |------|-------------|--------|
-| [spec-11-chromium](./docs/specs/11-engine-chromium.md) | Chromium engine | ✅ Done |
-| [spec-12-libreoffice](./docs/specs/12-engine-libreoffice.md) | LibreOffice engine | ✅ Done |
-| [spec-13-pdfops](./docs/specs/13-engine-pdfops.md) | PDF operations | ✅ Done |
-| [spec-20-cli](./docs/specs/20-cli.md) | CLI interface | ✅ Done |
-| [spec-30-server](./docs/specs/30-server.md) | HTTP server | ✅ Done |
-| [spec-50-bdd-tests](./docs/specs/50-testing-bdd.md) | BDD testing | ✅ Done |
-| [spec-20-roadmap](./docs/specs/20-missing-features-roadmap.md) | Feature roadmap | 🚧 New |
+| [00-overview](./docs/specs/00-overview.md) | Spec system overview & conventions | 📋 Reference |
+| [10-engine-types](./docs/specs/10-engine-types.md) | Core types, errors, options | ✅ Done |
+| [11-engine-chromium](./docs/specs/11-engine-chromium.md) | Chromium engine (HTML/URL/Markdown→PDF + screenshots) | ✅ Done |
+| [12-engine-libreoffice](./docs/specs/12-engine-libreoffice.md) | LibreOffice engine (Office→PDF) | ✅ Done |
+| [13-engine-pdfops](./docs/specs/13-engine-pdfops.md) | PDF operations (merge, split, flatten, metadata, watermark, rotate) | ✅ Done |
+| [14-engine-pdfa](./docs/specs/14-engine-pdfa.md) | PDF/A & PDF/UA conformance conversion | ❌ Not Done |
+| [15-webhook](./docs/specs/15-webhook.md) | Async webhook callback system | 🚧 Partially Done |
+| [16-bookmarks](./docs/specs/16-bookmarks.md) | PDF bookmarks/outline read & write | ❌ Not Done |
+| [17-watermark](./docs/specs/17-watermark.md) | PDF watermark & stamp overlay | ✅ Done *(via spec 13)* |
+| [18-screenshot](./docs/specs/18-screenshot.md) | Chromium screenshot API (PNG/JPEG/WebP) | ✅ Done *(via spec 11)* |
+| [19-encrypt](./docs/specs/19-encrypt.md) | PDF encryption & password protection | ❌ Not Done |
+| [20-cli](./docs/specs/20-cli.md) | Command-line interface (`folio` binary) | ✅ Done |
+| [20-bdd-testing](./docs/specs/20-bdd-testing.md) | BDD test strategy | 🚧 Partially Done |
+| [20-missing-features-roadmap](./docs/specs/20-missing-features-roadmap.md) | Feature parity roadmap vs Gotenberg | 📋 Reference |
+| [30-server](./docs/specs/30-server.md) | HTTP server (Gotenberg-compatible API) | ✅ Done |
+| [36-chromium-wait-conditions](./docs/specs/36-chromium-wait-conditions.md) | Advanced wait conditions & options | 🚧 Partially Done |
+| [37-libreoffice-advanced](./docs/specs/37-libreoffice-advanced.md) | Advanced LibreOffice form fields | 🚧 Partially Done |
+| [38-pdfengines-backends](./docs/specs/38-pdfengines-backends.md) | Multi-backend support (qpdf, pdfcpu, pdftk) | ❌ Not Done |
+| [39-config-flags](./docs/specs/39-config-flags.md) | Full Gotenberg CLI flag parity | 🚧 Partially Done |
+| [40-bindings-py](./docs/specs/40-bindings-py.md) | Python bindings (`py` crate) | ❌ Not Done *(placeholder)* |
+| [40-special-features](./docs/specs/40-special-features.md) | TLS, auth, cloud-run, remote URL download | ❌ Not Done |
+| [41-bindings-js](./docs/specs/41-bindings-js.md) | Node.js bindings (`js` crate) | ❌ Not Done *(placeholder)* |
+| [41-github-issues-analysis](./docs/specs/41-github-issues-analysis.md) | User pain-point research from GitHub issues | 📋 Research |
+| [42-smart-pdf-optimiser](./docs/specs/42-smart-pdf-optimiser.md) | Automatic PDF size optimisation | ❌ Not Done |
+| [43-font-doctor](./docs/specs/43-font-doctor.md) | Font rendering diagnostics & fixes | ❌ Not Done |
+| [44-crystal-clear-errors](./docs/specs/44-crystal-clear-errors.md) | Actionable error messages (replace generic 500s) | 🚧 Partially Done |
+| [45-live-preview-mode](./docs/specs/45-live-preview-mode.md) | Live HTML→image preview for debugging | ❌ Not Done |
+| [46-pdf-size-estimator](./docs/specs/46-pdf-size-estimator.md) | Pre-flight PDF size prediction | ❌ Not Done |
+| [47-one-command-install](./docs/specs/47-one-command-install.md) | Frictionless install (`curl | bash`) | ❌ Not Done |
+| [48-interactive-docs](./docs/specs/48-interactive-docs.md) | Built-in API explorer at `/docs` | ❌ Not Done |
+| [49-template-library](./docs/specs/49-template-library.md) | Pre-built document templates | ❌ Not Done |
+| [50-batch-api](./docs/specs/50-batch-api.md) | Bulk conversion API (100+ docs in one request) | 🚧 Partially Done *(CLI batch only)* |
+| [50-testing-bdd](./docs/specs/50-testing-bdd.md) | BDD integration test suite (Gherkin→Rust) | 🚧 Partially Done |
+| [51-health-dashboard](./docs/specs/51-health-dashboard.md) | Visual health dashboard beyond JSON `/health` | 🚧 Partially Done |
+
+**Legend:** `✅ Done` = fully implemented & tested. `🚧 Partially Done` = core working, gaps remain. `❌ Not Done` = spec only, no code. `📋 Reference` = meta-doc or research, no code expected.
 
 ### API Reference
 
@@ -326,7 +375,7 @@ folio/
 │   │   │   ├── chromium/          # Chrome/Chromium integration
 │   │   │   │   ├── launch.rs     # Browser discovery & launch
 │   │   │   │   ├── render.rs     # HTML/URL → PDF
-│   │   │   │   └── screenshot.rs # Screenshots (🚧)
+│   │   │   │   └── screenshot.rs # Screenshots (✅)
 │   │   │   ├── libreoffice/       # LibreOffice integration
 │   │   │   └── pdfops/           # PDF manipulation
 │   │   └── Cargo.toml
@@ -340,22 +389,13 @@ folio/
 │   ├── cli/                       # Command-line interface
 │   │   └── src/commands/         # CLI subcommands
 │   │
-│   ├── py/                        # Python bindings (🚧 PyO3)
-│   └── js/                        # Node.js bindings (🚧 napi-rs)
 │
 ├── docs/
 │   ├── proposal.md                 # Technical specification
 │   ├── gotenberg-spec.md         # Gotenberg API analysis
 │   ├── gap-analysis.md           # Research findings
 │   ├── assets/                    # Images, logos
-│   └── specs/                    # Implementation specs
-│       ├── 11-engine-chromium.md
-│       ├── 12-engine-libreoffice.md
-│       ├── 13-engine-pdfops.md
-│       ├── 20-cli.md
-│       ├── 30-server.md
-│       ├── 20-missing-features-roadmap.md
-│       └── 50-testing-bdd.md
+│   └── specs/                    # Implementation specs (32 files, see table above)
 │
 └── tests/                         # BDD integration tests
     └── integration/
@@ -455,28 +495,44 @@ See [BDD Testing Spec](./docs/specs/50-testing-bdd.md) for details.
 ## Roadmap
 
 ### Phase 1: Core Features ✅
-- [x] HTML/URL/Markdown → PDF (Chromium)
-- [x] Office documents → PDF (LibreOffice)
-- [x] PDF operations (merge, split, flatten, rotate, watermark, stamp, encrypt, bookmarks)
-- [x] Gotenberg-compatible API
-- [x] Screenshots (HTML/URL/Markdown → PNG/JPEG/WebP)
+- [x] HTML/URL/Markdown → PDF (Chromium) — spec 11
+- [x] Office documents → PDF (LibreOffice) — spec 12
+- [x] PDF operations (merge, split, flatten, rotate, watermark) — spec 13
+- [x] PDF metadata read/write — spec 13
+- [x] Gotenberg-compatible API — spec 30
+- [x] Screenshots (HTML/URL/Markdown → PNG/JPEG/WebP) — spec 11 / 18
 - [x] Structured Logging (tracing with text/JSON formats)
 - [x] Prometheus Metrics (`/prometheus/metrics` endpoint)
+- [x] CLI (`folio` binary) — spec 20
 
-### Phase 2: Advanced Features 🚧
-- [ ] OpenTelemetry tracing (spec 34)
-- [ ] Process supervision (auto-restart, idle shutdown) (spec 31)
-- [ ] Queue management (async job queue) (spec 32)
-- [ ] PDF/UA compliance (spec 22)
+### Phase 2: Advanced Engine Features 🚧
+- [ ] PDF/A & PDF/UA conformance conversion — spec 14
+- [ ] PDF bookmarks read/write — spec 16
+- [ ] PDF encryption & password protection — spec 19
+- [ ] Advanced Chromium wait conditions — spec 36
+- [ ] Advanced LibreOffice form fields — spec 37
+- [ ] Multi-backend PDF engines (qpdf, pdfcpu, pdftk) — spec 38
 
-### Phase 3: Bindings & Ecosystem 🚧
-- [ ] Python bindings (complete)
-- [ ] Node.js bindings (complete)
+### Phase 3: Server & Infrastructure 🚧
+- [ ] Webhook system with retry — spec 15
+- [ ] Full CLI flag parity with Gotenberg — spec 39
+- [ ] Batch API (server-side bulk conversion) — spec 50-batch
+- [ ] Actionable error messages — spec 44
+- [ ] Visual health dashboard — spec 51
 
-### Phase 4: Distribution & CI/CD 🚧
-- [ ] GitHub Actions CI/CD
-- [ ] Docker Hub publication
-- [ ] Language binding packages (PyPI, npm)
+### Phase 4: Bindings & Ecosystem ❌
+- [ ] Python bindings (`py` crate) — spec 40
+- [ ] Node.js bindings (`js` crate) — spec 41
+- [ ] TLS, auth, cloud-run, remote URL download — spec 40-special
+
+### Phase 5: Unique Folio Features ❌
+- [ ] Smart PDF optimiser — spec 42
+- [ ] Font doctor / diagnostics — spec 43
+- [ ] Live preview mode — spec 45
+- [ ] PDF size estimator — spec 46
+- [ ] One-command install (`curl | bash`) — spec 47
+- [ ] Interactive API docs (`/docs`) — spec 48
+- [ ] Template library — spec 49
 
 See [Full Roadmap](./docs/specs/20-missing-features-roadmap.md) and detailed specs in [docs/specs/](./docs/specs/) for planning.
 
