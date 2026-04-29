@@ -459,9 +459,6 @@ pub struct BrowserConfig {
     /// Restart Chromium after N conversions (0 = never restart).
     /// Default: 0.
     pub restart_after: u64,
-    /// Maximum Chromium request queue size (0 = unlimited).
-    /// Default: 0.
-    pub max_queue_size: usize,
     /// Maximum concurrent Chromium conversions.
     /// Default: 6 (Gotenberg max).
     pub max_concurrency: usize,
@@ -472,10 +469,6 @@ pub struct BrowserConfig {
     /// Default: 20s.
     #[serde(with = "humantime_serde")]
     pub start_timeout: Duration,
-    /// Idle shutdown timeout for Chromium (None = disabled).
-    /// Default: None.
-    #[serde(with = "humantime_serde")]
-    pub idle_shutdown_timeout: Option<Duration>,
 }
 
 impl Default for BrowserConfig {
@@ -488,11 +481,9 @@ impl Default for BrowserConfig {
             timeout: Duration::from_secs(60),
             // Gotenberg supervision defaults
             restart_after: 0,
-            max_queue_size: 0,
             max_concurrency: 6,
             auto_start: false,
             start_timeout: Duration::from_secs(20),
-            idle_shutdown_timeout: None,
         }
     }
 }
@@ -992,6 +983,10 @@ mod tests {
             extra_args: vec!["--mute-audio".into()],
             no_sandbox: true,
             timeout: Duration::from_secs(30),
+            restart_after: 100,
+            max_concurrency: 8,
+            auto_start: true,
+            start_timeout: Duration::from_secs(45),
         };
         let json = serde_json::to_string(&c).unwrap();
         let back: BrowserConfig = serde_json::from_str(&json).unwrap();
@@ -1000,6 +995,10 @@ mod tests {
         assert_eq!(back.extra_args, c.extra_args);
         assert_eq!(back.no_sandbox, c.no_sandbox);
         assert_eq!(back.timeout, c.timeout);
+        assert_eq!(back.restart_after, c.restart_after);
+        assert_eq!(back.max_concurrency, c.max_concurrency);
+        assert_eq!(back.auto_start, c.auto_start);
+        assert_eq!(back.start_timeout, c.start_timeout);
     }
 
     // --- Sanity: types are Send + Sync where expected ---------------------

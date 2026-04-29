@@ -12,6 +12,7 @@ mod discover;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -51,6 +52,10 @@ struct Inner {
     exe: PathBuf,
     timeout: Duration,
     semaphore: Semaphore,
+    /// Conversion counter for restart-after functionality.
+    conversion_count: AtomicU32,
+    /// Frozen configuration used for restart.
+    config: LibreOfficeConfig,
 }
 
 /// Engine-wide configuration. Pass to [`LibreOfficeEngine::launch`].
@@ -69,21 +74,12 @@ pub struct LibreOfficeConfig {
     /// Restart LibreOffice after N conversions (0 = never restart).
     /// Default: 0.
     pub restart_after: u64,
-    /// Maximum LibreOffice request queue size (0 = unlimited).
-    /// Default: 0.
-    pub max_queue_size: usize,
     /// Auto-start LibreOffice on server startup.
     /// Default: false.
     pub auto_start: bool,
     /// LibreOffice start timeout.
     /// Default: 20s.
     pub start_timeout: Duration,
-    /// Disable LibreOffice routes.
-    /// Default: false.
-    pub disable_routes: bool,
-    /// Idle shutdown timeout for LibreOffice (None = disabled).
-    /// Default: None.
-    pub idle_shutdown_timeout: Option<Duration>,
 }
 
 impl Default for LibreOfficeConfig {
@@ -96,11 +92,8 @@ impl Default for LibreOfficeConfig {
                 .unwrap_or(4),
             // Gotenberg supervision defaults
             restart_after: 0,
-            max_queue_size: 0,
             auto_start: false,
             start_timeout: Duration::from_secs(20),
-            disable_routes: false,
-            idle_shutdown_timeout: None,
         }
     }
 }
@@ -129,7 +122,7 @@ impl LibreOfficeEngine {
     #[instrument(skip(config), fields(executable = ?config.executable))]
     pub async fn launch(config: LibreOfficeConfig) -> EngineResult<Self> {
         info!("Launching LibreOffice engine");
-        let exe = match config.executable {
+        let exe = match config.executable.as_ref() {
             Some(p) => {
                 if !p.exists() {
                     return Err(EngineError::Internal(format!(
@@ -137,7 +130,7 @@ impl LibreOfficeEngine {
                         p.display()
                     )));
                 }
-                p
+                p.clone()
             }
             None => discover::find_soffice()?,
         };
@@ -151,6 +144,8 @@ impl LibreOfficeEngine {
                 exe,
                 timeout: config.timeout,
                 semaphore: Semaphore::new(max),
+                conversion_count: AtomicU32::new(0),
+                config,
             }),
         })
     }
@@ -182,10 +177,16 @@ impl LibreOfficeEngine {
         let result = convert::run_convert(&self.inner.exe, self.inner.timeout, input, opts).await;
         let duration = start.elapsed();
         match &result {
-            Ok(_) => info!(
-                duration_ms = duration.as_millis() as u64,
-                "LibreOffice conversion completed"
-            ),
+            Ok(_) => {
+                info!(
+                    duration_ms = duration.as_millis() as u64,
+                    "LibreOffice conversion completed"
+                );
+                let needs_restart = self.increment_conversion_count();
+                if needs_restart {
+                    tracing::warn!("LibreOffice engine restart recommended after this conversion");
+                }
+            }
             Err(e) => tracing::error!(
                 duration_ms = duration.as_millis() as u64,
                 error = %e,
@@ -251,6 +252,58 @@ impl LibreOfficeEngine {
         discover::probe(&self.inner.exe, Duration::from_secs(5))
             .await
             .is_ok()
+    }
+
+    /// Increment conversion count and log when restart threshold is reached.
+    /// Returns true if restart is needed (caller should restart the engine).
+    fn increment_conversion_count(&self) -> bool {
+        let restart_after = self.inner.config.restart_after;
+        if restart_after == 0 {
+            // Restart disabled
+            return false;
+        }
+
+        let count = self
+            .inner
+            .conversion_count
+            .fetch_add(1, Ordering::SeqCst) as u64;
+        let new_count = count + 1;
+
+        tracing::debug!(
+            conversion_count = new_count,
+            restart_after = restart_after,
+            "Incremented LibreOffice conversion count"
+        );
+
+        if new_count >= restart_after {
+            tracing::info!(
+                conversion_count = new_count,
+                restart_after = restart_after,
+                "Restart threshold reached, LibreOffice should be restarted"
+            );
+            // Reset counter for next cycle
+            self.inner
+                .conversion_count
+                .store(0, Ordering::SeqCst);
+            return true;
+        }
+        false
+    }
+
+    /// Returns true if the engine should be restarted based on conversion count.
+    pub fn needs_restart(&self) -> bool {
+        let restart_after = self.inner.config.restart_after;
+        if restart_after == 0 {
+            return false;
+        }
+        let count = self.inner.conversion_count.load(Ordering::SeqCst) as u64;
+        count >= restart_after
+    }
+
+    /// Reset the conversion counter and mark restart as complete.
+    pub fn mark_restarted(&self) {
+        self.inner.conversion_count.store(0, Ordering::SeqCst);
+        tracing::info!("LibreOffice engine restart marked complete");
     }
 }
 
