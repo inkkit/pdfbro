@@ -176,15 +176,6 @@ mod tests {
             soffice_path: None,
             log_level: "info".to_string(),
             log_format: LogFormat::Text,
-            // Chromium supervision
-            chromium_restart_after: 0,
-            chromium_max_concurrency: 6,
-            chromium_auto_start: false,
-            chromium_start_timeout: std::time::Duration::from_secs(20),
-            // LibreOffice supervision
-            libreoffice_restart_after: 0,
-            libreoffice_auto_start: false,
-            libreoffice_start_timeout: std::time::Duration::from_secs(20),
             // API server
             api_disable_health_route_telemetry: false,
             api_disable_root_route_telemetry: false,
