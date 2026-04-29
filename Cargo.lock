@@ -2944,7 +2944,6 @@ dependencies = [
  "clap",
  "cucumber",
  "engine",
- "futures-util",
  "http 1.4.0",
  "humantime",
  "hyper 0.14.32",
