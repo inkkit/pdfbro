@@ -258,6 +258,96 @@ pub struct OfficeOptions {
     pub quality: Option<u8>,
     /// Reduce image resolution (DPI). `None` = LibreOffice default.
     pub max_image_resolution: Option<u32>,
+
+    // --- Bookmarks & Index ---
+    /// Export bookmarks to PDF outline.
+    pub export_bookmarks: bool,
+    /// Export bookmarks as Named Destinations.
+    pub export_bookmarks_to_pdf_destination: bool,
+    /// Update document indexes before conversion.
+    pub update_indexes: bool,
+
+    // --- Form Fields & Placeholders ---
+    /// Export form fields as interactive widgets.
+    pub export_form_fields: bool,
+    /// Allow duplicate field names in exported forms.
+    pub allow_duplicate_field_names: bool,
+    /// Export placeholder field visual markings.
+    pub export_placeholders: bool,
+
+    // --- Notes & Margins ---
+    /// Export notes to PDF.
+    pub export_notes: bool,
+    /// Export notes pages (Impress only).
+    pub export_notes_pages: bool,
+    /// Export only notes pages.
+    pub export_only_notes_pages: bool,
+    /// Export notes in margin.
+    pub export_notes_in_margin: bool,
+
+    // --- Advanced Options ---
+    /// Convert .od* link targets to .pdf.
+    pub convert_ooo_target_to_pdf_target: bool,
+    /// Export file:// links as relative paths.
+    pub export_links_relative_fsys: bool,
+    /// Export hidden slides (Impress only).
+    pub export_hidden_slides: bool,
+    /// Suppress automatically inserted empty pages.
+    pub skip_empty_pages: bool,
+    /// Embed original document as a stream for archiving.
+    pub add_original_document_as_stream: bool,
+    /// Put every spreadsheet sheet on exactly one page.
+    pub single_page_sheets: bool,
+    /// Use lossless (PNG) instead of JPEG for images.
+    pub lossless_image_compression: bool,
+    /// Reduce image resolution before embedding.
+    pub reduce_image_resolution: bool,
+
+    // --- Native Watermarks ---
+    /// Watermark text drawn on every page.
+    pub native_watermark_text: Option<String>,
+    /// Watermark color as decimal RGB long (default 8388223 = light green).
+    pub native_watermark_color: Option<u32>,
+    /// Watermark font height in points.
+    pub native_watermark_font_height: Option<u32>,
+    /// Watermark rotation angle in degrees.
+    pub native_watermark_rotate_angle: Option<i32>,
+    /// Watermark font name (default "Helvetica").
+    pub native_watermark_font_name: Option<String>,
+    /// Tiled watermark text.
+    pub native_tiled_watermark_text: Option<String>,
+
+    // --- PDF Viewer Preferences ---
+    /// Initial view mode (0=default, 1=bookmarks, 2=thumbnails, 3=layers).
+    pub initial_view: Option<i32>,
+    /// Page to open on (1-indexed).
+    pub initial_page: Option<i32>,
+    /// Magnification action (0=default, 1=fit width, 2=fit page, 3=fit visible, 4=use zoom).
+    pub magnification: Option<i32>,
+    /// Zoom percentage (only when magnification=4).
+    pub zoom: Option<i32>,
+    /// Page layout (0=default, 1=single page, 2=continuous, 3=facing, 4=continuous facing).
+    pub page_layout: Option<i32>,
+    /// First page on left side (used with facing layout).
+    pub first_page_on_left: bool,
+    /// Resize viewer window to fit initial page.
+    pub resize_window_to_initial_page: bool,
+    /// Center viewer window on screen.
+    pub center_window: bool,
+    /// Open in full-screen mode.
+    pub open_in_full_screen_mode: bool,
+    /// Display document title in viewer title bar.
+    pub display_pdf_document_title: bool,
+    /// Hide viewer menubar.
+    pub hide_viewer_menubar: bool,
+    /// Hide viewer toolbar.
+    pub hide_viewer_toolbar: bool,
+    /// Hide viewer window controls.
+    pub hide_viewer_window_controls: bool,
+    /// Export slide transition effects (Impress only).
+    pub use_transition_effects: bool,
+    /// How many bookmark levels to auto-open (-1=all, 0=none, 1-10=specific).
+    pub open_bookmark_levels: Option<i32>,
 }
 
 impl OfficeOptions {
@@ -277,17 +367,64 @@ impl OfficeOptions {
                 "quality must be 1..=100 (got {q})"
             )));
         }
-        if let Some(r) = self.max_image_resolution
-            && r == 0
-        {
-            return Err(EngineError::InvalidOption(
-                "maxImageResolution must be > 0".into(),
-            ));
+        if let Some(r) = self.max_image_resolution {
+            if r == 0 {
+                return Err(EngineError::InvalidOption(
+                    "maxImageResolution must be > 0".into(),
+                ));
+            }
+            if ![75, 150, 300, 600, 1200].contains(&r) {
+                return Err(EngineError::InvalidOption(format!(
+                    "maxImageResolution must be one of 75, 150, 300, 600, 1200 (got {r})"
+                )));
+            }
         }
         if let Some(pr) = &self.page_ranges
             && pr.as_slice().is_empty()
         {
             return Err(EngineError::InvalidOption("pageRanges is empty".into()));
+        }
+        if let Some(v) = self.initial_view {
+            if !(0..=3).contains(&v) {
+                return Err(EngineError::InvalidOption(format!(
+                    "initialView must be 0..=3 (got {v})"
+                )));
+            }
+        }
+        if let Some(v) = self.initial_page {
+            if v < 1 {
+                return Err(EngineError::InvalidOption(format!(
+                    "initialPage must be >= 1 (got {v})"
+                )));
+            }
+        }
+        if let Some(v) = self.magnification {
+            if !(0..=4).contains(&v) {
+                return Err(EngineError::InvalidOption(format!(
+                    "magnification must be 0..=4 (got {v})"
+                )));
+            }
+        }
+        if let Some(v) = self.zoom {
+            if v < 1 {
+                return Err(EngineError::InvalidOption(format!(
+                    "zoom must be >= 1 (got {v})"
+                )));
+            }
+        }
+        if let Some(v) = self.page_layout {
+            if !(0..=4).contains(&v) {
+                return Err(EngineError::InvalidOption(format!(
+                    "pageLayout must be 0..=4 (got {v})"
+                )));
+            }
+        }
+        if let Some(v) = self.open_bookmark_levels {
+            if v != -1 && !(1..=10).contains(&v) {
+                return Err(EngineError::InvalidOption(format!(
+                    "openBookmarkLevels must be -1 or 1..=10 (got {v})"
+                )));
+            }
         }
         Ok(())
     }
@@ -320,6 +457,132 @@ impl OfficeOptions {
         }
         if self.landscape {
             map.insert("IsLandscape".into(), entry_bool(true));
+        }
+
+        // Bookmarks
+        if self.export_bookmarks {
+            map.insert("ExportBookmarks".into(), entry_bool(true));
+        }
+        if self.export_bookmarks_to_pdf_destination {
+            map.insert("ExportBookmarksToPDFDestination".into(), entry_bool(true));
+        }
+
+        // Form Fields
+        if self.export_form_fields {
+            map.insert("ExportFormFields".into(), entry_bool(true));
+        }
+        if self.allow_duplicate_field_names {
+            map.insert("AllowDuplicateFieldNames".into(), entry_bool(true));
+        }
+        if self.export_placeholders {
+            map.insert("ExportPlaceholders".into(), entry_bool(true));
+        }
+
+        // Notes
+        if self.export_notes {
+            map.insert("ExportNotes".into(), entry_bool(true));
+        }
+        if self.export_notes_pages {
+            map.insert("ExportNotesPages".into(), entry_bool(true));
+        }
+        if self.export_only_notes_pages {
+            map.insert("ExportOnlyNotesPages".into(), entry_bool(true));
+        }
+        if self.export_notes_in_margin {
+            map.insert("ExportNotesInMargin".into(), entry_bool(true));
+        }
+
+        // Advanced
+        if self.convert_ooo_target_to_pdf_target {
+            map.insert("ConvertOOoTargetToPDFTarget".into(), entry_bool(true));
+        }
+        if self.export_links_relative_fsys {
+            map.insert("ExportLinksRelativeFsys".into(), entry_bool(true));
+        }
+        if self.export_hidden_slides {
+            map.insert("ExportHiddenSlides".into(), entry_bool(true));
+        }
+        if self.skip_empty_pages {
+            map.insert("IsSkipEmptyPages".into(), entry_bool(true));
+        }
+        if self.add_original_document_as_stream {
+            map.insert("IsAddStream".into(), entry_bool(true));
+        }
+        if self.single_page_sheets {
+            map.insert("SinglePageSheets".into(), entry_bool(true));
+        }
+        if self.lossless_image_compression {
+            map.insert("UseLosslessCompression".into(), entry_bool(true));
+        }
+        if self.reduce_image_resolution {
+            map.insert("ReduceImageResolution".into(), entry_bool(true));
+        }
+
+        // Native Watermarks
+        if let Some(ref text) = self.native_watermark_text {
+            map.insert("Watermark".into(), entry_str(text));
+        }
+        if let Some(color) = self.native_watermark_color {
+            map.insert("WatermarkColor".into(), entry_long(i64::from(color)));
+        }
+        if let Some(h) = self.native_watermark_font_height {
+            map.insert("WatermarkFontHeight".into(), entry_long(i64::from(h)));
+        }
+        if let Some(angle) = self.native_watermark_rotate_angle {
+            map.insert("WatermarkRotateAngle".into(), entry_long(i64::from(angle)));
+        }
+        if let Some(ref name) = self.native_watermark_font_name {
+            map.insert("WatermarkFontName".into(), entry_str(name));
+        }
+        if let Some(ref text) = self.native_tiled_watermark_text {
+            map.insert("TiledWatermark".into(), entry_str(text));
+        }
+
+        // Viewer Preferences
+        if let Some(v) = self.initial_view {
+            map.insert("InitialView".into(), entry_long(i64::from(v)));
+        }
+        if let Some(v) = self.initial_page {
+            map.insert("InitialPage".into(), entry_long(i64::from(v)));
+        }
+        if let Some(v) = self.magnification {
+            map.insert("Magnification".into(), entry_long(i64::from(v)));
+        }
+        if let Some(v) = self.zoom {
+            map.insert("Zoom".into(), entry_long(i64::from(v)));
+        }
+        if let Some(v) = self.page_layout {
+            map.insert("PageLayout".into(), entry_long(i64::from(v)));
+        }
+        if self.first_page_on_left {
+            map.insert("FirstPageOnLeft".into(), entry_bool(true));
+        }
+        if self.resize_window_to_initial_page {
+            map.insert("ResizeWindowToInitialPage".into(), entry_bool(true));
+        }
+        if self.center_window {
+            map.insert("CenterWindow".into(), entry_bool(true));
+        }
+        if self.open_in_full_screen_mode {
+            map.insert("OpenInFullScreenMode".into(), entry_bool(true));
+        }
+        if self.display_pdf_document_title {
+            map.insert("DisplayPDFDocumentTitle".into(), entry_bool(true));
+        }
+        if self.hide_viewer_menubar {
+            map.insert("HideViewerMenubar".into(), entry_bool(true));
+        }
+        if self.hide_viewer_toolbar {
+            map.insert("HideViewerToolbar".into(), entry_bool(true));
+        }
+        if self.hide_viewer_window_controls {
+            map.insert("HideViewerWindowControls".into(), entry_bool(true));
+        }
+        if self.use_transition_effects {
+            map.insert("UseTransitionEffects".into(), entry_bool(true));
+        }
+        if let Some(v) = self.open_bookmark_levels {
+            map.insert("OpenBookmarkLevels".into(), entry_long(i64::from(v)));
         }
 
         if map.is_empty() {
@@ -495,6 +758,7 @@ mod tests {
             pdf_ua: true,
             quality: Some(80),
             max_image_resolution: Some(200),
+            ..Default::default()
         };
         let json = serde_json::to_value(&opts).expect("ser");
         assert_eq!(json["pageRanges"], "1-3");
@@ -509,6 +773,128 @@ mod tests {
     fn office_options_deserialise_with_missing_fields() {
         let v: OfficeOptions = serde_json::from_str("{}").expect("de");
         assert_eq!(v, OfficeOptions::default());
+    }
+
+    #[test]
+    fn office_options_filter_blob_all_new_fields() {
+        let opts = OfficeOptions {
+            landscape: true,
+            export_bookmarks: true,
+            export_bookmarks_to_pdf_destination: true,
+            export_form_fields: true,
+            allow_duplicate_field_names: true,
+            export_placeholders: true,
+            export_notes: true,
+            export_notes_pages: true,
+            export_only_notes_pages: true,
+            export_notes_in_margin: true,
+            convert_ooo_target_to_pdf_target: true,
+            export_links_relative_fsys: true,
+            export_hidden_slides: true,
+            skip_empty_pages: true,
+            add_original_document_as_stream: true,
+            single_page_sheets: true,
+            lossless_image_compression: true,
+            reduce_image_resolution: true,
+            native_watermark_text: Some("SECRET".into()),
+            native_watermark_color: Some(16711680),
+            native_watermark_font_height: Some(20),
+            native_watermark_rotate_angle: Some(30),
+            native_watermark_font_name: Some("Times".into()),
+            native_tiled_watermark_text: Some("DRAFT".into()),
+            initial_view: Some(1),
+            initial_page: Some(5),
+            magnification: Some(2),
+            zoom: Some(150),
+            page_layout: Some(3),
+            first_page_on_left: true,
+            resize_window_to_initial_page: true,
+            center_window: true,
+            open_in_full_screen_mode: true,
+            display_pdf_document_title: true,
+            hide_viewer_menubar: true,
+            hide_viewer_toolbar: true,
+            hide_viewer_window_controls: true,
+            use_transition_effects: true,
+            open_bookmark_levels: Some(-1),
+            ..Default::default()
+        };
+        let blob = opts.filter_blob().expect("blob");
+        let v: serde_json::Value = serde_json::from_str(&blob).expect("json");
+        assert_eq!(v["ExportBookmarks"]["type"], "boolean");
+        assert_eq!(v["ExportBookmarks"]["value"], true);
+        assert_eq!(v["ExportBookmarksToPDFDestination"]["value"], true);
+        assert_eq!(v["ExportFormFields"]["value"], true);
+        assert_eq!(v["AllowDuplicateFieldNames"]["value"], true);
+        assert_eq!(v["ExportPlaceholders"]["value"], true);
+        assert_eq!(v["ExportNotes"]["value"], true);
+        assert_eq!(v["ExportNotesPages"]["value"], true);
+        assert_eq!(v["ExportOnlyNotesPages"]["value"], true);
+        assert_eq!(v["ExportNotesInMargin"]["value"], true);
+        assert_eq!(v["ConvertOOoTargetToPDFTarget"]["value"], true);
+        assert_eq!(v["ExportLinksRelativeFsys"]["value"], true);
+        assert_eq!(v["ExportHiddenSlides"]["value"], true);
+        assert_eq!(v["IsSkipEmptyPages"]["value"], true);
+        assert_eq!(v["IsAddStream"]["value"], true);
+        assert_eq!(v["SinglePageSheets"]["value"], true);
+        assert_eq!(v["UseLosslessCompression"]["value"], true);
+        assert_eq!(v["ReduceImageResolution"]["value"], true);
+        assert_eq!(v["Watermark"]["type"], "string");
+        assert_eq!(v["Watermark"]["value"], "SECRET");
+        assert_eq!(v["WatermarkColor"]["type"], "long");
+        assert_eq!(v["WatermarkColor"]["value"], 16711680);
+        assert_eq!(v["WatermarkFontHeight"]["value"], 20);
+        assert_eq!(v["WatermarkRotateAngle"]["value"], 30);
+        assert_eq!(v["WatermarkFontName"]["value"], "Times");
+        assert_eq!(v["TiledWatermark"]["value"], "DRAFT");
+        assert_eq!(v["InitialView"]["type"], "long");
+        assert_eq!(v["InitialView"]["value"], 1);
+        assert_eq!(v["InitialPage"]["value"], 5);
+        assert_eq!(v["Magnification"]["value"], 2);
+        assert_eq!(v["Zoom"]["value"], 150);
+        assert_eq!(v["PageLayout"]["value"], 3);
+        assert_eq!(v["FirstPageOnLeft"]["value"], true);
+        assert_eq!(v["ResizeWindowToInitialPage"]["value"], true);
+        assert_eq!(v["CenterWindow"]["value"], true);
+        assert_eq!(v["OpenInFullScreenMode"]["value"], true);
+        assert_eq!(v["DisplayPDFDocumentTitle"]["value"], true);
+        assert_eq!(v["HideViewerMenubar"]["value"], true);
+        assert_eq!(v["HideViewerToolbar"]["value"], true);
+        assert_eq!(v["HideViewerWindowControls"]["value"], true);
+        assert_eq!(v["UseTransitionEffects"]["value"], true);
+        assert_eq!(v["OpenBookmarkLevels"]["value"], -1);
+    }
+
+    #[test]
+    fn office_options_validation_new_ranges() {
+        let bad = OfficeOptions {
+            initial_view: Some(5),
+            ..Default::default()
+        };
+        assert!(matches!(bad.validate(), Err(EngineError::InvalidOption(_))));
+
+        let bad = OfficeOptions {
+            magnification: Some(10),
+            ..Default::default()
+        };
+        assert!(matches!(bad.validate(), Err(EngineError::InvalidOption(_))));
+
+        let bad = OfficeOptions {
+            max_image_resolution: Some(200),
+            ..Default::default()
+        };
+        assert!(matches!(bad.validate(), Err(EngineError::InvalidOption(_))));
+
+        let ok = OfficeOptions {
+            initial_view: Some(2),
+            magnification: Some(3),
+            zoom: Some(200),
+            page_layout: Some(1),
+            open_bookmark_levels: Some(5),
+            max_image_resolution: Some(300),
+            ..Default::default()
+        };
+        assert!(ok.validate().is_ok());
     }
 
     #[tokio::test]
