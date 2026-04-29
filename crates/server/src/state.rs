@@ -7,13 +7,12 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-#[cfg(feature = "libreoffice")]
-use engine::LibreOfficeEngine;
 use tokio::sync::Semaphore;
 
 use crate::ServerConfig;
 use crate::backend::PdfBackend;
 use crate::metrics::FolioMetrics;
+use crate::supervised_engine::SupervisedLibreOfficeEngine;
 use crate::webhook::WebhookQueue;
 use prometheus;
 
@@ -24,7 +23,7 @@ pub struct AppState {
     pub chromium: Option<Arc<dyn PdfBackend>>,
     /// LibreOffice engine; `None` in tests that don't need it.
     #[cfg(feature = "libreoffice")]
-    pub libreoffice: Option<Arc<LibreOfficeEngine>>,
+    pub libreoffice: Option<Arc<SupervisedLibreOfficeEngine>>,
     /// Outer concurrency cap.
     pub sem: Arc<Semaphore>,
     /// Resolved server config (for body limits, paths, etc.).
@@ -60,7 +59,7 @@ impl AppState {
 
     #[cfg(feature = "libreoffice")]
     /// Attach a LibreOffice engine.
-    pub fn with_libreoffice(mut self, libreoffice: Option<Arc<LibreOfficeEngine>>) -> Self {
+    pub fn with_libreoffice(mut self, libreoffice: Option<Arc<SupervisedLibreOfficeEngine>>) -> Self {
         self.libreoffice = libreoffice;
         self
     }

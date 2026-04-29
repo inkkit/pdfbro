@@ -29,6 +29,7 @@ use tracing::Level;
 
 use crate::error::ApiError;
 
+use crate::config::ServerConfig;
 use crate::routes::{health, pdfengines};
 #[cfg(feature = "chromium")]
 use crate::routes::chromium;
@@ -74,14 +75,14 @@ impl<B> MakeSpan<B> for RequestIdMakeSpan {
     }
 }
 
-/// Build the full HTTP router for the given [`AppState`].
+/// Build the full HTTP router for the given [`AppState`] and [`ServerConfig`].
 ///
 /// The middleware stack (outer → inner) is:
 /// `Trace → SetRequestId → PropagateRequestId → RequestBodyLimit → Timeout
 /// → CORS → routes`. `/health` and `/version` are served from a separate
 /// sub-router that bypasses the timeout layer (they must always respond
 /// quickly even under heavy load).
-pub fn build_router(state: AppState) -> Router {
+pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
     let max_body = state.config.max_body_bytes;
     let request_timeout = state.config.request_timeout;
 
@@ -180,10 +181,15 @@ pub fn build_router(state: AppState) -> Router {
         )
         .layer(DefaultBodyLimit::max(max_body));
 
-    let untimed = Router::new()
+    let mut untimed = Router::new()
         .route("/health", get(health::health))
         .route("/version", get(health::version))
         .route("/prometheus/metrics", get(health::metrics_handler));
+    
+    // Conditionally add debug route
+    if config.api_enable_debug_route {
+        untimed = untimed.route("/debug", get(health::debug));
+    }
 
     let header_name = HeaderName::from_static(REQUEST_ID_HEADER);
 
