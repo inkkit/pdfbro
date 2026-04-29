@@ -265,12 +265,12 @@ const pdf = await engine.htmlToPdf('<h1>Hello</h1>');
 - **Concurrent Rendering**: Thread-safe browser instance sharing
 - **Screenshots**: URL/HTML/Markdown to PNG/JPEG/WebP
 - **BDD Testing**: Port Gotenberg's Gherkin scenarios to Rust
+- **Webhook System**: Async job dispatch with retry, full engine integration (spec 15)
 - **Structured Logging**: Context-aware logs with request_id, engine type, duration (text/JSON formats)
 - **Prometheus Metrics**: `/prometheus/metrics` endpoint with conversion, queue, and engine metrics
 
 ### 🚧 In Progress / Partially Done
 
-- **Webhook System**: Delivery client & retry exist, but job execution is stubbed (spec 15)
 - **Advanced Wait Conditions**: `skipNetworkIdleEvent`, `failOnResourceLoadingFailed`, etc. (spec 36)
 - **Advanced LibreOffice Fields**: 30+ missing export options (spec 37)
 - **Full CLI Flag Parity**: Many Gotenberg flags still missing (spec 39)

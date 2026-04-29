@@ -26,10 +26,10 @@
 | 12 | LibreOffice Engine | ✅ Done | ✅ Done | `crates/engine/src/libreoffice/` | Office doc conversion. |
 | 13 | PDF Operations | ✅ Done | ✅ Done | `crates/engine/src/pdfops/` — merge, split, flatten, rotate, watermark, metadata | Watermark & stamp both implemented. |
 | 14 | PDF/A Conversion | ❌ Not Started | **✅ Done** ⚠️ | `crates/engine/src/pdfa/mod.rs` | Ghostscript + qpdf fallback. Route `/forms/pdfengines/convert` wired. **README is wrong.** |
-| 15 | Webhook System | 🚧 Partially Done | 🚧 Partial | `crates/server/src/webhook/` | Delivery client, queue, retry, config extraction all real. **BUT** `execute_job()` is a stub: `(Ok(()), None)`. Async mode returns `job_id` without executing the job. |
+| 15 | Webhook System | 🚧 Partially Done | ✅ Done | `crates/server/src/webhook/` | Full async job dispatch with all engine operations (Chromium, LibreOffice, PDF ops, encrypt, bookmarks, screenshots). Retry, queue, config extraction all real. **Shipped.** |
 | 16 | PDF Bookmarks | ❌ Not Started | **✅ Done** ⚠️ | `crates/engine/src/bookmarks/mod.rs` (397 lines) | Full read/write/flatten with `lopdf`. Routes `/forms/pdfengines/bookmarks/{read,write}` wired. **README is wrong.** |
 | 17 | Watermark | ✅ Done | ✅ Done | Via spec 13 | — |
-| 18 | Screenshots | ✅ Done / 🚧 Mixed | ✅ Done (mostly) | `crates/engine/src/chromium/screenshot.rs` | Engine supports PNG & JPEG. **WebP missing** at engine level (`ScreenshotFormat` only has `Png`, `Jpeg`). Server routes for all three exist. README incorrectly lists 🚧 in the Usage Modes table. |
+| 18 | Screenshots | ✅ Done / 🚧 Mixed | ✅ Done | `crates/engine/src/chromium/screenshot.rs` | PNG, JPEG, **WebP** all supported. Server routes wired. Tests present. |
 | 19 | PDF Encryption | ✅ Done | **✅ Done** | `crates/engine/src/encrypt/mod.rs` (326 lines) | AES-128/256 via qpdf. CLI `folio encrypt/decrypt`, server routes `/forms/pdfengines/{encrypt,decrypt}` wired. BDD tests + engine integration tests. |
 
 ---
