@@ -1,4 +1,6 @@
-//! Router-level integration tests.
+#![cfg(feature = "chromium")]
+
+//! Router-level integration tests (no real Chrome required).
 //!
 //! These tests drive the full router via `tower::ServiceExt::oneshot`
 //! against a mock [`PdfBackend`]. They cover the wire contract for the
@@ -154,7 +156,7 @@ fn test_config() -> ServerConfig {
 }
 
 fn build_app(backend: MockBackend) -> axum::Router {
-    let state = AppState::new(Arc::new(backend), None, test_config());
+    let state = AppState::new(Some(Arc::new(backend)), test_config());
     build_router(state)
 }
 

@@ -1,3 +1,5 @@
+#![cfg(all(feature = "chromium", feature = "libreoffice"))]
+
 //! End-to-end integration tests against real engines.
 //!
 //! These tests skip gracefully when dependencies are missing:
@@ -121,7 +123,8 @@ async fn spawn_server(with_libreoffice: bool) -> TestServer {
         None
     };
 
-    let state = AppState::new(Arc::new(backend), lo, config);
+    let state = AppState::new(Some(Arc::new(backend)), config)
+        .with_libreoffice(lo);
     let router = build_router(state);
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();

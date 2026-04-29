@@ -12,11 +12,18 @@ use crate::metrics::export_metrics;
 /// Liveness summary. Always returns 200 OK; the body indicates per-engine
 /// availability (matching Gotenberg's convention).
 pub async fn health(State(state): State<AppState>) -> impl IntoResponse {
-    let chromium_up = state.chromium.healthy().await;
+    let chromium_up = match state.chromium.as_ref() {
+        Some(be) => be.healthy().await,
+        None => false,
+    };
+
+    #[cfg(feature = "libreoffice")]
     let lo_up = match state.libreoffice.as_ref() {
         Some(lo) => lo.healthy().await,
         None => false,
     };
+    #[cfg(not(feature = "libreoffice"))]
+    let lo_up = false;
 
     // Update engine health metrics
     state.metrics.update_engine_health(chromium_up, lo_up);
