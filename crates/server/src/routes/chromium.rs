@@ -813,6 +813,10 @@ fn parse_screenshot_options(map: &HashMap<String, String>) -> ApiResult<Screensh
             let quality = map.get("quality").and_then(|s| s.parse::<u8>().ok()).unwrap_or(80);
             ScreenshotFormat::Jpeg { quality }
         }
+        Some("webp") => {
+            let quality = map.get("quality").and_then(|s| s.parse::<u8>().ok()).unwrap_or(80);
+            ScreenshotFormat::Webp { quality }
+        }
         _ => ScreenshotFormat::Png,
     };
 

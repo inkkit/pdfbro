@@ -263,7 +263,7 @@ const pdf = await engine.htmlToPdf('<h1>Hello</h1>');
 - **Gotenberg Compatibility**: Drop-in API replacement
 - **Health Checks**: `/health` endpoint with engine status
 - **Concurrent Rendering**: Thread-safe browser instance sharing
-- **Screenshots**: URL/HTML/Markdown to PNG/JPEG (WebP pending)
+- **Screenshots**: URL/HTML/Markdown to PNG/JPEG/WebP
 - **BDD Testing**: Port Gotenberg's Gherkin scenarios to Rust
 - **Structured Logging**: Context-aware logs with request_id, engine type, duration (text/JSON formats)
 - **Prometheus Metrics**: `/prometheus/metrics` endpoint with conversion, queue, and engine metrics
@@ -278,7 +278,6 @@ const pdf = await engine.htmlToPdf('<h1>Hello</h1>');
 - **BDD Test Suite**: Framework exists, scenario coverage incomplete (spec 50)
 - **Batch API**: CLI batch works; server-side bulk endpoint pending (spec 50-batch)
 - **Health Dashboard**: JSON `/health` works; visual HTML dashboard pending (spec 51)
-- **WebP Screenshots**: Engine only supports PNG/JPEG (spec 18)
 
 ### ❌ Not Started (Spec-Only)
 
@@ -498,7 +497,7 @@ See [BDD Testing Spec](./docs/specs/50-testing-bdd.md) for details.
 - [x] PDF operations (merge, split, flatten, rotate, watermark) — spec 13
 - [x] PDF metadata read/write — spec 13
 - [x] Gotenberg-compatible API — spec 30
-- [x] Screenshots (HTML/URL/Markdown → PNG/JPEG) — spec 11 / 18 (WebP pending)
+- [x] Screenshots (HTML/URL/Markdown → PNG/JPEG/WebP) — spec 11 / 18
 - [x] Structured Logging (tracing with text/JSON formats)
 - [x] Prometheus Metrics (`/prometheus/metrics` endpoint)
 - [x] CLI (`folio` binary) — spec 20

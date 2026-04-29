@@ -16,9 +16,14 @@ pub enum ScreenshotFormat {
     /// PNG format (lossless).
     Png,
     /// JPEG format with quality 0-100.
-    Jpeg { 
+    Jpeg {
         /// JPEG quality (0-100).
-        quality: u8 
+        quality: u8
+    },
+    /// WebP format with quality 0-100.
+    Webp {
+        /// WebP quality (0-100).
+        quality: u8
     },
 }
 
@@ -27,6 +32,7 @@ impl ScreenshotFormat {
         match self {
             ScreenshotFormat::Png => CaptureScreenshotFormat::Png,
             ScreenshotFormat::Jpeg { .. } => CaptureScreenshotFormat::Jpeg,
+            ScreenshotFormat::Webp { .. } => CaptureScreenshotFormat::Webp,
         }
     }
 
@@ -34,6 +40,7 @@ impl ScreenshotFormat {
         match self {
             ScreenshotFormat::Png => None,
             ScreenshotFormat::Jpeg { quality } => Some(*quality as i64),
+            ScreenshotFormat::Webp { quality } => Some(*quality as i64),
         }
     }
 
@@ -42,6 +49,7 @@ impl ScreenshotFormat {
         match self {
             ScreenshotFormat::Png => "image/png",
             ScreenshotFormat::Jpeg { .. } => "image/jpeg",
+            ScreenshotFormat::Webp { .. } => "image/webp",
         }
     }
 
@@ -50,6 +58,7 @@ impl ScreenshotFormat {
         match self {
             ScreenshotFormat::Png => "png",
             ScreenshotFormat::Jpeg { .. } => "jpg",
+            ScreenshotFormat::Webp { .. } => "webp",
         }
     }
 }
@@ -385,12 +394,14 @@ mod tests {
     fn screenshot_format_content_type() {
         assert_eq!(ScreenshotFormat::Png.content_type(), "image/png");
         assert_eq!(ScreenshotFormat::Jpeg { quality: 80 }.content_type(), "image/jpeg");
+        assert_eq!(ScreenshotFormat::Webp { quality: 80 }.content_type(), "image/webp");
     }
 
     #[test]
     fn screenshot_format_extension() {
         assert_eq!(ScreenshotFormat::Png.extension(), "png");
         assert_eq!(ScreenshotFormat::Jpeg { quality: 80 }.extension(), "jpg");
+        assert_eq!(ScreenshotFormat::Webp { quality: 80 }.extension(), "webp");
     }
 
     #[test]
