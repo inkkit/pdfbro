@@ -6,15 +6,19 @@
 //! `tokio::time::timeout(BrowserConfig::timeout, ...)` so wait
 //! conditions and slow networks are bounded uniformly.
 
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use chromiumoxide::Page;
 use chromiumoxide::cdp::browser_protocol::emulation::SetEmulatedMediaParams;
 use chromiumoxide::cdp::browser_protocol::network::{
-    CookieParam, EventResponseReceived, Headers, ResourceType, SetExtraHttpHeadersParams,
-    SetUserAgentOverrideParams,
+    CookieParam, EventLoadingFailed, EventResponseReceived, Headers, ResourceType,
+    SetExtraHttpHeadersParams, SetUserAgentOverrideParams,
 };
+use chromiumoxide::cdp::browser_protocol::page::{EventDomContentEventFired, EventLoadEventFired};
+use chromiumoxide::cdp::js_protocol::runtime::EventExceptionThrown;
 use futures_util::StreamExt;
+use tokio::task::JoinHandle;
 
 use crate::types::{EngineError, EngineResult, PdfOptions};
 
@@ -120,16 +124,38 @@ async fn render_url_on(
 ) -> EngineResult<Vec<u8>> {
     apply_request_context(engine, page, request).await?;
 
-    // Set up the fail-on-status watcher only if requested.
-    let captured = if request.fail_on_status.is_empty() {
+    // Set up event listeners before navigation.
+    let main_frame_status = if request.fail_on_status.is_empty() {
         None
     } else {
         Some(spawn_main_frame_status_capture(page).await?)
     };
 
-    page.goto(url).await.map_err(|e| navigation_error(url, e))?;
+    let resource_status = if request.fail_on_resource_status.is_empty() {
+        None
+    } else {
+        Some(spawn_resource_status_capture(page, &request.fail_on_resource_status).await?)
+    };
 
-    if let Some((status, task)) = captured {
+    let console_exceptions = if request.fail_on_console_exceptions {
+        Some(spawn_console_exception_capture(page).await?)
+    } else {
+        None
+    };
+
+    let resource_loading = if request.fail_on_resource_loading_failed {
+        Some(spawn_resource_loading_capture(page).await?)
+    } else {
+        None
+    };
+
+    // Navigate with lifecycle event waits.
+    navigate_with_lifecycle(page, url, request.skip_network_idle, request.skip_network_almost_idle)
+        .await
+        .map_err(|e| navigation_error(url, e))?;
+
+    // Check main frame status.
+    if let Some((status, task)) = main_frame_status {
         task.abort();
         let observed = *status.lock().expect("captured status mutex poisoned");
         if let Some(code) = observed
@@ -138,6 +164,45 @@ async fn render_url_on(
             return Err(EngineError::Navigation {
                 url: url.into(),
                 reason: format!("status {code}"),
+            });
+        }
+    }
+
+    // Check resource status.
+    if let Some((errors, task)) = resource_status {
+        task.abort();
+        let errors = errors.lock().expect("resource status mutex poisoned");
+        if !errors.is_empty() {
+            let msg = errors.join(", ");
+            return Err(EngineError::Navigation {
+                url: url.into(),
+                reason: format!("resource HTTP status failed: {msg}"),
+            });
+        }
+    }
+
+    // Check console exceptions.
+    if let Some((exceptions, task)) = console_exceptions {
+        task.abort();
+        let exceptions = exceptions.lock().expect("console exceptions mutex poisoned");
+        if !exceptions.is_empty() {
+            let msg = exceptions.join(", ");
+            return Err(EngineError::Navigation {
+                url: url.into(),
+                reason: format!("console exceptions: {msg}"),
+            });
+        }
+    }
+
+    // Check resource loading failures.
+    if let Some((failures, task)) = resource_loading {
+        task.abort();
+        let failures = failures.lock().expect("resource loading mutex poisoned");
+        if !failures.is_empty() {
+            let msg = failures.join(", ");
+            return Err(EngineError::Navigation {
+                url: url.into(),
+                reason: format!("resource loading failed: {msg}"),
             });
         }
     }
@@ -286,4 +351,140 @@ async fn spawn_main_frame_status_capture(
         }
     });
     Ok((captured, task))
+}
+
+/// Spawn a background task that records resource loading failures.
+async fn spawn_resource_loading_capture(
+    page: &Page,
+) -> EngineResult<(Arc<Mutex<Vec<String>>>, JoinHandle<()>)> {
+    let mut events = page
+        .event_listener::<EventLoadingFailed>()
+        .await
+        .map_err(|e| EngineError::Cdp(e.to_string()))?;
+    let failures: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let writer = failures.clone();
+    let task = tokio::spawn(async move {
+        while let Some(ev) = events.next().await {
+            // Only capture resource loading failures, not main document failures.
+            if !matches!(ev.r#type, ResourceType::Document) {
+                let msg = format!("{:?}: {}", ev.r#type, ev.error_text);
+                if let Ok(mut g) = writer.lock() {
+                    g.push(msg);
+                }
+            }
+        }
+    });
+    Ok((failures, task))
+}
+
+/// Spawn a background task that records console exceptions.
+async fn spawn_console_exception_capture(
+    page: &Page,
+) -> EngineResult<(Arc<Mutex<Vec<String>>>, JoinHandle<()>)> {
+    let mut events = page
+        .event_listener::<EventExceptionThrown>()
+        .await
+        .map_err(|e| EngineError::Cdp(e.to_string()))?;
+    let exceptions: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let writer = exceptions.clone();
+    let task = tokio::spawn(async move {
+        while let Some(ev) = events.next().await {
+            let msg = ev
+                .exception_details
+                .exception
+                .as_ref()
+                .map(|e| {
+                    e.description.clone().unwrap_or_else(|| {
+                        e.value.as_ref().map(|v| v.to_string()).unwrap_or_else(|| "unknown".to_string())
+                    })
+                })
+                .unwrap_or_else(|| "unknown exception".to_string());
+            if let Ok(mut g) = writer.lock() {
+                g.push(msg);
+            }
+        }
+    });
+    Ok((exceptions, task))
+}
+
+/// Spawn a background task that records resource HTTP status codes that match
+/// the given list of failing statuses.
+async fn spawn_resource_status_capture(
+    page: &Page,
+    fail_statuses: &[u16],
+) -> EngineResult<(Arc<Mutex<Vec<String>>>, JoinHandle<()>)> {
+    let mut events = page
+        .event_listener::<EventResponseReceived>()
+        .await
+        .map_err(|e| EngineError::Cdp(e.to_string()))?;
+    let fail_set: HashSet<u16> = fail_statuses.iter().copied().collect();
+    let errors: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let writer = errors.clone();
+    let task = tokio::spawn(async move {
+        while let Some(ev) = events.next().await {
+            // Only check resources, not main document.
+            if !matches!(ev.r#type, ResourceType::Document) {
+                let status = ev.response.status as u16;
+                if fail_set.contains(&status) {
+                    let msg = format!("{}: {}", ev.response.url, status);
+                    if let Ok(mut g) = writer.lock() {
+                        g.push(msg);
+                    }
+                }
+            }
+        }
+    });
+    Ok((errors, task))
+}
+
+/// Navigate to URL and wait for lifecycle events.
+/// If `skip_network_idle` is false, waits for the `networkIdle` event.
+/// If `skip_network_almost_idle` is false, waits for the `networkIdle2` event.
+async fn navigate_with_lifecycle(
+    page: &Page,
+    url: &str,
+    skip_network_idle: bool,
+    skip_network_almost_idle: bool,
+) -> Result<(), chromiumoxide::error::CdpError> {
+    // Start listening for lifecycle events before navigation.
+    let mut dom_content_events = page.event_listener::<EventDomContentEventFired>().await?;
+    let mut load_events = page.event_listener::<EventLoadEventFired>().await?;
+
+    // Navigate.
+    page.goto(url).await?;
+
+    // Always wait for domContentLoaded and load events.
+    let dom_fut = async {
+        dom_content_events.next().await;
+    };
+    let load_fut = async {
+        load_events.next().await;
+    };
+
+    tokio::join!(dom_fut, load_fut);
+
+    // Conditionally wait for network idle events.
+    if !skip_network_idle {
+        wait_lifecycle_event(page, "networkIdle").await?;
+    }
+    if !skip_network_almost_idle {
+        wait_lifecycle_event(page, "networkAlmostIdle").await?;
+    }
+
+    Ok(())
+}
+
+/// Wait for a specific lifecycle event name.
+async fn wait_lifecycle_event(
+    page: &Page,
+    event_name: &str,
+) -> Result<(), chromiumoxide::error::CdpError> {
+    use chromiumoxide::cdp::browser_protocol::page::EventLifecycleEvent;
+    let mut events = page.event_listener::<EventLifecycleEvent>().await?;
+    while let Some(ev) = events.next().await {
+        if ev.name == event_name {
+            return Ok(());
+        }
+    }
+    Ok(())
 }

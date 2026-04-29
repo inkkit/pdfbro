@@ -424,6 +424,11 @@ pub enum WaitCondition {
         #[serde(with = "humantime_serde")]
         duration: Duration,
     },
+    /// Wait until `window.status` equals the given value.
+    WindowStatus {
+        /// The value to wait for in `window.status`.
+        status: String,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -919,6 +924,23 @@ mod tests {
             back,
             WaitCondition::Delay {
                 duration: Duration::from_millis(500),
+            }
+        );
+
+        // WindowStatus variant
+        let v = serde_json::to_value(&WaitCondition::WindowStatus {
+            status: "ready".into(),
+        })
+        .unwrap();
+        assert_eq!(
+            v,
+            serde_json::json!({"kind": "windowStatus", "status": "ready"})
+        );
+        let back: WaitCondition = serde_json::from_value(v).unwrap();
+        assert_eq!(
+            back,
+            WaitCondition::WindowStatus {
+                status: "ready".into(),
             }
         );
     }
