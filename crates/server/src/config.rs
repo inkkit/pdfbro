@@ -120,18 +120,10 @@ pub struct ServerArgs {
     #[arg(long, value_name = "DUR", env = "CHROMIUM_START_TIMEOUT")]
     pub chromium_start_timeout: Option<String>,
 
-    /// Idle shutdown timeout for Chromium (e.g., "10m", "0" to disable).
-    #[arg(long, value_name = "DUR", env = "CHROMIUM_IDLE_SHUTDOWN_TIMEOUT")]
-    pub chromium_idle_shutdown_timeout: Option<String>,
-
     // === LibreOffice Supervision Flags ===
     /// Restart LibreOffice after N conversions (0 = never restart).
     #[arg(long, value_name = "N", env = "LIBREOFFICE_RESTART_AFTER")]
     pub libreoffice_restart_after: Option<u64>,
-
-    /// Maximum LibreOffice request queue size (0 = unlimited).
-    #[arg(long, value_name = "N", env = "LIBREOFFICE_MAX_QUEUE_SIZE")]
-    pub libreoffice_max_queue_size: Option<usize>,
 
     /// Auto-start LibreOffice on server startup.
     #[arg(long, env = "LIBREOFFICE_AUTO_START")]
@@ -140,14 +132,6 @@ pub struct ServerArgs {
     /// LibreOffice start timeout (e.g., "20s", "1m").
     #[arg(long, value_name = "DUR", env = "LIBREOFFICE_START_TIMEOUT")]
     pub libreoffice_start_timeout: Option<String>,
-
-    /// Disable LibreOffice routes.
-    #[arg(long, env = "LIBREOFFICE_DISABLE_ROUTES")]
-    pub libreoffice_disable_routes: bool,
-
-    /// Idle shutdown timeout for LibreOffice (e.g., "10m", "0" to disable).
-    #[arg(long, value_name = "DUR", env = "LIBREOFFICE_IDLE_SHUTDOWN_TIMEOUT")]
-    pub libreoffice_idle_shutdown_timeout: Option<String>,
 
     // === API Server Flags ===
     /// Disable telemetry for health check route.
@@ -237,30 +221,20 @@ pub struct ServerConfig {
     // === Chromium Supervision Config ===
     /// Restart Chromium after N conversions (0 = never).
     pub chromium_restart_after: u64,
-    /// Maximum Chromium request queue size (0 = unlimited).
-    pub chromium_max_queue_size: usize,
     /// Maximum concurrent Chromium conversions.
     pub chromium_max_concurrency: usize,
     /// Auto-start Chromium on server startup.
     pub chromium_auto_start: bool,
     /// Chromium start timeout.
     pub chromium_start_timeout: Duration,
-    /// Idle shutdown timeout for Chromium (None = disabled).
-    pub chromium_idle_shutdown_timeout: Option<Duration>,
 
     // === LibreOffice Supervision Config ===
     /// Restart LibreOffice after N conversions (0 = never).
     pub libreoffice_restart_after: u64,
-    /// Maximum LibreOffice request queue size (0 = unlimited).
-    pub libreoffice_max_queue_size: usize,
     /// Auto-start LibreOffice on server startup.
     pub libreoffice_auto_start: bool,
     /// LibreOffice start timeout.
     pub libreoffice_start_timeout: Duration,
-    /// Disable LibreOffice routes.
-    pub libreoffice_disable_routes: bool,
-    /// Idle shutdown timeout for LibreOffice (None = disabled).
-    pub libreoffice_idle_shutdown_timeout: Option<Duration>,
 
     // === API Server Config ===
     /// Disable telemetry for health check route.
@@ -400,9 +374,6 @@ impl ServerConfig {
         let chromium_restart_after = args.chromium_restart_after
             .or_else(|| env.get("CHROMIUM_RESTART_AFTER").and_then(|v| v.parse().ok()))
             .unwrap_or(0);
-        let chromium_max_queue_size = args.chromium_max_queue_size
-            .or_else(|| env.get("CHROMIUM_MAX_QUEUE_SIZE").and_then(|v| v.parse().ok()))
-            .unwrap_or(0);
         let chromium_max_concurrency = args.chromium_max_concurrency
             .or_else(|| env.get("CHROMIUM_MAX_CONCURRENCY").and_then(|v| v.parse().ok()))
             .unwrap_or(6);
@@ -419,20 +390,10 @@ impl ServerConfig {
                 field: "chromium_start_timeout",
                 message: e.to_string(),
             })?;
-        let chromium_idle_shutdown_timeout = args.chromium_idle_shutdown_timeout.as_deref()
-            .or_else(|| env.get("CHROMIUM_IDLE_SHUTDOWN_TIMEOUT").map(|v| v.as_str()))
-            .and_then(|v| {
-                humantime::parse_duration(v)
-                    .ok()
-                    .filter(|d| !d.is_zero())
-            });
 
         // === LibreOffice Supervision Config Resolution ===
         let libreoffice_restart_after = args.libreoffice_restart_after
             .or_else(|| env.get("LIBREOFFICE_RESTART_AFTER").and_then(|v| v.parse().ok()))
-            .unwrap_or(0);
-        let libreoffice_max_queue_size = args.libreoffice_max_queue_size
-            .or_else(|| env.get("LIBREOFFICE_MAX_QUEUE_SIZE").and_then(|v| v.parse().ok()))
             .unwrap_or(0);
         let libreoffice_auto_start = args.libreoffice_auto_start
             || env.get("LIBREOFFICE_AUTO_START").map(|v| is_truthy(v)).unwrap_or(false);
@@ -447,15 +408,6 @@ impl ServerConfig {
                 field: "libreoffice_start_timeout",
                 message: e.to_string(),
             })?;
-        let libreoffice_disable_routes = args.libreoffice_disable_routes
-            || env.get("LIBREOFFICE_DISABLE_ROUTES").map(|v| is_truthy(v)).unwrap_or(false);
-        let libreoffice_idle_shutdown_timeout = args.libreoffice_idle_shutdown_timeout.as_deref()
-            .or_else(|| env.get("LIBREOFFICE_IDLE_SHUTDOWN_TIMEOUT").map(|v| v.as_str()))
-            .and_then(|v| {
-                humantime::parse_duration(v)
-                    .ok()
-                    .filter(|d| !d.is_zero())
-            });
 
         // === API Server Config Resolution ===
         let api_disable_health_route_telemetry = args.api_disable_health_route_telemetry
@@ -490,18 +442,13 @@ impl ServerConfig {
             log_format,
             // Chromium supervision
             chromium_restart_after,
-            chromium_max_queue_size,
             chromium_max_concurrency,
             chromium_auto_start,
             chromium_start_timeout,
-            chromium_idle_shutdown_timeout,
             // LibreOffice supervision
             libreoffice_restart_after,
-            libreoffice_max_queue_size,
             libreoffice_auto_start,
             libreoffice_start_timeout,
-            libreoffice_disable_routes,
-            libreoffice_idle_shutdown_timeout,
             // API server
             api_disable_health_route_telemetry,
             api_disable_root_route_telemetry,
@@ -715,11 +662,9 @@ mod tests {
         let args = ServerArgs::default();
         let cfg = ServerConfig::resolve(&args, &env(&[])).unwrap();
         assert_eq!(cfg.chromium_restart_after, 0);
-        assert_eq!(cfg.chromium_max_queue_size, 0);
         assert_eq!(cfg.chromium_max_concurrency, 6);
         assert!(!cfg.chromium_auto_start);
         assert_eq!(cfg.chromium_start_timeout, Duration::from_secs(20));
-        assert!(cfg.chromium_idle_shutdown_timeout.is_none());
     }
 
     #[test]
@@ -729,20 +674,16 @@ mod tests {
             &args,
             &env(&[
                 ("CHROMIUM_RESTART_AFTER", "100"),
-                ("CHROMIUM_MAX_QUEUE_SIZE", "50"),
                 ("CHROMIUM_MAX_CONCURRENCY", "8"),
                 ("CHROMIUM_AUTO_START", "true"),
                 ("CHROMIUM_START_TIMEOUT", "30s"),
-                ("CHROMIUM_IDLE_SHUTDOWN_TIMEOUT", "10m"),
             ]),
         )
         .unwrap();
         assert_eq!(cfg.chromium_restart_after, 100);
-        assert_eq!(cfg.chromium_max_queue_size, 50);
         assert_eq!(cfg.chromium_max_concurrency, 8);
         assert!(cfg.chromium_auto_start);
         assert_eq!(cfg.chromium_start_timeout, Duration::from_secs(30));
-        assert_eq!(cfg.chromium_idle_shutdown_timeout, Some(Duration::from_secs(600)));
     }
 
     #[test]
@@ -775,11 +716,8 @@ mod tests {
         let args = ServerArgs::default();
         let cfg = ServerConfig::resolve(&args, &env(&[])).unwrap();
         assert_eq!(cfg.libreoffice_restart_after, 0);
-        assert_eq!(cfg.libreoffice_max_queue_size, 0);
         assert!(!cfg.libreoffice_auto_start);
         assert_eq!(cfg.libreoffice_start_timeout, Duration::from_secs(20));
-        assert!(!cfg.libreoffice_disable_routes);
-        assert!(cfg.libreoffice_idle_shutdown_timeout.is_none());
     }
 
     #[test]
@@ -789,20 +727,14 @@ mod tests {
             &args,
             &env(&[
                 ("LIBREOFFICE_RESTART_AFTER", "50"),
-                ("LIBREOFFICE_MAX_QUEUE_SIZE", "25"),
                 ("LIBREOFFICE_AUTO_START", "true"),
                 ("LIBREOFFICE_START_TIMEOUT", "45s"),
-                ("LIBREOFFICE_DISABLE_ROUTES", "true"),
-                ("LIBREOFFICE_IDLE_SHUTDOWN_TIMEOUT", "5m"),
             ]),
         )
         .unwrap();
         assert_eq!(cfg.libreoffice_restart_after, 50);
-        assert_eq!(cfg.libreoffice_max_queue_size, 25);
         assert!(cfg.libreoffice_auto_start);
         assert_eq!(cfg.libreoffice_start_timeout, Duration::from_secs(45));
-        assert!(cfg.libreoffice_disable_routes);
-        assert_eq!(cfg.libreoffice_idle_shutdown_timeout, Some(Duration::from_secs(300)));
     }
 
     #[test]
@@ -869,21 +801,6 @@ mod tests {
         assert!(cfg.api_disable_health_route_telemetry);
         assert!(cfg.api_enable_debug_route);
         assert_eq!(cfg.api_basic_auth_username, Some("superuser".to_string()));
-    }
-
-    #[test]
-    fn idle_shutdown_zero_means_none() {
-        let args = ServerArgs::default();
-        let cfg = ServerConfig::resolve(
-            &args,
-            &env(&[
-                ("CHROMIUM_IDLE_SHUTDOWN_TIMEOUT", "0"),
-                ("LIBREOFFICE_IDLE_SHUTDOWN_TIMEOUT", "0s"),
-            ]),
-        )
-        .unwrap();
-        assert!(cfg.chromium_idle_shutdown_timeout.is_none());
-        assert!(cfg.libreoffice_idle_shutdown_timeout.is_none());
     }
 
     #[test]

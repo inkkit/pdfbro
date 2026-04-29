@@ -178,18 +178,13 @@ mod tests {
             log_format: LogFormat::Text,
             // Chromium supervision
             chromium_restart_after: 0,
-            chromium_max_queue_size: 0,
             chromium_max_concurrency: 6,
             chromium_auto_start: false,
             chromium_start_timeout: std::time::Duration::from_secs(20),
-            chromium_idle_shutdown_timeout: None,
             // LibreOffice supervision
             libreoffice_restart_after: 0,
-            libreoffice_max_queue_size: 0,
             libreoffice_auto_start: false,
             libreoffice_start_timeout: std::time::Duration::from_secs(20),
-            libreoffice_disable_routes: false,
-            libreoffice_idle_shutdown_timeout: None,
             // API server
             api_disable_health_route_telemetry: false,
             api_disable_root_route_telemetry: false,
