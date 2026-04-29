@@ -31,10 +31,10 @@ ENV CHROME_PATH=/usr/bin/chromium
 RUN cargo install cargo-chef --locked
 
 COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json --no-default-features --features chromium
 
-COPY . .
-RUN cargo build --release && \
+COPY --link . .
+RUN cargo build --release --no-default-features --features chromium && \
     strip target/release/folio-server && \
     strip target/release/folio
 
