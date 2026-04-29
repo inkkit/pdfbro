@@ -126,5 +126,6 @@ pub(crate) fn build_office_options(pdf: &PdfFlags, office: &OfficeFlags) -> Offi
         pdf_ua: office.pdf_ua,
         quality: office.quality,
         max_image_resolution: office.max_image_resolution,
+        ..Default::default()
     }
 }
