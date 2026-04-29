@@ -10,8 +10,7 @@ use engine::pdfops::{self, Metadata, SplitMode};
 
 use crate::error::{ApiError, ApiResult};
 use crate::multipart::{FormFields, UploadedFile};
-use crate::routes::chromium::{pdf_response, zip_response};
-use crate::routes::libreoffice::build_zip;
+use crate::routes::util::{build_zip, pdf_response, zip_response};
 use crate::state::AppState;
 use engine::Bookmark;
 use engine::PdfAProfile;
