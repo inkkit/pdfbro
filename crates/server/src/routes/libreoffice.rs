@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use axum::extract::{Multipart, State};
+use axum::http::HeaderMap;
 use axum::response::Response;
 use engine::{OfficeOptions, PageRanges};
 use engine::libreoffice::PdfAProfile;
@@ -16,6 +17,7 @@ use crate::state::AppState;
 /// `POST /forms/libreoffice/convert`.
 pub async fn libreoffice_convert(
     State(state): State<AppState>,
+    headers: HeaderMap,
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = state
@@ -42,6 +44,27 @@ pub async fn libreoffice_convert(
         .collect();
     if inputs.is_empty() {
         return Err(ApiError::MissingFile("files".to_string()));
+    }
+
+    // Read file bytes for potential webhook job.
+    let mut file_bytes = Vec::new();
+    for path in &inputs {
+        let bytes = tokio::fs::read(path).await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
+        file_bytes.push(bytes);
+    }
+
+    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+        &headers,
+        &state,
+        crate::webhook::WebhookOperation::LibreOfficeConvert,
+        crate::webhook::JobData::LibreOffice {
+            files: file_bytes,
+            options: opts.clone(),
+            merge,
+        },
+    ).await? {
+        return Ok(resp);
     }
 
     let mut outputs = lo.convert_many(&inputs, &opts).await?;

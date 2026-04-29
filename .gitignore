@@ -3,7 +3,6 @@
 Cargo.lock.bak
 .DS_Store
 *.pdf
-!docs/**/*.pdf
 .env
 .env.*
 !.env.example
