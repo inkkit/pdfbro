@@ -101,7 +101,8 @@ pub async fn pdfengines_merge(
         merged
     };
 
-    Ok(pdf_response(merged, "result.pdf"))
+    let filename = output_filename(&headers, "result");
+    Ok(pdf_response(merged, &filename))
 }
 
 fn merge_blobs(blobs: &[Vec<u8>]) -> engine::EngineResult<Vec<u8>> {
@@ -114,7 +115,7 @@ fn merge_blobs(blobs: &[Vec<u8>]) -> engine::EngineResult<Vec<u8>> {
 // ---------------------------------------------------------------------------
 
 /// `POST /forms/pdfengines/split`.
-pub async fn pdfengines_split(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_split(State(state): State<AppState>, headers: HeaderMap, mp: Multipart) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -168,7 +169,8 @@ pub async fn pdfengines_split(State(state): State<AppState>, mp: Multipart) -> A
     if chunks.len() == 1
         && let Some(only) = chunks.pop()
     {
-        return Ok(pdf_response(only, "result.pdf"));
+        let filename = output_filename(&headers, "result");
+        return Ok(pdf_response(only, &filename));
     }
 
     if unify && mode_was_pages {
@@ -176,7 +178,8 @@ pub async fn pdfengines_split(State(state): State<AppState>, mp: Multipart) -> A
         let merged = tokio::task::spawn_blocking(move || merge_blobs(&chunks))
             .await
             .map_err(|e| ApiError::Internal(e.to_string()))??;
-        return Ok(pdf_response(merged, "result.pdf"));
+        let filename = output_filename(&headers, "result");
+        return Ok(pdf_response(merged, &filename));
     }
 
     let names: Vec<String> = (1..=chunks.len())
@@ -241,6 +244,7 @@ fn parse_split_mode(map: &HashMap<String, String>) -> ApiResult<SplitMode> {
 /// `POST /forms/pdfengines/flatten`.
 pub async fn pdfengines_flatten(
     State(state): State<AppState>,
+    headers: HeaderMap,
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
@@ -266,7 +270,8 @@ pub async fn pdfengines_flatten(
     if outputs.len() == 1
         && let Some(only) = outputs.pop()
     {
-        return Ok(pdf_response(only, "result.pdf"));
+        let filename = output_filename(&headers, "result");
+        return Ok(pdf_response(only, &filename));
     }
     let names: Vec<String> = files.iter().map(|f| f.filename.clone()).collect();
     let zip = build_zip(&names, &outputs)?;
@@ -319,6 +324,7 @@ pub async fn pdfengines_metadata_read(
 /// `POST /forms/pdfengines/metadata/write`.
 pub async fn pdfengines_metadata_write(
     State(state): State<AppState>,
+    headers: HeaderMap,
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
@@ -355,7 +361,8 @@ pub async fn pdfengines_metadata_write(
     if outputs.len() == 1
         && let Some(only) = outputs.pop()
     {
-        return Ok(pdf_response(only, "result.pdf"));
+        let filename = output_filename(&headers, "result");
+        return Ok(pdf_response(only, &filename));
     }
     let names: Vec<String> = files.iter().map(|f| f.filename.clone()).collect();
     let zip = build_zip(&names, &outputs)?;
