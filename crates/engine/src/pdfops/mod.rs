@@ -313,7 +313,7 @@ mod tests {
         let bytes = make_fake_encrypted_pdf();
         let err = parse_input(&bytes).expect_err("encrypted input must be rejected");
         match err {
-            EngineError::Internal(msg) => {
+            EngineError::InvalidOption(msg) => {
                 assert!(msg.contains("encrypted"), "msg: {msg}");
             }
             other => panic!("unexpected error: {other:?}"),
