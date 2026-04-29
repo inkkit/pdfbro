@@ -9,13 +9,17 @@ description = "Folio HTTP server (Gotenberg-compatible)"
 name = "folio-server"
 path = "src/main.rs"
 
+[features]
+default = ["chromium", "libreoffice"]
+chromium = ["engine/chromium", "dep:pulldown-cmark"]
+libreoffice = ["engine/libreoffice"]
+
 [dependencies]
 engine = { workspace = true }
 
 # Async / runtime
 tokio = { workspace = true }
 async-trait = { workspace = true }
-futures-util = { workspace = true }
 
 # HTTP server
 axum = { workspace = true }
@@ -35,7 +39,7 @@ serde_urlencoded = { workspace = true }
 tempfile = { workspace = true }
 
 # Markdown (wrapper-template inlining for /forms/chromium/convert/markdown)
-pulldown-cmark = { workspace = true }
+pulldown-cmark = { workspace = true, optional = true }
 
 # Errors
 anyhow = { workspace = true }

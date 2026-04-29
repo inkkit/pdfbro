@@ -7,6 +7,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 
+#[cfg(feature = "libreoffice")]
 use engine::LibreOfficeEngine;
 use tokio::sync::Semaphore;
 
@@ -20,8 +21,9 @@ use prometheus;
 #[derive(Clone)]
 pub struct AppState {
     /// PDF rendering backend (production = chromium).
-    pub chromium: Arc<dyn PdfBackend>,
+    pub chromium: Option<Arc<dyn PdfBackend>>,
     /// LibreOffice engine; `None` in tests that don't need it.
+    #[cfg(feature = "libreoffice")]
     pub libreoffice: Option<Arc<LibreOfficeEngine>>,
     /// Outer concurrency cap.
     pub sem: Arc<Semaphore>,
@@ -38,8 +40,7 @@ pub struct AppState {
 impl AppState {
     /// Build a new state given concrete components.
     pub fn new(
-        chromium: Arc<dyn PdfBackend>,
-        libreoffice: Option<Arc<LibreOfficeEngine>>,
+        chromium: Option<Arc<dyn PdfBackend>>,
         config: ServerConfig,
     ) -> Self {
         let sem = Arc::new(Semaphore::new(config.concurrency));
@@ -47,13 +48,21 @@ impl AppState {
         let metrics = Arc::new((*crate::metrics::METRICS).clone());
         Self {
             chromium,
-            libreoffice,
+            #[cfg(feature = "libreoffice")]
+            libreoffice: None,
             sem,
             config: Arc::new(config),
             started_at: Instant::now(),
             webhook_queue: None,
             metrics,
         }
+    }
+
+    #[cfg(feature = "libreoffice")]
+    /// Attach a LibreOffice engine.
+    pub fn with_libreoffice(mut self, libreoffice: Option<Arc<LibreOfficeEngine>>) -> Self {
+        self.libreoffice = libreoffice;
+        self
     }
 
     /// Attach a webhook queue for async processing.

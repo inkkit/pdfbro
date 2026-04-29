@@ -11,13 +11,17 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use engine::{ChromiumEngine, EngineResult, PdfOptions, RequestContext, ScreenshotOptions};
+use engine::{EngineResult, PdfOptions};
+
+#[cfg(feature = "chromium")]
+use engine::{ChromiumEngine, RequestContext, ScreenshotOptions};
 
 /// Minimal trait surface mirroring the parts of [`ChromiumEngine`] that
 /// the server invokes from request handlers.
 #[async_trait]
 pub trait PdfBackend: Send + Sync + 'static {
     /// Render an HTML string to PDF bytes.
+    #[cfg(feature = "chromium")]
     async fn html_to_pdf(
         &self,
         html: &str,
@@ -27,6 +31,7 @@ pub trait PdfBackend: Send + Sync + 'static {
     ) -> EngineResult<Vec<u8>>;
 
     /// Navigate to a URL and render to PDF bytes.
+    #[cfg(feature = "chromium")]
     async fn url_to_pdf(
         &self,
         url: &str,
@@ -35,6 +40,7 @@ pub trait PdfBackend: Send + Sync + 'static {
     ) -> EngineResult<Vec<u8>>;
 
     /// Render Markdown to PDF.
+    #[cfg(feature = "chromium")]
     async fn markdown_to_pdf(
         &self,
         markdown: &str,
@@ -46,18 +52,22 @@ pub trait PdfBackend: Send + Sync + 'static {
     async fn healthy(&self) -> bool;
 
     /// Render HTML to screenshot image.
+    #[cfg(feature = "chromium")]
     async fn html_to_screenshot(&self, html: &str, opts: &ScreenshotOptions) -> EngineResult<Vec<u8>>;
 
     /// Navigate to URL and capture screenshot.
+    #[cfg(feature = "chromium")]
     async fn url_to_screenshot(&self, url: &str, opts: &ScreenshotOptions) -> EngineResult<Vec<u8>>;
 }
 
 /// Production [`PdfBackend`] backed by the real Chromium engine.
+#[cfg(feature = "chromium")]
 #[derive(Clone)]
 pub struct ChromiumBackend {
     inner: Arc<ChromiumEngine>,
 }
 
+#[cfg(feature = "chromium")]
 impl ChromiumBackend {
     /// Wrap an existing [`ChromiumEngine`] handle.
     pub fn new(engine: ChromiumEngine) -> Self {
@@ -72,6 +82,7 @@ impl ChromiumBackend {
     }
 }
 
+#[cfg(feature = "chromium")]
 #[async_trait]
 impl PdfBackend for ChromiumBackend {
     async fn html_to_pdf(
