@@ -430,12 +430,10 @@ pub enum WaitCondition {
         status: String,
     },
 }
-
-// ---------------------------------------------------------------------------
 // BrowserConfig
 // ---------------------------------------------------------------------------
 
-/// Browser-level configuration shared by every render.
+/// Engine-wide browser configuration.
 ///
 /// Constructed once when launching a [`crate::types::BrowserConfig`]-aware
 /// engine; not per-render.
@@ -456,6 +454,28 @@ pub struct BrowserConfig {
     /// Per-page navigation/render timeout. Default: 60s.
     #[serde(with = "humantime_serde")]
     pub timeout: Duration,
+
+    // === Gotenberg Supervision Fields ===
+    /// Restart Chromium after N conversions (0 = never restart).
+    /// Default: 0.
+    pub restart_after: u64,
+    /// Maximum Chromium request queue size (0 = unlimited).
+    /// Default: 0.
+    pub max_queue_size: usize,
+    /// Maximum concurrent Chromium conversions.
+    /// Default: 6 (Gotenberg max).
+    pub max_concurrency: usize,
+    /// Auto-start Chromium on server startup.
+    /// Default: false.
+    pub auto_start: bool,
+    /// Chromium start timeout.
+    /// Default: 20s.
+    #[serde(with = "humantime_serde")]
+    pub start_timeout: Duration,
+    /// Idle shutdown timeout for Chromium (None = disabled).
+    /// Default: None.
+    #[serde(with = "humantime_serde")]
+    pub idle_shutdown_timeout: Option<Duration>,
 }
 
 impl Default for BrowserConfig {
@@ -466,6 +486,13 @@ impl Default for BrowserConfig {
             extra_args: Vec::new(),
             no_sandbox: cfg!(target_os = "linux"),
             timeout: Duration::from_secs(60),
+            // Gotenberg supervision defaults
+            restart_after: 0,
+            max_queue_size: 0,
+            max_concurrency: 6,
+            auto_start: false,
+            start_timeout: Duration::from_secs(20),
+            idle_shutdown_timeout: None,
         }
     }
 }
