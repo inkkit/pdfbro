@@ -17,6 +17,7 @@ pub mod multipart;
 pub mod routes;
 pub mod shutdown;
 pub mod state;
+pub mod supervised_engine;
 pub mod webhook;
 
 pub use app::build_router;
