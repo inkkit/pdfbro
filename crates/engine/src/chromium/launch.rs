@@ -119,7 +119,7 @@ pub(crate) async fn launch_with(config: BrowserConfig) -> EngineResult<ChromiumE
 
     let cx_config = build_chromiumoxide_config(&config, &executable)?;
 
-    let (browser, mut handler) = Browser::launch(cx_config)
+    let (mut browser, mut handler) = Browser::launch(cx_config)
         .await
         .map_err(|e| EngineError::ChromeLaunch(e.to_string()))?;
 
@@ -136,7 +136,14 @@ pub(crate) async fn launch_with(config: BrowserConfig) -> EngineResult<ChromiumE
         }
     });
 
-    Ok(ChromiumEngine::from_parts(browser, handler_task, config))
+    // Capture the child-process PID so [`Inner::Drop`] can synchronously
+    // SIGKILL Chrome if the engine is dropped without explicit shutdown
+    // (e.g. test panic, early return).
+    let chrome_pid = browser
+        .get_mut_child()
+        .and_then(|child| child.as_mut_inner().id());
+
+    Ok(ChromiumEngine::from_parts(browser, handler_task, config, chrome_pid))
 }
 
 /// Translate our [`BrowserConfig`] into a chromiumoxide

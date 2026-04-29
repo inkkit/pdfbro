@@ -17,7 +17,7 @@ mod wait;
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use chromiumoxide::Browser;
 use tokio::sync::Mutex;
@@ -71,6 +71,9 @@ pub(crate) struct Inner {
     pub(crate) handler_task: std::sync::Mutex<Option<JoinHandle<()>>>,
     /// Frozen browser-level configuration used for every render.
     pub(crate) config: BrowserConfig,
+    /// OS process ID of the Chrome child process; used for best-effort
+    /// synchronous kill in [`Inner::Drop`] when shutdown was skipped.
+    pub(crate) chrome_pid: AtomicU32,
 }
 
 /// Per-render context describing user-agent, headers, cookies, and
@@ -348,6 +351,30 @@ impl ChromiumEngine {
     }
 }
 
+impl Drop for Inner {
+    fn drop(&mut self) {
+        if self.is_shutdown.load(Ordering::SeqCst) {
+            return;
+        }
+
+        let pid = self.chrome_pid.load(Ordering::SeqCst);
+        if pid != 0 {
+            tracing::debug!(pid, "Inner dropped without shutdown; killing Chrome");
+            let _ = std::process::Command::new("kill")
+                .args(["-9", &pid.to_string()])
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn();
+        }
+
+        if let Ok(mut g) = self.handler_task.try_lock() {
+            if let Some(handle) = g.take() {
+                handle.abort();
+            }
+        }
+    }
+}
+
 impl std::fmt::Debug for ChromiumEngine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ChromiumEngine")
@@ -368,6 +395,7 @@ impl ChromiumEngine {
         browser: Browser,
         handler_task: JoinHandle<()>,
         config: BrowserConfig,
+        chrome_pid: Option<u32>,
     ) -> Self {
         Self {
             inner: Arc::new(Inner {
@@ -375,6 +403,7 @@ impl ChromiumEngine {
                 is_shutdown: AtomicBool::new(false),
                 handler_task: std::sync::Mutex::new(Some(handler_task)),
                 config,
+                chrome_pid: AtomicU32::new(chrome_pid.unwrap_or(0)),
             }),
         }
     }
