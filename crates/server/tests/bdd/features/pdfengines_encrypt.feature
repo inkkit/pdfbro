@@ -19,9 +19,30 @@ Feature: /forms/pdfengines/encrypt
       | ownerPassword | owner123   | field |
     Then the response status code should be 200
 
+  Scenario: POST /forms/pdfengines/encrypt with custom output filename
+    Given I have a default Folio container
+    When I make a "POST" request to "/forms/pdfengines/encrypt" with the following form data and header(s):
+      | files                     | page_1.pdf | file   |
+      | userPassword              | secret123  | field  |
+      | Gotenberg-Output-Filename | secret_doc | header |
+    Then the response status code should be 200
+    Then the response header "Content-Type" should be "application/pdf"
+    Then there should be the following file(s) in the response:
+      | secret_doc.pdf |
+
   Scenario: POST /forms/pdfengines/decrypt
     Given I have a default Folio container
     When I make a "POST" request to "/forms/pdfengines/decrypt" with the following form data and header(s):
       | files    | encrypted_page_1.pdf | file  |
       | password | secret123            | field |
     Then the response status code should be 200
+
+  Scenario: POST /forms/pdfengines/decrypt with custom output filename
+    Given I have a default Folio container
+    When I make a "POST" request to "/forms/pdfengines/decrypt" with the following form data and header(s):
+      | files                     | encrypted_page_1.pdf | file   |
+      | password                  | secret123            | field  |
+      | Gotenberg-Output-Filename | open_doc             | header |
+    Then the response status code should be 200
+    Then there should be the following file(s) in the response:
+      | open_doc.pdf |

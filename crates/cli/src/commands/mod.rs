@@ -5,5 +5,6 @@
 pub(crate) mod batch;
 pub(crate) mod completions;
 pub(crate) mod convert;
+pub(crate) mod encrypt;
 pub(crate) mod metadata;
 pub(crate) mod pdfops;

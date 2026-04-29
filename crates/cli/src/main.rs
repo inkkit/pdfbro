@@ -77,6 +77,8 @@ async fn dispatch(cli: Cli) -> anyhow::Result<()> {
         Commands::Split(args) => commands::pdfops::run_split(&args),
         Commands::Flatten(args) => commands::pdfops::run_flatten(&args),
         Commands::Metadata { action } => commands::metadata::run(&action),
+        Commands::Encrypt(args) => commands::encrypt::run_encrypt(&args).await,
+        Commands::Decrypt(args) => commands::encrypt::run_decrypt(&args).await,
         Commands::Completions { shell } => commands::completions::run(shell),
     }
 }

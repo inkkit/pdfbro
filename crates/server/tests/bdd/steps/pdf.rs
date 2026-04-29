@@ -99,9 +99,17 @@ pub async fn check_page_content(
 /// Step: Then there should be the following file(s) in the response:
 /// | foo.pdf |
 /// | bar.pdf |
-pub async fn check_files_in_response(world: &mut FolioWorld, _files: Vec<String>) {
-    // For now, just verify we have a body
-    assert!(world.body.is_some(), "No response body available");
+pub async fn check_files_in_response(world: &mut FolioWorld, files: Vec<String>) {
+    let headers = world.response_headers.as_ref().expect("No response headers available");
+    let cd = headers
+        .get("content-disposition")
+        .expect("Missing Content-Disposition header");
+    for expected in &files {
+        assert!(
+            cd.contains(expected),
+            "Content-Disposition `{cd}` does not contain expected filename `{expected}`"
+        );
+    }
 }
 
 /// Check if bytes are valid PDF
