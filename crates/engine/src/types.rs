@@ -972,6 +972,8 @@ mod tests {
             extra_args: vec!["--mute-audio".into()],
             no_sandbox: true,
             timeout: Duration::from_secs(30),
+            auto_start: false,
+            idle_shutdown_timeout: None,
         };
         let json = serde_json::to_string(&c).unwrap();
         let back: BrowserConfig = serde_json::from_str(&json).unwrap();
@@ -980,6 +982,8 @@ mod tests {
         assert_eq!(back.extra_args, c.extra_args);
         assert_eq!(back.no_sandbox, c.no_sandbox);
         assert_eq!(back.timeout, c.timeout);
+        assert_eq!(back.auto_start, c.auto_start);
+        assert_eq!(back.idle_shutdown_timeout, c.idle_shutdown_timeout);
     }
 
     // --- Sanity: types are Send + Sync where expected ---------------------
