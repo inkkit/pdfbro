@@ -491,7 +491,7 @@ pub async fn pdfengines_rotate(
         .map
         .get("Gotenberg-Output-Filename")
         .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| "rotated.pdf".to_string());
+        .unwrap_or_else(|| files[0].filename.clone());
 
     Ok(pdf_response(rotated, &filename))
 }
@@ -598,7 +598,7 @@ pub async fn pdfengines_convert(
         .map
         .get("Gotenberg-Output-Filename")
         .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| "converted.pdf".to_string());
+        .unwrap_or_else(|| files[0].filename.clone());
 
     Ok(pdf_response(converted, &filename))
 }
@@ -701,7 +701,7 @@ pub async fn pdfengines_bookmarks_write(
         .map
         .get("Gotenberg-Output-Filename")
         .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| "document.pdf".to_string());
+        .unwrap_or_else(|| files[0].filename.clone());
 
     Ok(pdf_response(output, &filename))
 }
@@ -760,7 +760,7 @@ pub async fn pdfengines_watermark(
         .map
         .get("Gotenberg-Output-Filename")
         .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| "result.pdf".to_string());
+        .unwrap_or_else(|| files[0].filename.clone());
 
     Ok(pdf_response(output, &filename))
 }
@@ -815,7 +815,7 @@ pub async fn pdfengines_stamp(
         .map
         .get("Gotenberg-Output-Filename")
         .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| "result.pdf".to_string());
+        .unwrap_or_else(|| files[0].filename.clone());
 
     Ok(pdf_response(output, &filename))
 }
@@ -923,7 +923,7 @@ pub async fn pdfengines_encrypt(
         .map
         .get("Gotenberg-Output-Filename")
         .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| "encrypted.pdf".to_string());
+        .unwrap_or_else(|| files[0].filename.clone());
 
     Ok(pdf_response(output, &filename))
 }
@@ -968,7 +968,7 @@ pub async fn pdfengines_decrypt(
         .map
         .get("Gotenberg-Output-Filename")
         .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| "decrypted.pdf".to_string());
+        .unwrap_or_else(|| files[0].filename.clone());
 
     Ok(pdf_response(output, &filename))
 }
