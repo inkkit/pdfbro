@@ -9,6 +9,7 @@ use clap::Parser;
 use server::backend::PdfBackend;
 use server::config::{Cli, Command};
 use server::logging::init_logging;
+use server::routes::batch_state::{BatchStateManager, spawn_cleanup_task};
 use server::webhook::{WebhookClient, WebhookEngineContext, WebhookQueue, start_workers};
 use server::{AppState, ServerArgs, ServerConfig, banner, build_router, shutdown};
 
@@ -98,6 +99,17 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
     };
     start_workers(webhook_rx, 2, WebhookClient::default(), webhook_ctx);
 
+    // Initialize batch state manager
+    let batch_manager = BatchStateManager::new(
+        config.batch_storage_path.clone(),
+        config.batch_retention_minutes,
+    )
+    .await
+    .context("batch manager initialization")?;
+
+    // Spawn batch cleanup task (runs every hour)
+    spawn_cleanup_task(batch_manager.clone(), 60);
+
     let state = AppState::new(
         #[cfg(feature = "chromium")]
         Some(Arc::new(backend)),
@@ -105,7 +117,8 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
         None::<Arc<dyn PdfBackend>>,
         config.clone(),
     )
-    .with_webhook_queue(webhook_queue);
+    .with_webhook_queue(webhook_queue)
+    .with_batch_manager(batch_manager);
     #[cfg(feature = "libreoffice")]
     let state = state.with_libreoffice(libreoffice.map(Arc::new));
 

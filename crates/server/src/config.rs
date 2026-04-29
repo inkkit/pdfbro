@@ -146,6 +146,17 @@ pub struct ServerConfig {
     pub log_level: String,
     /// Log output format.
     pub log_format: LogFormat,
+    // Batch API configuration
+    /// Maximum items per batch.
+    pub batch_max_items: usize,
+    /// Concurrent conversions per batch.
+    pub batch_concurrency: usize,
+    /// Maximum concurrent batches server-wide.
+    pub batch_max_active: usize,
+    /// Batch retention time in minutes.
+    pub batch_retention_minutes: u64,
+    /// Batch storage path.
+    pub batch_storage_path: PathBuf,
 }
 
 /// Errors produced by [`ServerConfig::resolve`].
@@ -261,6 +272,28 @@ impl ServerConfig {
             },
         };
 
+        // Batch config defaults (can be extended with CLI/env later)
+        let batch_max_items: usize = env
+            .get("FOLIO_BATCH_MAX_ITEMS")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(50);
+        let batch_concurrency: usize = env
+            .get("FOLIO_BATCH_CONCURRENCY")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(4);
+        let batch_max_active: usize = env
+            .get("FOLIO_BATCH_MAX_ACTIVE")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(10);
+        let batch_retention_minutes: u64 = env
+            .get("FOLIO_BATCH_RETENTION_MINUTES")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(60);
+        let batch_storage_path: PathBuf = env
+            .get("FOLIO_BATCH_STORAGE_PATH")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| std::path::PathBuf::from("/tmp/folio-batches"));
+
         Ok(Self {
             host,
             port,
@@ -272,6 +305,11 @@ impl ServerConfig {
             soffice_path,
             log_level,
             log_format,
+            batch_max_items,
+            batch_concurrency,
+            batch_max_active,
+            batch_retention_minutes,
+            batch_storage_path,
         })
     }
 
