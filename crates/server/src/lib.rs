@@ -9,6 +9,7 @@
 pub mod app;
 pub mod backend;
 pub mod banner;
+pub mod batch_worker;
 pub mod config;
 pub mod error;
 pub mod logging;

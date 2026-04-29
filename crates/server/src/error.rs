@@ -44,6 +44,10 @@ pub enum ApiError {
     Internal(String),
     /// Webhook configuration or delivery error.
     Webhook(String),
+    /// Resource not found (e.g., batch ID doesn't exist).
+    NotFound,
+    /// Resource gone (e.g., batch already downloaded and removed).
+    Gone,
 }
 
 impl ApiError {
@@ -62,6 +66,8 @@ impl ApiError {
             }
             ApiError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL"),
             ApiError::Webhook(_) => (StatusCode::BAD_REQUEST, "WEBHOOK_ERROR"),
+            ApiError::NotFound => (StatusCode::NOT_FOUND, "NOT_FOUND"),
+            ApiError::Gone => (StatusCode::GONE, "GONE"),
         }
     }
 
@@ -107,6 +113,14 @@ impl ApiError {
             }),
             ApiError::Internal(msg) => json!({ "error": msg, "code": code }),
             ApiError::Webhook(msg) => json!({ "error": msg, "code": code }),
+            ApiError::NotFound => json!({
+                "error": "resource not found",
+                "code": code,
+            }),
+            ApiError::Gone => json!({
+                "error": "resource no longer available",
+                "code": code,
+            }),
         }
     }
 }
@@ -124,6 +138,8 @@ impl std::fmt::Display for ApiError {
             ApiError::UnsupportedMediaType => write!(f, "unsupported media type"),
             ApiError::Internal(m) => write!(f, "internal: {m}"),
             ApiError::Webhook(m) => write!(f, "webhook: {m}"),
+            ApiError::NotFound => write!(f, "resource not found"),
+            ApiError::Gone => write!(f, "resource gone"),
         }
     }
 }

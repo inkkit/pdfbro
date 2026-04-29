@@ -29,7 +29,7 @@ use tracing::Level;
 
 use crate::error::ApiError;
 
-use crate::routes::{health, pdfengines};
+use crate::routes::{batch, health, pdfengines};
 #[cfg(feature = "chromium")]
 use crate::routes::chromium;
 #[cfg(feature = "libreoffice")]
@@ -173,6 +173,10 @@ pub fn build_router(state: AppState) -> Router {
             "/forms/pdfengines/rotate",
             post(pdfengines::pdfengines_rotate),
         )
+        // Batch API routes
+        .route("/forms/batch/submit", post(batch::batch_submit))
+        .route("/forms/batch/:id/status", get(batch::batch_status))
+        .route("/forms/batch/:id/download", get(batch::batch_download))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(handle_timeout_error))

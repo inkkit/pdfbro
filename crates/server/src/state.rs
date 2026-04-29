@@ -14,6 +14,7 @@ use tokio::sync::Semaphore;
 use crate::ServerConfig;
 use crate::backend::PdfBackend;
 use crate::metrics::FolioMetrics;
+use crate::routes::batch_state::BatchStateManager;
 use crate::webhook::WebhookQueue;
 use prometheus;
 
@@ -27,7 +28,7 @@ pub struct AppState {
     pub libreoffice: Option<Arc<LibreOfficeEngine>>,
     /// Outer concurrency cap.
     pub sem: Arc<Semaphore>,
-    /// Resolved server config (for body limits, paths, etc.).
+    /// Resolved server config (for body limits, paths, etc).
     pub config: Arc<ServerConfig>,
     /// Process start time, for `/health` uptime reporting.
     pub started_at: Instant,
@@ -35,6 +36,8 @@ pub struct AppState {
     pub webhook_queue: Option<WebhookQueue>,
     /// Prometheus metrics for monitoring.
     pub metrics: Arc<FolioMetrics>,
+    /// Batch state manager for batch API.
+    pub batch_manager: Option<BatchStateManager>,
 }
 
 impl AppState {
@@ -55,6 +58,7 @@ impl AppState {
             started_at: Instant::now(),
             webhook_queue: None,
             metrics,
+            batch_manager: None,
         }
     }
 
@@ -68,6 +72,12 @@ impl AppState {
     /// Attach a webhook queue for async processing.
     pub fn with_webhook_queue(mut self, queue: WebhookQueue) -> Self {
         self.webhook_queue = Some(queue);
+        self
+    }
+
+    /// Attach a batch state manager for batch API.
+    pub fn with_batch_manager(mut self, manager: BatchStateManager) -> Self {
+        self.batch_manager = Some(manager);
         self
     }
 }
