@@ -14,10 +14,11 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use engine::{BrowserConfig, ChromiumEngine, LibreOfficeConfig, LibreOfficeEngine};
+use engine::{BrowserConfig, LibreOfficeConfig};
 use reqwest::multipart::{Form, Part};
 use server::backend::ChromiumBackend;
 use server::config::{LogFormat, ServerConfig};
+use server::supervised_engine::{SupervisedChromiumEngine, SupervisedLibreOfficeEngine};
 use server::{AppState, build_router};
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
@@ -56,7 +57,7 @@ struct TestServer {
     addr: SocketAddr,
     shutdown_tx: Option<oneshot::Sender<()>>,
     handle: tokio::task::JoinHandle<()>,
-    chromium: ChromiumEngine,
+    chromium: SupervisedChromiumEngine,
 }
 
 impl TestServer {
@@ -93,10 +94,23 @@ fn test_config() -> ServerConfig {
         batch_storage_path: std::path::PathBuf::from("/tmp/folio-batches"),
         otel_enabled: false,
         otel_endpoint: "http://localhost:4318/v1/traces".to_string(),
+        chromium_auto_start: false,
+        chromium_idle_shutdown_timeout: None,
+        libreoffice_auto_start: false,
+        libreoffice_idle_shutdown_timeout: None,
+        api_disable_health_route_telemetry: false,
+        api_disable_root_route_telemetry: false,
+        api_disable_debug_route_telemetry: false,
+        api_disable_version_route_telemetry: false,
+        api_enable_debug_route: false,
+        api_tls_cert_file: None,
+        api_tls_key_file: None,
+        api_basic_auth_username: None,
+        api_basic_auth_password: None,
     }
 }
 
-async fn launch_chromium(config: &ServerConfig) -> ChromiumEngine {
+async fn launch_chromium(config: &ServerConfig) -> SupervisedChromiumEngine {
     let defaults = BrowserConfig::default();
     let cfg = BrowserConfig {
         executable: config.chrome_path.clone(),
@@ -104,20 +118,16 @@ async fn launch_chromium(config: &ServerConfig) -> ChromiumEngine {
         timeout: config.request_timeout,
         ..defaults
     };
-    ChromiumEngine::launch_with(cfg)
-        .await
-        .expect("chromium launch")
+    SupervisedChromiumEngine::new(cfg)
 }
 
-async fn launch_libreoffice(config: &ServerConfig) -> LibreOfficeEngine {
+async fn launch_libreoffice(config: &ServerConfig) -> SupervisedLibreOfficeEngine {
     let cfg = LibreOfficeConfig {
         executable: config.soffice_path.clone(),
         timeout: config.request_timeout,
         ..LibreOfficeConfig::default()
     };
-    LibreOfficeEngine::launch(cfg)
-        .await
-        .expect("soffice launch")
+    SupervisedLibreOfficeEngine::new(cfg)
 }
 
 async fn spawn_server(with_libreoffice: bool) -> TestServer {
@@ -130,9 +140,9 @@ async fn spawn_server(with_libreoffice: bool) -> TestServer {
         None
     };
 
-    let state = AppState::new(Some(Arc::new(backend)), config)
+    let state = AppState::new(Some(Arc::new(backend)), config.clone())
         .with_libreoffice(lo);
-    let router = build_router(state);
+    let router = build_router(state, &config);
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
