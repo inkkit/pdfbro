@@ -1,5 +1,9 @@
 # Missing Features Roadmap - Folio vs Gotenberg
 
+> **⚠️ DEPRECATED — This document is stale.**  
+> Many features listed below as "missing" (screenshots, bookmarks, encrypt, watermark/stamp, PDF/A, Prometheus, webhooks, BDD tests) are actually **implemented**.  
+> **For the ground-truth status, see [`docs/implementation-status.md`](../implementation-status.md).**
+
 > **Goal**: Bring Folio to feature parity with Gotenberg, phase by phase.
 
 ## Phase 1: Core Chromium Features (Screenshots)

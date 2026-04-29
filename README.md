@@ -5,16 +5,16 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/yourusername/folio/actions">
-    <img src="https://img.shields.io/github/actions/workflow/status/yourusername/folio/ci.yml?branch=main&style=flat-square" alt="CI Status"/>
+  <a href="https://github.com/__deesh_reddy__/folio/actions">
+    <img src="https://img.shields.io/github/actions/workflow/status/__deesh_reddy__/folio/ci.yml?branch=main&style=flat-square" alt="CI Status"/>
   </a>
   <a href="https://crates.io/crates/folio">
     <img src="https://img.shields.io/crates/v/folio?style=flat-square" alt="Crates.io"/>
   </a>
   <img src="https://img.shields.io/badge/rust-1.75%2B-orange?style=flat-square" alt="Rust Version"/>
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"/>
-  <a href="https://github.com/yourusername/folio/releases">
-    <img src="https://img.shields.io/github/v/release/yourusername/folio?style=flat-square" alt="Release"/>
+  <a href="https://github.com/__deesh_reddy__/folio/releases">
+    <img src="https://img.shields.io/github/v/release/__deesh_reddy__/folio?style=flat-square" alt="Release"/>
   </a>
 </p>
 
@@ -74,7 +74,7 @@
 | **Screenshots** | ✅ Done | ✅ | ❌ | ❌ |
 | **Structured Logging** | ✅ Full (tracing) | ✅ (slog) | ❌ | ❌ |
 | **Prometheus Metrics** | ✅ `/prometheus/metrics` | ✅ | ❌ | ❌ |
-| **OpenTelemetry** | 🚧 In Progress | ✅ | ❌ | ❌ |
+| **OpenTelemetry** | ❌ Not Started | ✅ | ❌ | ❌ |
 | **Process Supervision** | 🚧 In Progress | ✅ | ❌ | ❌ |
 
 ### Architecture Pattern
@@ -191,7 +191,7 @@ Gotenberg-compatible REST API for document conversion:
 | `/forms/chromium/convert/html` | POST | HTML file | PDF |
 | `/forms/chromium/convert/url` | POST | URL | PDF |
 | `/forms/chromium/convert/markdown` | POST | Markdown | PDF |
-| `/forms/chromium/screenshot/html` | POST | HTML | PNG/JPEG/WebP 🚧 |
+| `/forms/chromium/screenshot/html` | POST | HTML | PNG/JPEG/WebP |
 | `/forms/libreoffice/convert` | POST | Office docs | PDF |
 | `/forms/pdfengines/merge` | POST | PDFs | Merged PDF |
 | `/forms/pdfengines/split` | POST | PDF | Split PDFs |
@@ -263,14 +263,14 @@ const pdf = await engine.htmlToPdf('<h1>Hello</h1>');
 - **Gotenberg Compatibility**: Drop-in API replacement
 - **Health Checks**: `/health` endpoint with engine status
 - **Concurrent Rendering**: Thread-safe browser instance sharing
-- **Screenshots**: URL/HTML/Markdown to PNG/JPEG/WebP
+- **Screenshots**: URL/HTML/Markdown to PNG/JPEG (WebP pending)
 - **BDD Testing**: Port Gotenberg's Gherkin scenarios to Rust
 - **Structured Logging**: Context-aware logs with request_id, engine type, duration (text/JSON formats)
 - **Prometheus Metrics**: `/prometheus/metrics` endpoint with conversion, queue, and engine metrics
 
 ### 🚧 In Progress / Partially Done
 
-- **Webhook System**: Async callbacks with retry (spec 15)
+- **Webhook System**: Delivery client & retry exist, but job execution is stubbed (spec 15)
 - **Advanced Wait Conditions**: `skipNetworkIdleEvent`, `failOnResourceLoadingFailed`, etc. (spec 36)
 - **Advanced LibreOffice Fields**: 30+ missing export options (spec 37)
 - **Full CLI Flag Parity**: Many Gotenberg flags still missing (spec 39)
@@ -278,12 +278,10 @@ const pdf = await engine.htmlToPdf('<h1>Hello</h1>');
 - **BDD Test Suite**: Framework exists, scenario coverage incomplete (spec 50)
 - **Batch API**: CLI batch works; server-side bulk endpoint pending (spec 50-batch)
 - **Health Dashboard**: JSON `/health` works; visual HTML dashboard pending (spec 51)
+- **WebP Screenshots**: Engine only supports PNG/JPEG (spec 18)
 
 ### ❌ Not Started (Spec-Only)
 
-- **PDF/A & PDF/UA Conformance**: Archival compliance conversion (spec 14)
-- **PDF Bookmarks**: Outline read/write (spec 16)
-- **PDF Encryption**: Password protection & permissions (spec 19)
 - **Python / Node.js Bindings**: Empty placeholders only (specs 40, 41)
 - **Multi-Backend PDF Engines**: qpdf, pdfcpu, pdftk backends (spec 38)
 - **Special Features**: TLS, auth, cloud-run, remote URL download (spec 40-special)
@@ -295,7 +293,7 @@ const pdf = await engine.htmlToPdf('<h1>Hello</h1>');
 - **Interactive Docs**: Built-in `/docs` API explorer (spec 48)
 - **Template Library**: Pre-built document templates (spec 49)
 
-See [Full Roadmap](./docs/specs/20-missing-features-roadmap.md) for detailed phases.
+> **Note:** This README is a high-level overview. For a ground-truth audit of what is actually built vs. spec claims, see [`docs/implementation-status.md`](./docs/implementation-status.md). The `20-missing-features-roadmap.md` spec is currently stale and should not be relied upon for current status.
 
 ---
 
@@ -318,12 +316,12 @@ See [Full Roadmap](./docs/specs/20-missing-features-roadmap.md) for detailed pha
 | [11-engine-chromium](./docs/specs/11-engine-chromium.md) | Chromium engine (HTML/URL/Markdown→PDF + screenshots) | ✅ Done |
 | [12-engine-libreoffice](./docs/specs/12-engine-libreoffice.md) | LibreOffice engine (Office→PDF) | ✅ Done |
 | [13-engine-pdfops](./docs/specs/13-engine-pdfops.md) | PDF operations (merge, split, flatten, metadata, watermark, rotate) | ✅ Done |
-| [14-engine-pdfa](./docs/specs/14-engine-pdfa.md) | PDF/A & PDF/UA conformance conversion | ❌ Not Done |
+| [14-engine-pdfa](./docs/specs/14-engine-pdfa.md) | PDF/A & PDF/UA conformance conversion | ✅ Done |
 | [15-webhook](./docs/specs/15-webhook.md) | Async webhook callback system | 🚧 Partially Done |
-| [16-bookmarks](./docs/specs/16-bookmarks.md) | PDF bookmarks/outline read & write | ❌ Not Done |
+| [16-bookmarks](./docs/specs/16-bookmarks.md) | PDF bookmarks/outline read & write | ✅ Done |
 | [17-watermark](./docs/specs/17-watermark.md) | PDF watermark & stamp overlay | ✅ Done *(via spec 13)* |
 | [18-screenshot](./docs/specs/18-screenshot.md) | Chromium screenshot API (PNG/JPEG/WebP) | ✅ Done *(via spec 11)* |
-| [19-encrypt](./docs/specs/19-encrypt.md) | PDF encryption & password protection | ❌ Not Done |
+| [19-encrypt](./docs/specs/19-encrypt.md) | PDF encryption & password protection | ✅ Done |
 | [20-cli](./docs/specs/20-cli.md) | Command-line interface (`folio` binary) | ✅ Done |
 | [20-bdd-testing](./docs/specs/20-bdd-testing.md) | BDD test strategy | 🚧 Partially Done |
 | [20-missing-features-roadmap](./docs/specs/20-missing-features-roadmap.md) | Feature parity roadmap vs Gotenberg | 📋 Reference |
@@ -397,8 +395,8 @@ folio/
 │   ├── assets/                    # Images, logos
 │   └── specs/                    # Implementation specs (32 files, see table above)
 │
-└── tests/                         # BDD integration tests
-    └── integration/
+└── crates/*/tests/                # Crate-local tests (unit + integration)
+    └── server/tests/bdd/            # BDD integration tests
 ```
 
 ---
@@ -485,7 +483,7 @@ make docker-test
 We're porting Gotenberg's comprehensive BDD test suite:
 
 - ✅ Unit tests: 50+ test cases
-- ✅ Integration tests: 52 Gherkin scenarios
+- 🚧 Integration tests: BDD framework with 25+ feature files (scenario pass rate unverified)
 - ✅ E2E tests: Server + CLI smoke tests
 
 See [BDD Testing Spec](./docs/specs/50-testing-bdd.md) for details.
@@ -500,15 +498,15 @@ See [BDD Testing Spec](./docs/specs/50-testing-bdd.md) for details.
 - [x] PDF operations (merge, split, flatten, rotate, watermark) — spec 13
 - [x] PDF metadata read/write — spec 13
 - [x] Gotenberg-compatible API — spec 30
-- [x] Screenshots (HTML/URL/Markdown → PNG/JPEG/WebP) — spec 11 / 18
+- [x] Screenshots (HTML/URL/Markdown → PNG/JPEG) — spec 11 / 18 (WebP pending)
 - [x] Structured Logging (tracing with text/JSON formats)
 - [x] Prometheus Metrics (`/prometheus/metrics` endpoint)
 - [x] CLI (`folio` binary) — spec 20
 
 ### Phase 2: Advanced Engine Features 🚧
-- [ ] PDF/A & PDF/UA conformance conversion — spec 14
-- [ ] PDF bookmarks read/write — spec 16
-- [ ] PDF encryption & password protection — spec 19
+- [x] PDF/A & PDF/UA conformance conversion — spec 14
+- [x] PDF bookmarks read/write — spec 16
+- [x] PDF encryption & password protection — spec 19
 - [ ] Advanced Chromium wait conditions — spec 36
 - [ ] Advanced LibreOffice form fields — spec 37
 - [ ] Multi-backend PDF engines (qpdf, pdfcpu, pdftk) — spec 38
