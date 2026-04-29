@@ -99,40 +99,6 @@ pub struct ServerArgs {
     #[arg(long, value_name = "FORMAT")]
     pub log_format: Option<LogFormat>,
 
-    // === Chromium Supervision Flags ===
-    /// Restart Chromium after N conversions (0 = never restart).
-    #[arg(long, value_name = "N", env = "CHROMIUM_RESTART_AFTER")]
-    pub chromium_restart_after: Option<u64>,
-
-    /// Maximum Chromium request queue size (0 = unlimited).
-    #[arg(long, value_name = "N", env = "CHROMIUM_MAX_QUEUE_SIZE")]
-    pub chromium_max_queue_size: Option<usize>,
-
-    /// Maximum concurrent Chromium conversions (default: 6, Gotenberg max).
-    #[arg(long, value_name = "N", env = "CHROMIUM_MAX_CONCURRENCY")]
-    pub chromium_max_concurrency: Option<usize>,
-
-    /// Auto-start Chromium on server startup.
-    #[arg(long, env = "CHROMIUM_AUTO_START")]
-    pub chromium_auto_start: bool,
-
-    /// Chromium start timeout (e.g., "20s", "1m").
-    #[arg(long, value_name = "DUR", env = "CHROMIUM_START_TIMEOUT")]
-    pub chromium_start_timeout: Option<String>,
-
-    // === LibreOffice Supervision Flags ===
-    /// Restart LibreOffice after N conversions (0 = never restart).
-    #[arg(long, value_name = "N", env = "LIBREOFFICE_RESTART_AFTER")]
-    pub libreoffice_restart_after: Option<u64>,
-
-    /// Auto-start LibreOffice on server startup.
-    #[arg(long, env = "LIBREOFFICE_AUTO_START")]
-    pub libreoffice_auto_start: bool,
-
-    /// LibreOffice start timeout (e.g., "20s", "1m").
-    #[arg(long, value_name = "DUR", env = "LIBREOFFICE_START_TIMEOUT")]
-    pub libreoffice_start_timeout: Option<String>,
-
     // === API Server Flags ===
     /// Disable telemetry for health check route.
     #[arg(long, env = "API_DISABLE_HEALTH_ROUTE_TELEMETRY")]
@@ -217,24 +183,6 @@ pub struct ServerConfig {
     pub log_level: String,
     /// Log output format.
     pub log_format: LogFormat,
-
-    // === Chromium Supervision Config ===
-    /// Restart Chromium after N conversions (0 = never).
-    pub chromium_restart_after: u64,
-    /// Maximum concurrent Chromium conversions.
-    pub chromium_max_concurrency: usize,
-    /// Auto-start Chromium on server startup.
-    pub chromium_auto_start: bool,
-    /// Chromium start timeout.
-    pub chromium_start_timeout: Duration,
-
-    // === LibreOffice Supervision Config ===
-    /// Restart LibreOffice after N conversions (0 = never).
-    pub libreoffice_restart_after: u64,
-    /// Auto-start LibreOffice on server startup.
-    pub libreoffice_auto_start: bool,
-    /// LibreOffice start timeout.
-    pub libreoffice_start_timeout: Duration,
 
     // === API Server Config ===
     /// Disable telemetry for health check route.
@@ -370,45 +318,6 @@ impl ServerConfig {
             },
         };
 
-        // === Chromium Supervision Config Resolution ===
-        let chromium_restart_after = args.chromium_restart_after
-            .or_else(|| env.get("CHROMIUM_RESTART_AFTER").and_then(|v| v.parse().ok()))
-            .unwrap_or(0);
-        let chromium_max_concurrency = args.chromium_max_concurrency
-            .or_else(|| env.get("CHROMIUM_MAX_CONCURRENCY").and_then(|v| v.parse().ok()))
-            .unwrap_or(6);
-        let chromium_auto_start = args.chromium_auto_start
-            || env.get("CHROMIUM_AUTO_START").map(|v| is_truthy(v)).unwrap_or(false);
-        let chromium_start_timeout_str = pick_string(
-            args.chromium_start_timeout.as_deref(),
-            env,
-            "CHROMIUM_START_TIMEOUT",
-            "20s",
-        );
-        let chromium_start_timeout = humantime::parse_duration(&chromium_start_timeout_str)
-            .map_err(|e| ConfigError::Parse {
-                field: "chromium_start_timeout",
-                message: e.to_string(),
-            })?;
-
-        // === LibreOffice Supervision Config Resolution ===
-        let libreoffice_restart_after = args.libreoffice_restart_after
-            .or_else(|| env.get("LIBREOFFICE_RESTART_AFTER").and_then(|v| v.parse().ok()))
-            .unwrap_or(0);
-        let libreoffice_auto_start = args.libreoffice_auto_start
-            || env.get("LIBREOFFICE_AUTO_START").map(|v| is_truthy(v)).unwrap_or(false);
-        let libreoffice_start_timeout_str = pick_string(
-            args.libreoffice_start_timeout.as_deref(),
-            env,
-            "LIBREOFFICE_START_TIMEOUT",
-            "20s",
-        );
-        let libreoffice_start_timeout = humantime::parse_duration(&libreoffice_start_timeout_str)
-            .map_err(|e| ConfigError::Parse {
-                field: "libreoffice_start_timeout",
-                message: e.to_string(),
-            })?;
-
         // === API Server Config Resolution ===
         let api_disable_health_route_telemetry = args.api_disable_health_route_telemetry
             || env.get("API_DISABLE_HEALTH_ROUTE_TELEMETRY").map(|v| is_truthy(v)).unwrap_or(false);
@@ -440,15 +349,6 @@ impl ServerConfig {
             soffice_path,
             log_level,
             log_format,
-            // Chromium supervision
-            chromium_restart_after,
-            chromium_max_concurrency,
-            chromium_auto_start,
-            chromium_start_timeout,
-            // LibreOffice supervision
-            libreoffice_restart_after,
-            libreoffice_auto_start,
-            libreoffice_start_timeout,
             // API server
             api_disable_health_route_telemetry,
             api_disable_root_route_telemetry,
@@ -655,88 +555,6 @@ mod tests {
         assert_eq!(cfg.no_sandbox, Some(false));
     }
 
-    // === Gotenberg CLI Flag Parity Tests ===
-
-    #[test]
-    fn chromium_flags_default_to_zero() {
-        let args = ServerArgs::default();
-        let cfg = ServerConfig::resolve(&args, &env(&[])).unwrap();
-        assert_eq!(cfg.chromium_restart_after, 0);
-        assert_eq!(cfg.chromium_max_concurrency, 6);
-        assert!(!cfg.chromium_auto_start);
-        assert_eq!(cfg.chromium_start_timeout, Duration::from_secs(20));
-    }
-
-    #[test]
-    fn chromium_flags_from_env() {
-        let args = ServerArgs::default();
-        let cfg = ServerConfig::resolve(
-            &args,
-            &env(&[
-                ("CHROMIUM_RESTART_AFTER", "100"),
-                ("CHROMIUM_MAX_CONCURRENCY", "8"),
-                ("CHROMIUM_AUTO_START", "true"),
-                ("CHROMIUM_START_TIMEOUT", "30s"),
-            ]),
-        )
-        .unwrap();
-        assert_eq!(cfg.chromium_restart_after, 100);
-        assert_eq!(cfg.chromium_max_concurrency, 8);
-        assert!(cfg.chromium_auto_start);
-        assert_eq!(cfg.chromium_start_timeout, Duration::from_secs(30));
-    }
-
-    #[test]
-    fn chromium_flags_cli_beats_env() {
-        let args = ServerArgs {
-            chromium_restart_after: Some(200),
-            chromium_max_concurrency: Some(12),
-            chromium_auto_start: true,
-            chromium_start_timeout: Some("45s".to_string()),
-            ..ServerArgs::default()
-        };
-        let cfg = ServerConfig::resolve(
-            &args,
-            &env(&[
-                ("CHROMIUM_RESTART_AFTER", "100"),
-                ("CHROMIUM_MAX_CONCURRENCY", "8"),
-                ("CHROMIUM_AUTO_START", "false"),
-                ("CHROMIUM_START_TIMEOUT", "30s"),
-            ]),
-        )
-        .unwrap();
-        assert_eq!(cfg.chromium_restart_after, 200);
-        assert_eq!(cfg.chromium_max_concurrency, 12);
-        assert!(cfg.chromium_auto_start);
-        assert_eq!(cfg.chromium_start_timeout, Duration::from_secs(45));
-    }
-
-    #[test]
-    fn libreoffice_flags_default() {
-        let args = ServerArgs::default();
-        let cfg = ServerConfig::resolve(&args, &env(&[])).unwrap();
-        assert_eq!(cfg.libreoffice_restart_after, 0);
-        assert!(!cfg.libreoffice_auto_start);
-        assert_eq!(cfg.libreoffice_start_timeout, Duration::from_secs(20));
-    }
-
-    #[test]
-    fn libreoffice_flags_from_env() {
-        let args = ServerArgs::default();
-        let cfg = ServerConfig::resolve(
-            &args,
-            &env(&[
-                ("LIBREOFFICE_RESTART_AFTER", "50"),
-                ("LIBREOFFICE_AUTO_START", "true"),
-                ("LIBREOFFICE_START_TIMEOUT", "45s"),
-            ]),
-        )
-        .unwrap();
-        assert_eq!(cfg.libreoffice_restart_after, 50);
-        assert!(cfg.libreoffice_auto_start);
-        assert_eq!(cfg.libreoffice_start_timeout, Duration::from_secs(45));
-    }
-
     #[test]
     fn api_server_flags_default() {
         let args = ServerArgs::default();
@@ -801,27 +619,5 @@ mod tests {
         assert!(cfg.api_disable_health_route_telemetry);
         assert!(cfg.api_enable_debug_route);
         assert_eq!(cfg.api_basic_auth_username, Some("superuser".to_string()));
-    }
-
-    #[test]
-    fn invalid_chromium_start_timeout_is_parse_error() {
-        let args = ServerArgs {
-            chromium_start_timeout: Some("invalid".to_string()),
-            ..ServerArgs::default()
-        };
-        let err = ServerConfig::resolve(&args, &env(&[])).unwrap_err();
-        let ConfigError::Parse { field, .. } = err;
-        assert_eq!(field, "chromium_start_timeout");
-    }
-
-    #[test]
-    fn invalid_libreoffice_start_timeout_is_parse_error() {
-        let args = ServerArgs {
-            libreoffice_start_timeout: Some("not-a-duration".to_string()),
-            ..ServerArgs::default()
-        };
-        let err = ServerConfig::resolve(&args, &env(&[])).unwrap_err();
-        let ConfigError::Parse { field, .. } = err;
-        assert_eq!(field, "libreoffice_start_timeout");
     }
 }
