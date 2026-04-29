@@ -114,7 +114,11 @@ fn merge_blobs(blobs: &[Vec<u8>]) -> engine::EngineResult<Vec<u8>> {
 // ---------------------------------------------------------------------------
 
 /// `POST /forms/pdfengines/split`.
-pub async fn pdfengines_split(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_split(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -147,6 +151,18 @@ pub async fn pdfengines_split(State(state): State<AppState>, mp: Multipart) -> A
             pages.dedup();
             mode = SplitMode::Pages(pages);
         }
+    }
+
+    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+        &headers,
+        &state,
+        crate::webhook::WebhookOperation::PdfSplit,
+        crate::webhook::JobData::PdfSplit {
+            file: bytes.clone(),
+            mode: mode.clone(),
+        },
+    ).await? {
+        return Ok(resp);
     }
 
     let mut chunks = if bytes.len() > SPAWN_BLOCKING_THRESHOLD {
@@ -241,6 +257,7 @@ fn parse_split_mode(map: &HashMap<String, String>) -> ApiResult<SplitMode> {
 /// `POST /forms/pdfengines/flatten`.
 pub async fn pdfengines_flatten(
     State(state): State<AppState>,
+    headers: HeaderMap,
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
@@ -248,6 +265,27 @@ pub async fn pdfengines_flatten(
     let files = form.files_by_field("files");
     if files.is_empty() {
         return Err(ApiError::MissingFile("files".to_string()));
+    }
+
+    // Webhook support for single-file flatten.
+    if files.len() == 1 {
+        let bytes = read_one(files[0]).await?;
+        if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+            &headers,
+            &state,
+            crate::webhook::WebhookOperation::PdfFlatten,
+            crate::webhook::JobData::PdfFlatten { file: bytes.clone() },
+        ).await? {
+            return Ok(resp);
+        }
+        let flat = if bytes.len() > SPAWN_BLOCKING_THRESHOLD {
+            tokio::task::spawn_blocking(move || pdfops::flatten(&bytes))
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))??
+        } else {
+            pdfops::flatten(&bytes)?
+        };
+        return Ok(pdf_response(flat, "result.pdf"));
     }
 
     let mut outputs: Vec<Vec<u8>> = Vec::with_capacity(files.len());
@@ -280,6 +318,7 @@ pub async fn pdfengines_flatten(
 /// `POST /forms/pdfengines/metadata/read`.
 pub async fn pdfengines_metadata_read(
     State(state): State<AppState>,
+    headers: HeaderMap,
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
@@ -287,6 +326,19 @@ pub async fn pdfengines_metadata_read(
     let files = form.files_by_field("files");
     if files.is_empty() {
         return Err(ApiError::MissingFile("files".to_string()));
+    }
+
+    // Webhook support for single-file read.
+    if files.len() == 1 {
+        let bytes = read_one(files[0]).await?;
+        if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+            &headers,
+            &state,
+            crate::webhook::WebhookOperation::PdfMetadataRead,
+            crate::webhook::JobData::PdfMetadataRead { file: bytes },
+        ).await? {
+            return Ok(resp);
+        }
     }
 
     let mut out: BTreeMap<String, Metadata> = BTreeMap::new();
@@ -304,21 +356,22 @@ pub async fn pdfengines_metadata_read(
     }
 
     let body = serde_json::to_vec(&out).map_err(|e| ApiError::Internal(e.to_string()))?;
-    let mut headers = HeaderMap::new();
-    headers.insert(
+    let mut resp_headers = HeaderMap::new();
+    resp_headers.insert(
         header::CONTENT_TYPE,
         HeaderValue::from_static("application/json"),
     );
-    headers.insert(
+    resp_headers.insert(
         header::CONTENT_DISPOSITION,
         HeaderValue::from_static("attachment; filename=\"result.json\""),
     );
-    Ok((StatusCode::OK, headers, body).into_response())
+    Ok((StatusCode::OK, resp_headers, body).into_response())
 }
 
 /// `POST /forms/pdfengines/metadata/write`.
 pub async fn pdfengines_metadata_write(
     State(state): State<AppState>,
+    headers: HeaderMap,
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
@@ -337,6 +390,22 @@ pub async fn pdfengines_metadata_write(
         field: "metadata",
         message: e.to_string(),
     })?;
+
+    // Webhook support for single-file write.
+    if files.len() == 1 {
+        let bytes = read_one(files[0]).await?;
+        if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+            &headers,
+            &state,
+            crate::webhook::WebhookOperation::PdfMetadataWrite,
+            crate::webhook::JobData::PdfMetadataWrite {
+                file: bytes,
+                metadata: meta.clone(),
+            },
+        ).await? {
+            return Ok(resp);
+        }
+    }
 
     let mut outputs: Vec<Vec<u8>> = Vec::with_capacity(files.len());
     for f in &files {
@@ -368,7 +437,11 @@ pub async fn pdfengines_metadata_write(
 
 /// `POST /forms/pdfengines/rotate`.
 /// Rotates selected pages by 90° increments.
-pub async fn pdfengines_rotate(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_rotate(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -381,15 +454,29 @@ pub async fn pdfengines_rotate(State(state): State<AppState>, mp: Multipart) -> 
     let bytes = read_one(files[0]).await?;
 
     let angle_str = form.map.get("rotate").ok_or(ApiError::MissingField("rotate"))?;
-    let angle: i32 = angle_str.parse().map_err(|e| ApiError::InvalidField {
+    let angle: u16 = angle_str.parse().map_err(|e| ApiError::InvalidField {
         field: "rotate",
         message: format!("expected integer angle: {e}"),
     })?;
 
     // Default to all pages ("1-" is open-ended, covers every page after clamping).
     let pages = PageRanges::parse("1-").map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+        &headers,
+        &state,
+        crate::webhook::WebhookOperation::PdfRotate,
+        crate::webhook::JobData::PdfRotate {
+            file: bytes.clone(),
+            angle,
+            pages: Some(pages.clone()),
+        },
+    ).await? {
+        return Ok(resp);
+    }
+
     let rotated = tokio::task::spawn_blocking(move || {
-        pdfops::rotate(&bytes, &pages, angle)
+        pdfops::rotate(&bytes, &pages, angle as i32)
     })
     .await
     .map_err(|e| ApiError::Internal(e.to_string()))?
@@ -452,7 +539,11 @@ fn parse_bool_field(map: &HashMap<String, String>, key: &'static str) -> ApiResu
 
 /// `POST /forms/pdfengines/convert`.
 /// Converts PDF to PDF/A conformance (PDF/A-1b, PDF/A-2b, PDF/A-3b).
-pub async fn pdfengines_convert(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_convert(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -470,6 +561,18 @@ pub async fn pdfengines_convert(State(state): State<AppState>, mp: Multipart) ->
         field: "pdfa",
         message: e,
     })?;
+
+    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+        &headers,
+        &state,
+        crate::webhook::WebhookOperation::PdfConvert,
+        crate::webhook::JobData::PdfConvert {
+            file: bytes.clone(),
+            profile,
+        },
+    ).await? {
+        return Ok(resp);
+    }
 
     // Run conversion
     let converted = convert_to_pdfa(&bytes, profile).await.map_err(|e| ApiError::Internal(e.to_string()))?;
@@ -489,7 +592,11 @@ pub async fn pdfengines_convert(State(state): State<AppState>, mp: Multipart) ->
 
 /// `POST /forms/pdfengines/bookmarks/read`.
 /// Reads bookmarks from a PDF and returns them as JSON.
-pub async fn pdfengines_bookmarks_read(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_bookmarks_read(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -500,6 +607,15 @@ pub async fn pdfengines_bookmarks_read(State(state): State<AppState>, mp: Multip
         });
     }
     let bytes = read_one(files[0]).await?;
+
+    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+        &headers,
+        &state,
+        crate::webhook::WebhookOperation::PdfBookmarksRead,
+        crate::webhook::JobData::PdfBookmarksRead { file: bytes.clone() },
+    ).await? {
+        return Ok(resp);
+    }
 
     let bookmarks = tokio::task::spawn_blocking(move || read_bookmarks(&bytes))
         .await
@@ -524,7 +640,11 @@ pub async fn pdfengines_bookmarks_read(State(state): State<AppState>, mp: Multip
 
 /// `POST /forms/pdfengines/bookmarks/write`.
 /// Writes bookmarks to a PDF.
-pub async fn pdfengines_bookmarks_write(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_bookmarks_write(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -542,6 +662,18 @@ pub async fn pdfengines_bookmarks_write(State(state): State<AppState>, mp: Multi
         field: "bookmarks",
         message: format!("Invalid bookmarks JSON: {}", e),
     })?;
+
+    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+        &headers,
+        &state,
+        crate::webhook::WebhookOperation::PdfBookmarksWrite,
+        crate::webhook::JobData::PdfBookmarksWrite {
+            file: bytes.clone(),
+            bookmarks: bookmarks.clone(),
+        },
+    ).await? {
+        return Ok(resp);
+    }
 
     let output = tokio::task::spawn_blocking(move || write_bookmarks(&bytes, &bookmarks))
         .await
@@ -562,7 +694,11 @@ pub async fn pdfengines_bookmarks_write(State(state): State<AppState>, mp: Multi
 // ---------------------------------------------------------------------------
 
 /// `POST /forms/pdfengines/watermark` - Apply watermark (behind content).
-pub async fn pdfengines_watermark(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_watermark(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -586,6 +722,18 @@ pub async fn pdfengines_watermark(State(state): State<AppState>, mp: Multipart) 
         color: [0.5, 0.5, 0.5, 0.5],
     })?;
 
+    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+        &headers,
+        &state,
+        crate::webhook::WebhookOperation::PdfWatermark,
+        crate::webhook::JobData::PdfWatermark {
+            file: pdf_bytes.clone(),
+            options: opts.clone(),
+        },
+    ).await? {
+        return Ok(resp);
+    }
+
     let output = tokio::task::spawn_blocking(move || watermark(&pdf_bytes, &opts))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?
@@ -601,7 +749,11 @@ pub async fn pdfengines_watermark(State(state): State<AppState>, mp: Multipart) 
 }
 
 /// `POST /forms/pdfengines/stamp` - Apply stamp (in front of content).
-pub async fn pdfengines_stamp(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_stamp(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -624,6 +776,18 @@ pub async fn pdfengines_stamp(State(state): State<AppState>, mp: Multipart) -> A
         font_size: 48.0,
         color: [0.5, 0.5, 0.5, 0.5],
     })?;
+
+    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+        &headers,
+        &state,
+        crate::webhook::WebhookOperation::PdfStamp,
+        crate::webhook::JobData::PdfStamp {
+            file: pdf_bytes.clone(),
+            options: opts.clone(),
+        },
+    ).await? {
+        return Ok(resp);
+    }
 
     let output = tokio::task::spawn_blocking(move || watermark(&pdf_bytes, &opts))
         .await
@@ -689,7 +853,11 @@ fn parse_watermark_options(
 // ---------------------------------------------------------------------------
 
 /// `POST /forms/pdfengines/encrypt` - Encrypt PDF with password.
-pub async fn pdfengines_encrypt(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_encrypt(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -702,8 +870,8 @@ pub async fn pdfengines_encrypt(State(state): State<AppState>, mp: Multipart) ->
     let pdf_bytes = read_one(files[0]).await?;
 
     // Get passwords
-    let user_password = form.map.get("userPassword").map(|s| s.as_str());
-    let owner_password = form.map.get("ownerPassword").map(|s| s.as_str());
+    let user_password = form.map.get("userPassword").cloned();
+    let owner_password = form.map.get("ownerPassword").cloned();
 
     // Parse algorithm
     let algorithm = match form.map.get("algorithm").map(|s| s.as_str()) {
@@ -716,7 +884,21 @@ pub async fn pdfengines_encrypt(State(state): State<AppState>, mp: Multipart) ->
         .map(|s| Permissions::from_string(s))
         .unwrap_or_else(Permissions::allow_all);
 
-    let output = encrypt_pdf(&pdf_bytes, user_password, owner_password, algorithm, permissions)
+    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+        &headers,
+        &state,
+        crate::webhook::WebhookOperation::PdfEncrypt,
+        crate::webhook::JobData::PdfEncrypt {
+            file: pdf_bytes.clone(),
+            password: user_password.clone().unwrap_or_default(),
+            algorithm,
+            permissions,
+        },
+    ).await? {
+        return Ok(resp);
+    }
+
+    let output = encrypt_pdf(&pdf_bytes, user_password.as_deref(), owner_password.as_deref(), algorithm, permissions)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
@@ -730,7 +912,11 @@ pub async fn pdfengines_encrypt(State(state): State<AppState>, mp: Multipart) ->
 }
 
 /// `POST /forms/pdfengines/decrypt` - Remove encryption from PDF.
-pub async fn pdfengines_decrypt(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_decrypt(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -744,6 +930,18 @@ pub async fn pdfengines_decrypt(State(state): State<AppState>, mp: Multipart) ->
 
     // Get password
     let password = form.map.get("password").ok_or(ApiError::MissingField("password"))?;
+
+    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+        &headers,
+        &state,
+        crate::webhook::WebhookOperation::PdfDecrypt,
+        crate::webhook::JobData::PdfDecrypt {
+            file: pdf_bytes.clone(),
+            password: password.clone(),
+        },
+    ).await? {
+        return Ok(resp);
+    }
 
     let output = decrypt_pdf(&pdf_bytes, password)
         .await
