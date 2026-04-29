@@ -109,13 +109,11 @@ RUN apt-get update -qq && apt-get upgrade -yqq && \
     # Emoji support
     fonts-noto-color-emoji \
     # Core fonts (tofu prevention)
-    fonts-noto-core \
+    fonts-noto \
     fontconfig \
     # PDF tools
     qpdf \
     ghostscript \
-    # Color profiles for PDF/A
-    icc-profiles \
     # Chromium runtime libs
     libgtk-3-0 libx11-xcb1 libxcomposite1 libxcursor1 \
     libxdamage1 libxi6 libxtst6 libnss3 libcups2 libxss1 \

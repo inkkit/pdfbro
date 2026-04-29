@@ -42,10 +42,19 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
         LibreOfficeEngine::launch(lo_cfg),
     );
     let chromium = chromium.context("Chromium failed to launch")?;
-    let libreoffice = libreoffice.context("LibreOffice failed to launch")?;
+    let libreoffice = match libreoffice {
+        Ok(lo) => Some(lo),
+        Err(e) => {
+            tracing::warn!(error = %e, "LibreOffice failed to launch; continuing without it");
+            None
+        }
+    };
 
     let chromium_ready = chromium.healthy().await;
-    let libreoffice_ready = libreoffice.healthy().await;
+    let libreoffice_ready = match &libreoffice {
+        Some(lo) => lo.healthy().await,
+        None => false,
+    };
     banner::print(&config, chromium_ready, libreoffice_ready);
 
     let chromium_handle = chromium.clone();
@@ -57,7 +66,7 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
 
     let state = AppState::new(
         Arc::new(backend),
-        Some(Arc::new(libreoffice)),
+        libreoffice.map(Arc::new),
         config.clone(),
     )
     .with_webhook_queue(webhook_queue);
