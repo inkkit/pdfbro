@@ -430,12 +430,10 @@ pub enum WaitCondition {
         status: String,
     },
 }
-
-// ---------------------------------------------------------------------------
 // BrowserConfig
 // ---------------------------------------------------------------------------
 
-/// Browser-level configuration shared by every render.
+/// Engine-wide browser configuration.
 ///
 /// Constructed once when launching a [`crate::types::BrowserConfig`]-aware
 /// engine; not per-render.
@@ -456,6 +454,13 @@ pub struct BrowserConfig {
     /// Per-page navigation/render timeout. Default: 60s.
     #[serde(with = "humantime_serde")]
     pub timeout: Duration,
+    /// Auto-start browser on first request instead of at server startup.
+    /// Default: false (start immediately).
+    pub auto_start: bool,
+    /// Idle shutdown timeout - browser shuts down after this duration of no requests.
+    /// None means no idle shutdown. Default: None.
+    #[serde(with = "humantime_serde")]
+    pub idle_shutdown_timeout: Option<Duration>,
 }
 
 impl Default for BrowserConfig {
@@ -466,6 +471,8 @@ impl Default for BrowserConfig {
             extra_args: Vec::new(),
             no_sandbox: cfg!(target_os = "linux"),
             timeout: Duration::from_secs(60),
+            auto_start: false,
+            idle_shutdown_timeout: None,
         }
     }
 }

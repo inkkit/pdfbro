@@ -176,13 +176,30 @@ mod tests {
             soffice_path: None,
             log_level: "info".to_string(),
             log_format: LogFormat::Text,
+            // Batch processing
             batch_max_items: 50,
             batch_concurrency: 4,
             batch_max_active: 10,
             batch_retention_minutes: 60,
             batch_storage_path: std::path::PathBuf::from("/tmp/folio-batches"),
+            // OpenTelemetry
             otel_enabled: false,
             otel_endpoint: "http://localhost:4318/v1/traces".to_string(),
+            // Engine supervision
+            chromium_auto_start: false,
+            chromium_idle_shutdown_timeout: None,
+            libreoffice_auto_start: false,
+            libreoffice_idle_shutdown_timeout: None,
+            // API server
+            api_disable_health_route_telemetry: false,
+            api_disable_root_route_telemetry: false,
+            api_disable_debug_route_telemetry: false,
+            api_disable_version_route_telemetry: false,
+            api_enable_debug_route: false,
+            api_tls_cert_file: None,
+            api_tls_key_file: None,
+            api_basic_auth_username: None,
+            api_basic_auth_password: None,
         }
     }
 

@@ -7,6 +7,7 @@
 //! [`config`] (CLI / env resolution).
 
 pub mod app;
+pub mod auth;
 pub mod backend;
 pub mod banner;
 pub mod batch_worker;
@@ -18,6 +19,7 @@ pub mod multipart;
 pub mod routes;
 pub mod shutdown;
 pub mod state;
+pub mod supervised_engine;
 pub mod webhook;
 
 pub use app::build_router;

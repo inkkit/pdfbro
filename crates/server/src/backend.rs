@@ -1,7 +1,7 @@
 //! Pluggable PDF backend trait used by the chromium routes.
 //!
 //! Production code wires [`ChromiumBackend`] (a wrapper around
-//! [`engine::ChromiumEngine`]) into [`crate::AppState`]; tests provide a
+//! [`supervised_engine::SupervisedChromiumEngine`]) into [`crate::AppState`]; tests provide a
 //! mock implementation that records inputs and returns canned outputs.
 //!
 //! Splitting the chromium-shaped surface into a trait lets the router
@@ -14,7 +14,9 @@ use async_trait::async_trait;
 use engine::{EngineResult, PdfOptions};
 
 #[cfg(feature = "chromium")]
-use engine::{ChromiumEngine, RequestContext, ScreenshotOptions};
+use engine::{RequestContext, ScreenshotOptions};
+#[cfg(feature = "chromium")]
+use crate::supervised_engine::SupervisedChromiumEngine;
 
 /// Minimal trait surface mirroring the parts of [`ChromiumEngine`] that
 /// the server invokes from request handlers.
@@ -60,24 +62,24 @@ pub trait PdfBackend: Send + Sync + 'static {
     async fn url_to_screenshot(&self, url: &str, opts: &ScreenshotOptions) -> EngineResult<Vec<u8>>;
 }
 
-/// Production [`PdfBackend`] backed by the real Chromium engine.
+/// Production [`PdfBackend`] backed by the supervised Chromium engine.
 #[cfg(feature = "chromium")]
 #[derive(Clone)]
 pub struct ChromiumBackend {
-    inner: Arc<ChromiumEngine>,
+    inner: SupervisedChromiumEngine,
 }
 
 #[cfg(feature = "chromium")]
 impl ChromiumBackend {
-    /// Wrap an existing [`ChromiumEngine`] handle.
-    pub fn new(engine: ChromiumEngine) -> Self {
+    /// Wrap an existing [`SupervisedChromiumEngine`] handle.
+    pub fn new(engine: SupervisedChromiumEngine) -> Self {
         Self {
-            inner: Arc::new(engine),
+            inner: engine,
         }
     }
 
     /// Borrow the inner engine (e.g. for shutdown).
-    pub fn engine(&self) -> &ChromiumEngine {
+    pub fn engine(&self) -> &SupervisedChromiumEngine {
         &self.inner
     }
 }
@@ -118,12 +120,10 @@ impl PdfBackend for ChromiumBackend {
     }
 
     async fn html_to_screenshot(&self, html: &str, opts: &ScreenshotOptions) -> EngineResult<Vec<u8>> {
-        use engine::chromium::screenshot::html_to_screenshot;
-        html_to_screenshot(&self.inner, html, opts).await
+        self.inner.html_to_screenshot(html, opts).await
     }
 
     async fn url_to_screenshot(&self, url: &str, opts: &ScreenshotOptions) -> EngineResult<Vec<u8>> {
-        use engine::chromium::screenshot::url_to_screenshot;
-        url_to_screenshot(&self.inner, url, opts).await
+        self.inner.url_to_screenshot(url, opts).await
     }
 }

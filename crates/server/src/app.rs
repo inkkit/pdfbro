@@ -29,6 +29,8 @@ use tracing::Level;
 
 use crate::error::ApiError;
 
+use crate::auth::{BasicAuthConfig, BasicAuthLayer};
+use crate::config::ServerConfig;
 use crate::routes::{batch, health, pdfengines};
 #[cfg(feature = "chromium")]
 use crate::routes::chromium;
@@ -54,10 +56,47 @@ impl MakeRequestId for UuidRequestId {
 /// Custom [`MakeSpan`] that includes `request_id` (set by
 /// [`SetRequestIdLayer`]) as a structured field on every request span.
 #[derive(Clone)]
-struct RequestIdMakeSpan;
+struct RequestIdMakeSpan {
+    /// Whether to disable telemetry for health route.
+    disable_health: bool,
+    /// Whether to disable telemetry for root route.
+    disable_root: bool,
+    /// Whether to disable telemetry for debug route.
+    disable_debug: bool,
+    /// Whether to disable telemetry for version route.
+    disable_version: bool,
+}
+
+impl RequestIdMakeSpan {
+    fn new(config: &ServerConfig) -> Self {
+        Self {
+            disable_health: config.api_disable_health_route_telemetry,
+            disable_root: config.api_disable_root_route_telemetry,
+            disable_debug: config.api_disable_debug_route_telemetry,
+            disable_version: config.api_disable_version_route_telemetry,
+        }
+    }
+
+    fn telemetry_disabled_for(&self, path: &str) -> bool {
+        match path {
+            "/health" => self.disable_health,
+            "/" => self.disable_root,
+            "/debug" => self.disable_debug,
+            "/version" => self.disable_version,
+            _ => false,
+        }
+    }
+}
 
 impl<B> MakeSpan<B> for RequestIdMakeSpan {
     fn make_span(&mut self, request: &Request<B>) -> tracing::Span {
+        let path = request.uri().path();
+
+        // Return disabled span if telemetry is disabled for this route
+        if self.telemetry_disabled_for(path) {
+            return tracing::Span::none();
+        }
+
         let request_id = request
             .headers()
             .get(REQUEST_ID_HEADER)
@@ -69,19 +108,19 @@ impl<B> MakeSpan<B> for RequestIdMakeSpan {
             "request",
             request_id = %request_id,
             method = %request.method(),
-            path = %request.uri().path(),
+            path = %path,
         )
     }
 }
 
-/// Build the full HTTP router for the given [`AppState`].
+/// Build the full HTTP router for the given [`AppState`] and [`ServerConfig`].
 ///
 /// The middleware stack (outer → inner) is:
 /// `Trace → SetRequestId → PropagateRequestId → RequestBodyLimit → Timeout
 /// → CORS → routes`. `/health` and `/version` are served from a separate
 /// sub-router that bypasses the timeout layer (they must always respond
 /// quickly even under heavy load).
-pub fn build_router(state: AppState) -> Router {
+pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
     let max_body = state.config.max_body_bytes;
     let request_timeout = state.config.request_timeout;
 
@@ -184,14 +223,19 @@ pub fn build_router(state: AppState) -> Router {
         )
         .layer(DefaultBodyLimit::max(max_body));
 
-    let untimed = Router::new()
+    let mut untimed = Router::new()
         .route("/health", get(health::health))
         .route("/version", get(health::version))
         .route("/prometheus/metrics", get(health::metrics_handler));
 
+    // Conditionally add debug route
+    if config.api_enable_debug_route {
+        untimed = untimed.route("/debug", get(health::debug));
+    }
+
     let header_name = HeaderName::from_static(REQUEST_ID_HEADER);
 
-    Router::new()
+    let mut router = Router::new()
         .merge(timed)
         .merge(untimed)
         .with_state(state)
@@ -199,7 +243,7 @@ pub fn build_router(state: AppState) -> Router {
             ServiceBuilder::new()
                 .layer(
                     TraceLayer::new_for_http()
-                        .make_span_with(RequestIdMakeSpan)
+                        .make_span_with(RequestIdMakeSpan::new(config))
                         .on_response(
                             tower_http::trace::DefaultOnResponse::new().level(Level::INFO),
                         )
@@ -211,7 +255,17 @@ pub fn build_router(state: AppState) -> Router {
                 .layer(PropagateRequestIdLayer::new(header_name))
                 .layer(CorsLayer::permissive()),
                 // metrics_middleware removed - handlers record metrics directly
-        )
+        );
+
+    // Add Basic Auth middleware if configured
+    if let (Some(username), Some(password)) = (&config.api_basic_auth_username, &config.api_basic_auth_password) {
+        router = router.layer(BasicAuthLayer::new(BasicAuthConfig::new(
+            username.clone(),
+            password.clone(),
+        )));
+    }
+
+    router
 }
 
 /// Default request timeout exposed for integration tests.
