@@ -74,8 +74,6 @@ pub(crate) struct Inner {
     /// OS process ID of the Chrome child process; used for best-effort
     /// synchronous kill in [`Inner::Drop`] when shutdown was skipped.
     pub(crate) chrome_pid: AtomicU32,
-    /// Conversion counter for restart-after functionality.
-    pub(crate) conversion_count: AtomicU32,
 }
 
 /// Per-render context describing user-agent, headers, cookies, and
@@ -195,16 +193,10 @@ impl ChromiumEngine {
         let result = render::html_to_pdf(self, html, base_url, opts, request).await;
         let duration = start.elapsed();
         match &result {
-            Ok(_) => {
-                info!(
-                    duration_ms = duration.as_millis() as u64,
-                    "HTML to PDF conversion completed"
-                );
-                let needs_restart = self.increment_conversion_count();
-                if needs_restart {
-                    tracing::warn!("Chromium engine restart recommended after this conversion");
-                }
-            }
+            Ok(_) => info!(
+                duration_ms = duration.as_millis() as u64,
+                "HTML to PDF conversion completed"
+            ),
             Err(e) => tracing::error!(
                 duration_ms = duration.as_millis() as u64,
                 error = %e,
@@ -233,16 +225,10 @@ impl ChromiumEngine {
         let result = render::url_to_pdf(self, url, opts, request).await;
         let duration = start.elapsed();
         match &result {
-            Ok(_) => {
-                info!(
-                    duration_ms = duration.as_millis() as u64,
-                    "URL to PDF conversion completed"
-                );
-                let needs_restart = self.increment_conversion_count();
-                if needs_restart {
-                    tracing::warn!("Chromium engine restart recommended after this conversion");
-                }
-            }
+            Ok(_) => info!(
+                duration_ms = duration.as_millis() as u64,
+                "URL to PDF conversion completed"
+            ),
             Err(e) => tracing::error!(
                 duration_ms = duration.as_millis() as u64,
                 error = %e,
@@ -272,9 +258,7 @@ impl ChromiumEngine {
         let _span = self.logger();
         info!("Starting Markdown to PDF conversion");
         let html = markdown::render(markdown_input);
-        let result = self.html_to_pdf(&html, None, opts, request).await;
-        // Note: html_to_pdf already increments counter, so we don't double-count
-        result
+        self.html_to_pdf(&html, None, opts, request).await
     }
 
     /// Screenshot an HTML string to a PNG or JPEG image.
@@ -433,7 +417,6 @@ impl ChromiumEngine {
                 handler_task: std::sync::Mutex::new(Some(handler_task)),
                 config,
                 chrome_pid: AtomicU32::new(chrome_pid.unwrap_or(0)),
-                conversion_count: AtomicU32::new(0),
             }),
         }
     }
@@ -450,59 +433,6 @@ impl ChromiumEngine {
         } else {
             EngineError::Cdp(err.to_string())
         }
-    }
-
-    /// Increment conversion count and log when restart threshold is reached.
-    /// Returns true if restart is needed (caller should restart the engine).
-    /// This is called after each successful PDF conversion.
-    fn increment_conversion_count(&self) -> bool {
-        let restart_after = self.inner.config.restart_after;
-        if restart_after == 0 {
-            // Restart disabled
-            return false;
-        }
-
-        let count = self
-            .inner
-            .conversion_count
-            .fetch_add(1, Ordering::SeqCst) as u64;
-        let new_count = count + 1;
-
-        tracing::debug!(
-            conversion_count = new_count,
-            restart_after = restart_after,
-            "Incremented conversion count"
-        );
-
-        if new_count >= restart_after {
-            tracing::info!(
-                conversion_count = new_count,
-                restart_after = restart_after,
-                "Restart threshold reached, Chromium should be restarted"
-            );
-            // Reset counter for next cycle
-            self.inner
-                .conversion_count
-                .store(0, Ordering::SeqCst);
-            return true;
-        }
-        false
-    }
-
-    /// Returns true if the engine should be restarted based on conversion count.
-    pub fn needs_restart(&self) -> bool {
-        let restart_after = self.inner.config.restart_after;
-        if restart_after == 0 {
-            return false;
-        }
-        let count = self.inner.conversion_count.load(Ordering::SeqCst) as u64;
-        count >= restart_after
-    }
-
-    /// Reset the conversion counter and mark restart as complete.
-    pub fn mark_restarted(&self) {
-        self.inner.conversion_count.store(0, Ordering::SeqCst);
-        tracing::info!("Chromium engine restart marked complete");
     }
 }
 
