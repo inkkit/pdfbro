@@ -86,6 +86,11 @@ fn test_config() -> ServerConfig {
         soffice_path: std::env::var("LIBREOFFICE_PATH").ok().map(Into::into),
         log_level: "off".to_string(),
         log_format: LogFormat::Text,
+        batch_max_items: 50,
+        batch_concurrency: 4,
+        batch_max_active: 10,
+        batch_retention_minutes: 60,
+        batch_storage_path: std::path::PathBuf::from("/tmp/folio-batches"),
     }
 }
 
