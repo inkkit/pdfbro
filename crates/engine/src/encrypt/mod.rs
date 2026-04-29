@@ -79,7 +79,7 @@ impl Permissions {
         for part in s.split(',') {
             match part.trim() {
                 "all" => return Self::allow_all(),
-                "none" => return Self::view_only(),
+                "none" | "view-only" => return Self::view_only(),
                 "print" => perms.print = true,
                 "print-hq" => {
                     perms.print = true;

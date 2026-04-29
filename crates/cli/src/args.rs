@@ -95,6 +95,12 @@ pub(crate) enum Commands {
         action: MetadataAction,
     },
 
+    /// Encrypt a PDF with password protection.
+    Encrypt(EncryptArgs),
+
+    /// Remove encryption from a PDF.
+    Decrypt(DecryptArgs),
+
     /// Emit a shell completion script to stdout.
     Completions {
         /// Target shell.
@@ -226,6 +232,47 @@ pub(crate) struct FlattenArgs {
     /// Output PDF (`-` for stdout).
     #[arg(long, value_name = "FILE", required = true)]
     pub(crate) output: String,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct EncryptArgs {
+    /// Input PDF (`-` for stdin).
+    #[arg(value_name = "INPUT")]
+    pub(crate) input: String,
+    /// Output PDF (`-` for stdout).
+    #[arg(long, value_name = "FILE", required = true)]
+    pub(crate) output: String,
+    /// User password (required to open).
+    #[arg(long, value_name = "PASS")]
+    pub(crate) user_password: Option<String>,
+    /// Owner password (required to change permissions).
+    #[arg(long, value_name = "PASS")]
+    pub(crate) owner_password: Option<String>,
+    /// Encryption algorithm.
+    #[arg(long, value_enum, default_value_t = EncryptAlgorithm::Aes256)]
+    pub(crate) algorithm: EncryptAlgorithm,
+    /// Permission flags (comma-separated: print,print-hq,modify,annotate,fill-forms,extract,assemble,all,none,view-only).
+    #[arg(long, default_value = "all")]
+    pub(crate) permissions: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub(crate) enum EncryptAlgorithm {
+    Aes128,
+    Aes256,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct DecryptArgs {
+    /// Input PDF (`-` for stdin).
+    #[arg(value_name = "INPUT")]
+    pub(crate) input: String,
+    /// Output PDF (`-` for stdout).
+    #[arg(long, value_name = "FILE", required = true)]
+    pub(crate) output: String,
+    /// Password (user or owner).
+    #[arg(long, value_name = "PASS", required = true)]
+    pub(crate) password: String,
 }
 
 #[derive(Debug, Subcommand)]

@@ -368,7 +368,11 @@ pub async fn pdfengines_metadata_write(
 
 /// `POST /forms/pdfengines/rotate`.
 /// Rotates selected pages by 90° increments.
-pub async fn pdfengines_rotate(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_rotate(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -395,11 +399,7 @@ pub async fn pdfengines_rotate(State(state): State<AppState>, mp: Multipart) -> 
     .map_err(|e| ApiError::Internal(e.to_string()))?
     .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let filename = form
-        .map
-        .get(" Gotenberg-Output-Filename")
-        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| "rotated.pdf".to_string());
+    let filename = output_filename(&headers, "rotated");
 
     Ok(pdf_response(rotated, &filename))
 }
@@ -420,6 +420,18 @@ async fn read_one(file: &UploadedFile) -> ApiResult<Vec<u8>> {
     tokio::fs::read(&file.path)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))
+}
+
+/// Extract `Gotenberg-Output-Filename` from HTTP headers.
+/// Strips any trailing `.pdf` and re-adds it.
+fn output_filename(headers: &HeaderMap, default: &str) -> String {
+    let raw = headers
+        .get("Gotenberg-Output-Filename")
+        .and_then(|v| v.to_str().ok());
+    match raw {
+        Some(s) => format!("{}.pdf", s.trim_end_matches(".pdf")),
+        None => format!("{}.pdf", default.trim_end_matches(".pdf")),
+    }
 }
 
 async fn acquire_permit(state: &AppState) -> ApiResult<tokio::sync::OwnedSemaphorePermit> {
@@ -452,7 +464,11 @@ fn parse_bool_field(map: &HashMap<String, String>, key: &'static str) -> ApiResu
 
 /// `POST /forms/pdfengines/convert`.
 /// Converts PDF to PDF/A conformance (PDF/A-1b, PDF/A-2b, PDF/A-3b).
-pub async fn pdfengines_convert(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_convert(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -474,11 +490,7 @@ pub async fn pdfengines_convert(State(state): State<AppState>, mp: Multipart) ->
     // Run conversion
     let converted = convert_to_pdfa(&bytes, profile).await.map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let filename = form
-        .map
-        .get(" Gotenberg-Output-Filename")
-        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| "converted.pdf".to_string());
+    let filename = output_filename(&headers, "converted");
 
     Ok(pdf_response(converted, &filename))
 }
@@ -489,7 +501,11 @@ pub async fn pdfengines_convert(State(state): State<AppState>, mp: Multipart) ->
 
 /// `POST /forms/pdfengines/bookmarks/read`.
 /// Reads bookmarks from a PDF and returns them as JSON.
-pub async fn pdfengines_bookmarks_read(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_bookmarks_read(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -524,7 +540,11 @@ pub async fn pdfengines_bookmarks_read(State(state): State<AppState>, mp: Multip
 
 /// `POST /forms/pdfengines/bookmarks/write`.
 /// Writes bookmarks to a PDF.
-pub async fn pdfengines_bookmarks_write(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_bookmarks_write(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -548,11 +568,7 @@ pub async fn pdfengines_bookmarks_write(State(state): State<AppState>, mp: Multi
         .map_err(|e| ApiError::Internal(e.to_string()))?
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let filename = form
-        .map
-        .get(" Gotenberg-Output-Filename")
-        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| "document.pdf".to_string());
+    let filename = output_filename(&headers, "document");
 
     Ok(pdf_response(output, &filename))
 }
@@ -562,7 +578,11 @@ pub async fn pdfengines_bookmarks_write(State(state): State<AppState>, mp: Multi
 // ---------------------------------------------------------------------------
 
 /// `POST /forms/pdfengines/watermark` - Apply watermark (behind content).
-pub async fn pdfengines_watermark(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_watermark(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -591,17 +611,17 @@ pub async fn pdfengines_watermark(State(state): State<AppState>, mp: Multipart) 
         .map_err(|e| ApiError::Internal(e.to_string()))?
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let filename = form
-        .map
-        .get(" Gotenberg-Output-Filename")
-        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| "result.pdf".to_string());
+    let filename = output_filename(&headers, "result");
 
     Ok(pdf_response(output, &filename))
 }
 
 /// `POST /forms/pdfengines/stamp` - Apply stamp (in front of content).
-pub async fn pdfengines_stamp(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_stamp(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -630,11 +650,7 @@ pub async fn pdfengines_stamp(State(state): State<AppState>, mp: Multipart) -> A
         .map_err(|e| ApiError::Internal(e.to_string()))?
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let filename = form
-        .map
-        .get(" Gotenberg-Output-Filename")
-        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| "result.pdf".to_string());
+    let filename = output_filename(&headers, "result");
 
     Ok(pdf_response(output, &filename))
 }
@@ -689,7 +705,11 @@ fn parse_watermark_options(
 // ---------------------------------------------------------------------------
 
 /// `POST /forms/pdfengines/encrypt` - Encrypt PDF with password.
-pub async fn pdfengines_encrypt(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_encrypt(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -718,19 +738,19 @@ pub async fn pdfengines_encrypt(State(state): State<AppState>, mp: Multipart) ->
 
     let output = encrypt_pdf(&pdf_bytes, user_password, owner_password, algorithm, permissions)
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::from)?;
 
-    let filename = form
-        .map
-        .get(" Gotenberg-Output-Filename")
-        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| "encrypted.pdf".to_string());
+    let filename = output_filename(&headers, "encrypted");
 
     Ok(pdf_response(output, &filename))
 }
 
 /// `POST /forms/pdfengines/decrypt` - Remove encryption from PDF.
-pub async fn pdfengines_decrypt(State(state): State<AppState>, mp: Multipart) -> ApiResult<Response> {
+pub async fn pdfengines_decrypt(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
     let form = FormFields::from_multipart(mp).await?;
     let files = form.files_by_field("files");
@@ -747,13 +767,9 @@ pub async fn pdfengines_decrypt(State(state): State<AppState>, mp: Multipart) ->
 
     let output = decrypt_pdf(&pdf_bytes, password)
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::from)?;
 
-    let filename = form
-        .map
-        .get(" Gotenberg-Output-Filename")
-        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| "decrypted.pdf".to_string());
+    let filename = output_filename(&headers, "decrypted");
 
     Ok(pdf_response(output, &filename))
 }
@@ -809,5 +825,60 @@ mod tests {
             ApiError::MissingField("splitSpan") => {}
             other => panic!("expected MissingField, got {other:?}"),
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // output_filename helper
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn output_filename_reads_from_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert("Gotenberg-Output-Filename", HeaderValue::from_static("report"));
+        assert_eq!(output_filename(&headers, "default"), "report.pdf");
+    }
+
+    #[test]
+    fn output_filename_falls_back_to_default() {
+        let headers = HeaderMap::new();
+        assert_eq!(output_filename(&headers, "default"), "default.pdf");
+    }
+
+    #[test]
+    fn output_filename_strips_trailing_pdf() {
+        let mut headers = HeaderMap::new();
+        headers.insert("Gotenberg-Output-Filename", HeaderValue::from_static("report.pdf"));
+        assert_eq!(output_filename(&headers, "default"), "report.pdf");
+    }
+
+    // -----------------------------------------------------------------------
+    // Encryption algorithm parsing
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn encryption_algorithm_from_form_field() {
+        let m = fm(&[("algorithm", "128")]);
+        let algo = m.get("algorithm").unwrap();
+        assert_eq!(algo.as_str(), "128");
+    }
+
+    // -----------------------------------------------------------------------
+    // Permissions parsing
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn permissions_all_grants_everything() {
+        let p = Permissions::from_string("all");
+        assert!(p.print);
+        assert!(p.modify_content);
+        assert!(p.annotate);
+    }
+
+    #[test]
+    fn permissions_view_only_alias() {
+        let p = Permissions::from_string("view-only");
+        assert!(!p.print);
+        assert!(!p.annotate);
+        assert!(!p.extract_content);
     }
 }

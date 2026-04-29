@@ -39,8 +39,8 @@ pub(crate) fn parse_input(bytes: &[u8]) -> EngineResult<Document> {
     let doc = Document::load_mem(bytes)
         .map_err(|e| EngineError::Internal(format!("failed to parse PDF: {e}")))?;
     if doc.is_encrypted() {
-        return Err(EngineError::Internal(
-            "encrypted PDFs are not supported in MVP".into(),
+        return Err(EngineError::InvalidOption(
+            "PDF is encrypted; use decrypt first".into(),
         ));
     }
     Ok(doc)
