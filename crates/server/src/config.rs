@@ -99,6 +99,23 @@ pub struct ServerArgs {
     #[arg(long, value_name = "FORMAT")]
     pub log_format: Option<LogFormat>,
 
+    // === Engine Supervision Flags ===
+    /// Auto-start Chromium on first request instead of server startup.
+    #[arg(long, env = "CHROMIUM_AUTO_START")]
+    pub chromium_auto_start: bool,
+
+    /// Idle shutdown timeout for Chromium (e.g., "10m", "0" to disable).
+    #[arg(long, value_name = "DUR", env = "CHROMIUM_IDLE_SHUTDOWN_TIMEOUT")]
+    pub chromium_idle_shutdown_timeout: Option<String>,
+
+    /// Auto-start LibreOffice on first request instead of server startup.
+    #[arg(long, env = "LIBREOFFICE_AUTO_START")]
+    pub libreoffice_auto_start: bool,
+
+    /// Idle shutdown timeout for LibreOffice (e.g., "10m", "0" to disable).
+    #[arg(long, value_name = "DUR", env = "LIBREOFFICE_IDLE_SHUTDOWN_TIMEOUT")]
+    pub libreoffice_idle_shutdown_timeout: Option<String>,
+
     // === API Server Flags ===
     /// Disable telemetry for health check route.
     #[arg(long, env = "API_DISABLE_HEALTH_ROUTE_TELEMETRY")]
@@ -183,6 +200,16 @@ pub struct ServerConfig {
     pub log_level: String,
     /// Log output format.
     pub log_format: LogFormat,
+
+    // === Engine Supervision Config ===
+    /// Auto-start Chromium on first request.
+    pub chromium_auto_start: bool,
+    /// Idle shutdown timeout for Chromium (None = disabled).
+    pub chromium_idle_shutdown_timeout: Option<Duration>,
+    /// Auto-start LibreOffice on first request.
+    pub libreoffice_auto_start: bool,
+    /// Idle shutdown timeout for LibreOffice (None = disabled).
+    pub libreoffice_idle_shutdown_timeout: Option<Duration>,
 
     // === API Server Config ===
     /// Disable telemetry for health check route.
@@ -318,6 +345,27 @@ impl ServerConfig {
             },
         };
 
+        // === Engine Supervision Config Resolution ===
+        let chromium_auto_start = args.chromium_auto_start
+            || env.get("CHROMIUM_AUTO_START").map(|v| is_truthy(v)).unwrap_or(false);
+        let chromium_idle_shutdown_timeout = args.chromium_idle_shutdown_timeout.as_deref()
+            .or_else(|| env.get("CHROMIUM_IDLE_SHUTDOWN_TIMEOUT").map(|v| v.as_str()))
+            .and_then(|v| {
+                humantime::parse_duration(v)
+                    .ok()
+                    .filter(|d| !d.is_zero())
+            });
+
+        let libreoffice_auto_start = args.libreoffice_auto_start
+            || env.get("LIBREOFFICE_AUTO_START").map(|v| is_truthy(v)).unwrap_or(false);
+        let libreoffice_idle_shutdown_timeout = args.libreoffice_idle_shutdown_timeout.as_deref()
+            .or_else(|| env.get("LIBREOFFICE_IDLE_SHUTDOWN_TIMEOUT").map(|v| v.as_str()))
+            .and_then(|v| {
+                humantime::parse_duration(v)
+                    .ok()
+                    .filter(|d| !d.is_zero())
+            });
+
         // === API Server Config Resolution ===
         let api_disable_health_route_telemetry = args.api_disable_health_route_telemetry
             || env.get("API_DISABLE_HEALTH_ROUTE_TELEMETRY").map(|v| is_truthy(v)).unwrap_or(false);
@@ -349,6 +397,11 @@ impl ServerConfig {
             soffice_path,
             log_level,
             log_format,
+            // Engine supervision
+            chromium_auto_start,
+            chromium_idle_shutdown_timeout,
+            libreoffice_auto_start,
+            libreoffice_idle_shutdown_timeout,
             // API server
             api_disable_health_route_telemetry,
             api_disable_root_route_telemetry,

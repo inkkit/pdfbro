@@ -176,6 +176,11 @@ mod tests {
             soffice_path: None,
             log_level: "info".to_string(),
             log_format: LogFormat::Text,
+            // Engine supervision
+            chromium_auto_start: false,
+            chromium_idle_shutdown_timeout: None,
+            libreoffice_auto_start: false,
+            libreoffice_idle_shutdown_timeout: None,
             // API server
             api_disable_health_route_telemetry: false,
             api_disable_root_route_telemetry: false,
