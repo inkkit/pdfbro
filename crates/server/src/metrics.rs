@@ -235,8 +235,9 @@ impl FolioMetrics {
     }
 
     /// Update engine health gauges.
-    pub fn update_engine_health(&self, chromium_up: bool, libreoffice_up: bool) {
+    pub fn update_engine_health(&self, chromium_up: bool, #[allow(unused_variables)] libreoffice_up: bool) {
         self.chromium_healthy.set(if chromium_up { 1.0 } else { 0.0 });
+        #[cfg(feature = "libreoffice")]
         self.libreoffice_healthy.set(if libreoffice_up { 1.0 } else { 0.0 });
     }
 
