@@ -394,7 +394,7 @@ async fn chromium_html_502_when_backend_returns_navigation_error() {
     assert_eq!(resp.status(), StatusCode::BAD_GATEWAY);
     let json: Value = serde_json::from_slice(&read_body(resp).await).unwrap();
     assert_eq!(json["code"], "NAVIGATION");
-    assert_eq!(json["url"], "https://example.com");
+    assert_eq!(json["details"]["url"], "https://example.com");
 }
 
 #[tokio::test]
