@@ -9,7 +9,7 @@ use clap::Parser;
 use server::backend::PdfBackend;
 use server::config::{Cli, Command};
 use server::logging::init_logging;
-use server::webhook::{WebhookClient, WebhookQueue, start_workers};
+use server::webhook::{WebhookClient, WebhookEngineContext, WebhookQueue, start_workers};
 use server::{AppState, ServerArgs, ServerConfig, banner, build_router, shutdown};
 
 #[cfg(feature = "chromium")]
@@ -86,7 +86,17 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
 
     // Start webhook workers for async processing.
     let (webhook_queue, webhook_rx) = WebhookQueue::new(100);
-    start_workers(webhook_rx, 2, WebhookClient::default());
+    let webhook_ctx = WebhookEngineContext {
+        #[cfg(feature = "chromium")]
+        chromium: Some(Arc::new(backend.clone())),
+        #[cfg(not(feature = "chromium"))]
+        chromium: None,
+        #[cfg(feature = "libreoffice")]
+        libreoffice: libreoffice.clone().map(Arc::new),
+        #[cfg(not(feature = "libreoffice"))]
+        libreoffice: None,
+    };
+    start_workers(webhook_rx, 2, WebhookClient::default(), webhook_ctx);
 
     let state = AppState::new(
         #[cfg(feature = "chromium")]
