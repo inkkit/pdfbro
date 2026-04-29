@@ -159,12 +159,26 @@ fn test_config() -> ServerConfig {
         batch_storage_path: std::path::PathBuf::from("/tmp/folio-batches"),
         otel_enabled: false,
         otel_endpoint: "http://localhost:4318/v1/traces".to_string(),
+        chromium_auto_start: false,
+        chromium_idle_shutdown_timeout: None,
+        libreoffice_auto_start: false,
+        libreoffice_idle_shutdown_timeout: None,
+        api_disable_health_route_telemetry: false,
+        api_disable_root_route_telemetry: false,
+        api_disable_debug_route_telemetry: false,
+        api_disable_version_route_telemetry: false,
+        api_enable_debug_route: false,
+        api_tls_cert_file: None,
+        api_tls_key_file: None,
+        api_basic_auth_username: None,
+        api_basic_auth_password: None,
     }
 }
 
 fn build_app(backend: MockBackend) -> axum::Router {
-    let state = AppState::new(Some(Arc::new(backend)), test_config());
-    build_router(state)
+    let config = test_config();
+    let state = AppState::new(Some(Arc::new(backend)), config.clone());
+    build_router(state, &config)
 }
 
 fn multipart_body(parts: &[Part<'_>]) -> Vec<u8> {
