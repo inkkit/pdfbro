@@ -40,7 +40,7 @@
 |------|---------|--------------|------------|----------|-------|
 | 30 | HTTP Server | ✅ Done | ✅ Done | `crates/server/src/app.rs` | All major routes wired. Gotenberg-compatible API. |
 | 36 | Chromium Wait Conditions | 🚧 Partially Done | 🚧 Partial | `crates/engine/src/chromium/wait.rs` | Basic conditions exist. Advanced ones (e.g. `skipNetworkIdleEvent`, `failOnResourceLoadingFailed`) may need verification against Gotenberg parity. |
-| 37 | LibreOffice Advanced Fields | 🚧 Partially Done | 🚧 Partial | `crates/engine/src/libreoffice/` | Core conversion works; 30+ export options from spec may be missing. |
+| 37 | LibreOffice Advanced Fields | 🚧 Partially Done | ✅ Done | `crates/engine/src/libreoffice/`, `crates/server/src/routes/libreoffice.rs` | All 30+ export options, native watermarks, and viewer preferences implemented. Form parsing, validation, and filter blob generation wired. |
 | 39 | CLI Flag Parity | 🚧 Partially Done | 🚧 Partial | `crates/cli/src/args.rs` | Many flags present; full Gotenberg parity not verified. |
 | 44 | Actionable Errors | 🚧 Partially Done | 🚧 Partial | `crates/server/src/error.rs` | Structured errors exist; room for enhancement per spec. |
 | 50 | BDD Test Suite | 🚧 Partially Done | 🚧 Partial | `crates/server/tests/bdd/` | 25 feature files, Cucumber runner, real step definitions (HTTP, PDF, container). **README claims "52 scenarios" and "✅" — unverified.** Server binary spawn logic is solid. Pass rate unknown without running. |
