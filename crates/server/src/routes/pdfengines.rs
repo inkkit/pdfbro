@@ -487,11 +487,7 @@ pub async fn pdfengines_rotate(
     .map_err(|e| ApiError::Internal(e.to_string()))?
     .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let filename = form
-        .map
-        .get("Gotenberg-Output-Filename")
-        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| files[0].filename.clone());
+    let filename = output_filename(&headers, &files[0].filename);
 
     Ok(pdf_response(rotated, &filename))
 }
@@ -594,11 +590,7 @@ pub async fn pdfengines_convert(
     // Run conversion
     let converted = convert_to_pdfa(&bytes, profile).await.map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let filename = form
-        .map
-        .get("Gotenberg-Output-Filename")
-        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| files[0].filename.clone());
+    let filename = output_filename(&headers, &files[0].filename);
 
     Ok(pdf_response(converted, &filename))
 }
@@ -697,11 +689,7 @@ pub async fn pdfengines_bookmarks_write(
         .map_err(|e| ApiError::Internal(e.to_string()))?
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let filename = form
-        .map
-        .get("Gotenberg-Output-Filename")
-        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| files[0].filename.clone());
+    let filename = output_filename(&headers, &files[0].filename);
 
     Ok(pdf_response(output, &filename))
 }
@@ -811,11 +799,7 @@ pub async fn pdfengines_stamp(
         .map_err(|e| ApiError::Internal(e.to_string()))?
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let filename = form
-        .map
-        .get("Gotenberg-Output-Filename")
-        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| files[0].filename.clone());
+    let filename = output_filename(&headers, &files[0].filename);
 
     Ok(pdf_response(output, &filename))
 }
@@ -919,11 +903,7 @@ pub async fn pdfengines_encrypt(
         .await
         .map_err(ApiError::from)?;
 
-    let filename = form
-        .map
-        .get("Gotenberg-Output-Filename")
-        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| files[0].filename.clone());
+    let filename = output_filename(&headers, &files[0].filename);
 
     Ok(pdf_response(output, &filename))
 }
@@ -964,11 +944,7 @@ pub async fn pdfengines_decrypt(
         .await
         .map_err(ApiError::from)?;
 
-    let filename = form
-        .map
-        .get("Gotenberg-Output-Filename")
-        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| files[0].filename.clone());
+    let filename = output_filename(&headers, &files[0].filename);
 
     Ok(pdf_response(output, &filename))
 }
