@@ -29,11 +29,11 @@ RUN cargo install cargo-chef --locked
 
 # Cache dependencies
 COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json --no-default-features --features libreoffice
 
 # Build
 COPY . .
-RUN cargo build --release && \
+RUN cargo build --release --no-default-features --features libreoffice && \
     strip target/release/folio-server && \
     strip target/release/folio
 

@@ -46,11 +46,11 @@ RUN cargo install cargo-chef --locked
 
 # Cache dependencies (cached layer - only rebuilds if deps change)
 COPY --link --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json --features "chromium libreoffice"
 
 # Build with optimizations
 COPY --link . .
-RUN cargo build --release && \
+RUN cargo build --release --features "chromium libreoffice" && \
     strip target/release/folio-server && \
     strip target/release/folio
 
