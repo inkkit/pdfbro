@@ -62,7 +62,7 @@ pub struct ChromiumEngine {
 
 pub(crate) struct Inner {
     /// `None` once `shutdown` has run; renders observe `None` and return
-    /// `EngineError::Internal("engine shut down")`.
+    /// [`EngineError::Internal("engine shut down")`].
     pub(crate) browser: Mutex<Option<Browser>>,
     /// Set to `true` at the start of `shutdown`; used to disambiguate
     /// CDP errors caused by intentional teardown from real CDP errors.

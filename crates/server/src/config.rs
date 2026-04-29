@@ -106,6 +106,60 @@ pub struct ServerArgs {
     /// OTLP HTTP endpoint for trace export.
     #[arg(long, value_name = "URL", env = "OTEL_EXPORTER_OTLP_ENDPOINT")]
     pub otel_endpoint: Option<String>,
+
+    // === Engine Supervision Flags ===
+    /// Auto-start Chromium on first request instead of server startup.
+    #[arg(long, env = "CHROMIUM_AUTO_START")]
+    pub chromium_auto_start: bool,
+
+    /// Idle shutdown timeout for Chromium (e.g., "10m", "0" to disable).
+    #[arg(long, value_name = "DUR", env = "CHROMIUM_IDLE_SHUTDOWN_TIMEOUT")]
+    pub chromium_idle_shutdown_timeout: Option<String>,
+
+    /// Auto-start LibreOffice on first request instead of server startup.
+    #[arg(long, env = "LIBREOFFICE_AUTO_START")]
+    pub libreoffice_auto_start: bool,
+
+    /// Idle shutdown timeout for LibreOffice (e.g., "10m", "0" to disable).
+    #[arg(long, value_name = "DUR", env = "LIBREOFFICE_IDLE_SHUTDOWN_TIMEOUT")]
+    pub libreoffice_idle_shutdown_timeout: Option<String>,
+
+    // === API Server Flags ===
+    /// Disable telemetry for health check route.
+    #[arg(long, env = "API_DISABLE_HEALTH_ROUTE_TELEMETRY")]
+    pub api_disable_health_route_telemetry: bool,
+
+    /// Disable telemetry for root route.
+    #[arg(long, env = "API_DISABLE_ROOT_ROUTE_TELEMETRY")]
+    pub api_disable_root_route_telemetry: bool,
+
+    /// Disable telemetry for debug route.
+    #[arg(long, env = "API_DISABLE_DEBUG_ROUTE_TELEMETRY")]
+    pub api_disable_debug_route_telemetry: bool,
+
+    /// Disable telemetry for version route.
+    #[arg(long, env = "API_DISABLE_VERSION_ROUTE_TELEMETRY")]
+    pub api_disable_version_route_telemetry: bool,
+
+    /// Enable the debug route (/debug).
+    #[arg(long, env = "API_ENABLE_DEBUG_ROUTE")]
+    pub api_enable_debug_route: bool,
+
+    /// TLS certificate file path (enables HTTPS when both cert and key are set).
+    #[arg(long, value_name = "PATH", env = "API_TLS_CERT_FILE")]
+    pub api_tls_cert_file: Option<PathBuf>,
+
+    /// TLS private key file path (enables HTTPS when both cert and key are set).
+    #[arg(long, value_name = "PATH", env = "API_TLS_KEY_FILE")]
+    pub api_tls_key_file: Option<PathBuf>,
+
+    /// HTTP Basic Auth username (enables auth when set).
+    #[arg(long, value_name = "USER", env = "API_BASIC_AUTH_USERNAME")]
+    pub api_basic_auth_username: Option<String>,
+
+    /// HTTP Basic Auth password (required when username is set).
+    #[arg(long, value_name = "PASS", env = "API_BASIC_AUTH_PASSWORD")]
+    pub api_basic_auth_password: Option<String>,
 }
 
 /// Log output formats supported by the server.
@@ -154,6 +208,7 @@ pub struct ServerConfig {
     pub log_level: String,
     /// Log output format.
     pub log_format: LogFormat,
+
     // Batch API configuration
     /// Maximum items per batch.
     pub batch_max_items: usize,
@@ -165,10 +220,42 @@ pub struct ServerConfig {
     pub batch_retention_minutes: u64,
     /// Batch storage path.
     pub batch_storage_path: PathBuf,
+
+    // OpenTelemetry
     /// Enable OpenTelemetry trace export.
     pub otel_enabled: bool,
     /// OTLP HTTP endpoint for trace export.
     pub otel_endpoint: String,
+
+    // === Engine Supervision Config ===
+    /// Auto-start Chromium on first request.
+    pub chromium_auto_start: bool,
+    /// Idle shutdown timeout for Chromium (None = disabled).
+    pub chromium_idle_shutdown_timeout: Option<Duration>,
+    /// Auto-start LibreOffice on first request.
+    pub libreoffice_auto_start: bool,
+    /// Idle shutdown timeout for LibreOffice (None = disabled).
+    pub libreoffice_idle_shutdown_timeout: Option<Duration>,
+
+    // === API Server Config ===
+    /// Disable telemetry for health check route.
+    pub api_disable_health_route_telemetry: bool,
+    /// Disable telemetry for root route.
+    pub api_disable_root_route_telemetry: bool,
+    /// Disable telemetry for debug route.
+    pub api_disable_debug_route_telemetry: bool,
+    /// Disable telemetry for version route.
+    pub api_disable_version_route_telemetry: bool,
+    /// Enable the debug route (/debug).
+    pub api_enable_debug_route: bool,
+    /// TLS certificate file path (enables HTTPS when both cert and key are set).
+    pub api_tls_cert_file: Option<PathBuf>,
+    /// TLS private key file path (enables HTTPS when both cert and key are set).
+    pub api_tls_key_file: Option<PathBuf>,
+    /// HTTP Basic Auth username.
+    pub api_basic_auth_username: Option<String>,
+    /// HTTP Basic Auth password.
+    pub api_basic_auth_password: Option<String>,
 }
 
 /// Errors produced by [`ServerConfig::resolve`].
@@ -316,6 +403,47 @@ impl ServerConfig {
             "http://localhost:4318/v1/traces",
         );
 
+        // === Engine Supervision Config Resolution ===
+        let chromium_auto_start = args.chromium_auto_start
+            || env.get("CHROMIUM_AUTO_START").map(|v| is_truthy(v)).unwrap_or(false);
+        let chromium_idle_shutdown_timeout = args.chromium_idle_shutdown_timeout.as_deref()
+            .or_else(|| env.get("CHROMIUM_IDLE_SHUTDOWN_TIMEOUT").map(|v| v.as_str()))
+            .and_then(|v| {
+                humantime::parse_duration(v)
+                    .ok()
+                    .filter(|d| !d.is_zero())
+            });
+
+        let libreoffice_auto_start = args.libreoffice_auto_start
+            || env.get("LIBREOFFICE_AUTO_START").map(|v| is_truthy(v)).unwrap_or(false);
+        let libreoffice_idle_shutdown_timeout = args.libreoffice_idle_shutdown_timeout.as_deref()
+            .or_else(|| env.get("LIBREOFFICE_IDLE_SHUTDOWN_TIMEOUT").map(|v| v.as_str()))
+            .and_then(|v| {
+                humantime::parse_duration(v)
+                    .ok()
+                    .filter(|d| !d.is_zero())
+            });
+
+        // === API Server Config Resolution ===
+        let api_disable_health_route_telemetry = args.api_disable_health_route_telemetry
+            || env.get("API_DISABLE_HEALTH_ROUTE_TELEMETRY").map(|v| is_truthy(v)).unwrap_or(false);
+        let api_disable_root_route_telemetry = args.api_disable_root_route_telemetry
+            || env.get("API_DISABLE_ROOT_ROUTE_TELEMETRY").map(|v| is_truthy(v)).unwrap_or(false);
+        let api_disable_debug_route_telemetry = args.api_disable_debug_route_telemetry
+            || env.get("API_DISABLE_DEBUG_ROUTE_TELEMETRY").map(|v| is_truthy(v)).unwrap_or(false);
+        let api_disable_version_route_telemetry = args.api_disable_version_route_telemetry
+            || env.get("API_DISABLE_VERSION_ROUTE_TELEMETRY").map(|v| is_truthy(v)).unwrap_or(false);
+        let api_enable_debug_route = args.api_enable_debug_route
+            || env.get("API_ENABLE_DEBUG_ROUTE").map(|v| is_truthy(v)).unwrap_or(false);
+        let api_tls_cert_file = args.api_tls_cert_file.clone()
+            .or_else(|| env.get("API_TLS_CERT_FILE").map(PathBuf::from));
+        let api_tls_key_file = args.api_tls_key_file.clone()
+            .or_else(|| env.get("API_TLS_KEY_FILE").map(PathBuf::from));
+        let api_basic_auth_username = args.api_basic_auth_username.clone()
+            .or_else(|| env.get("API_BASIC_AUTH_USERNAME").cloned());
+        let api_basic_auth_password = args.api_basic_auth_password.clone()
+            .or_else(|| env.get("API_BASIC_AUTH_PASSWORD").cloned());
+
         Ok(Self {
             host,
             port,
@@ -334,6 +462,19 @@ impl ServerConfig {
             batch_storage_path,
             otel_enabled,
             otel_endpoint,
+            chromium_auto_start,
+            chromium_idle_shutdown_timeout,
+            libreoffice_auto_start,
+            libreoffice_idle_shutdown_timeout,
+            api_disable_health_route_telemetry,
+            api_disable_root_route_telemetry,
+            api_disable_debug_route_telemetry,
+            api_disable_version_route_telemetry,
+            api_enable_debug_route,
+            api_tls_cert_file,
+            api_tls_key_file,
+            api_basic_auth_username,
+            api_basic_auth_password,
         })
     }
 
@@ -534,5 +675,71 @@ mod tests {
         let cfg = ServerConfig::resolve(&ServerArgs::default(), &env(&[("FOLIO_NO_SANDBOX", "0")]))
             .unwrap();
         assert_eq!(cfg.no_sandbox, Some(false));
+    }
+
+    #[test]
+    fn api_server_flags_default() {
+        let args = ServerArgs::default();
+        let cfg = ServerConfig::resolve(&args, &env(&[])).unwrap();
+        assert!(!cfg.api_disable_health_route_telemetry);
+        assert!(!cfg.api_disable_root_route_telemetry);
+        assert!(!cfg.api_disable_debug_route_telemetry);
+        assert!(!cfg.api_disable_version_route_telemetry);
+        assert!(!cfg.api_enable_debug_route);
+        assert!(cfg.api_tls_cert_file.is_none());
+        assert!(cfg.api_tls_key_file.is_none());
+        assert!(cfg.api_basic_auth_username.is_none());
+        assert!(cfg.api_basic_auth_password.is_none());
+    }
+
+    #[test]
+    fn api_server_flags_from_env() {
+        let args = ServerArgs::default();
+        let cfg = ServerConfig::resolve(
+            &args,
+            &env(&[
+                ("API_DISABLE_HEALTH_ROUTE_TELEMETRY", "true"),
+                ("API_DISABLE_ROOT_ROUTE_TELEMETRY", "true"),
+                ("API_DISABLE_DEBUG_ROUTE_TELEMETRY", "true"),
+                ("API_DISABLE_VERSION_ROUTE_TELEMETRY", "true"),
+                ("API_ENABLE_DEBUG_ROUTE", "true"),
+                ("API_TLS_CERT_FILE", "/etc/tls/cert.pem"),
+                ("API_TLS_KEY_FILE", "/etc/tls/key.pem"),
+                ("API_BASIC_AUTH_USERNAME", "admin"),
+                ("API_BASIC_AUTH_PASSWORD", "secret"),
+            ]),
+        )
+        .unwrap();
+        assert!(cfg.api_disable_health_route_telemetry);
+        assert!(cfg.api_disable_root_route_telemetry);
+        assert!(cfg.api_disable_debug_route_telemetry);
+        assert!(cfg.api_disable_version_route_telemetry);
+        assert!(cfg.api_enable_debug_route);
+        assert_eq!(cfg.api_tls_cert_file.as_deref().map(|p| p.to_str().unwrap()), Some("/etc/tls/cert.pem"));
+        assert_eq!(cfg.api_tls_key_file.as_deref().map(|p| p.to_str().unwrap()), Some("/etc/tls/key.pem"));
+        assert_eq!(cfg.api_basic_auth_username, Some("admin".to_string()));
+        assert_eq!(cfg.api_basic_auth_password, Some("secret".to_string()));
+    }
+
+    #[test]
+    fn api_server_flags_cli_beats_env() {
+        let args = ServerArgs {
+            api_disable_health_route_telemetry: true,
+            api_enable_debug_route: true,
+            api_basic_auth_username: Some("superuser".to_string()),
+            ..ServerArgs::default()
+        };
+        let cfg = ServerConfig::resolve(
+            &args,
+            &env(&[
+                ("API_DISABLE_HEALTH_ROUTE_TELEMETRY", "false"),
+                ("API_ENABLE_DEBUG_ROUTE", "false"),
+                ("API_BASIC_AUTH_USERNAME", "admin"),
+            ]),
+        )
+        .unwrap();
+        assert!(cfg.api_disable_health_route_telemetry);
+        assert!(cfg.api_enable_debug_route);
+        assert_eq!(cfg.api_basic_auth_username, Some("superuser".to_string()));
     }
 }

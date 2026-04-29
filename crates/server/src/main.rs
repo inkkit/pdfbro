@@ -12,14 +12,17 @@ use server::logging::init_logging;
 use server::routes::batch_state::{BatchStateManager, spawn_cleanup_task};
 use server::webhook::{WebhookClient, WebhookEngineContext, WebhookQueue, start_workers};
 use server::{AppState, ServerArgs, ServerConfig, banner, build_router, shutdown};
+use server::supervised_engine::{SupervisedChromiumEngine, SupervisedLibreOfficeEngine};
 
 #[cfg(feature = "chromium")]
-use engine::{BrowserConfig, ChromiumEngine};
+use engine::BrowserConfig;
 #[cfg(feature = "chromium")]
 use server::ChromiumBackend;
 #[cfg(feature = "libreoffice")]
-use engine::{LibreOfficeConfig, LibreOfficeEngine};
+use engine::LibreOfficeConfig;
 use tokio::net::TcpListener;
+
+use axum_server::tls_rustls::RustlsConfig;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -55,42 +58,36 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
     #[cfg(feature = "libreoffice")]
     let lo_cfg = libreoffice_config_from(&config);
 
+    // Create supervised engines with auto-start and idle shutdown support
     #[cfg(feature = "chromium")]
-    let chromium = ChromiumEngine::launch_with(browser_cfg)
-        .await
-        .context("Chromium failed to launch")?;
+    let chromium = SupervisedChromiumEngine::new(browser_cfg);
+    #[cfg(feature = "chromium")]
+    chromium.start_idle_monitor();
     #[cfg(not(feature = "chromium"))]
     let _chromium: Option<()> = None;
 
     #[cfg(feature = "libreoffice")]
-    let libreoffice = match LibreOfficeEngine::launch(lo_cfg).await {
-        Ok(lo) => Some(lo),
-        Err(e) => {
-            tracing::warn!(error = %e, "LibreOffice failed to launch; continuing without it");
-            None
-        }
-    };
+    let libreoffice = SupervisedLibreOfficeEngine::new(lo_cfg);
+    #[cfg(feature = "libreoffice")]
+    libreoffice.start_idle_monitor();
     #[cfg(not(feature = "libreoffice"))]
     let _libreoffice: Option<()> = None;
 
+    // Check health - for auto-start engines, this will start them if not already running
     #[cfg(feature = "chromium")]
     let chromium_ready = chromium.healthy().await;
     #[cfg(not(feature = "chromium"))]
     let chromium_ready = false;
 
     #[cfg(feature = "libreoffice")]
-    let libreoffice_ready = match &libreoffice {
-        Some(lo) => lo.healthy().await,
-        None => false,
-    };
+    let libreoffice_ready = libreoffice.healthy().await;
     #[cfg(not(feature = "libreoffice"))]
     let libreoffice_ready = false;
+    
     banner::print(&config, chromium_ready, libreoffice_ready);
 
     #[cfg(feature = "chromium")]
-    let chromium_handle = chromium.clone();
-    #[cfg(feature = "chromium")]
-    let backend = ChromiumBackend::new(chromium);
+    let backend = ChromiumBackend::new(chromium.clone());
 
     // Start webhook workers for async processing.
     let (webhook_queue, webhook_rx) = WebhookQueue::new(100);
@@ -100,7 +97,7 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
         #[cfg(not(feature = "chromium"))]
         chromium: None,
         #[cfg(feature = "libreoffice")]
-        libreoffice: libreoffice.clone().map(Arc::new),
+        libreoffice: Some(Arc::new(libreoffice.clone())),
         #[cfg(not(feature = "libreoffice"))]
         libreoffice: None,
     };
@@ -127,26 +124,57 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
     .with_webhook_queue(webhook_queue)
     .with_batch_manager(batch_manager);
     #[cfg(feature = "libreoffice")]
-    let state = state.with_libreoffice(libreoffice.map(Arc::new));
+    let state = state.with_libreoffice(Some(Arc::new(libreoffice)));
 
-    let router = build_router(state);
+    let router = build_router(state, &config);
     let addr: SocketAddr = SocketAddr::new(config.host, config.port);
-    let listener = TcpListener::bind(addr)
-        .await
-        .with_context(|| format!("binding {addr}"))?;
-    tracing::info!(%addr, "listening");
 
-    axum::serve(listener, router.into_make_service())
-        .with_graceful_shutdown(shutdown::shutdown_signal())
-        .await
-        .context("axum serve")?;
+    // Check if TLS is configured
+    let tls_enabled = config.api_tls_cert_file.is_some() && config.api_tls_key_file.is_some();
+
+    if tls_enabled {
+        let cert_file = config.api_tls_cert_file.as_ref().unwrap();
+        let key_file = config.api_tls_key_file.as_ref().unwrap();
+
+        tracing::info!(%addr, cert = %cert_file.display(), key = %key_file.display(), "starting HTTPS server");
+
+        let tls_config = RustlsConfig::from_pem_file(cert_file, key_file)
+            .await
+            .context("loading TLS certificates")?;
+
+        let handle = axum_server::Handle::new();
+        let shutdown_handle = handle.clone();
+
+        // Spawn graceful shutdown signal handler
+        tokio::spawn(async move {
+            shutdown::shutdown_signal().await;
+            shutdown_handle.shutdown();
+        });
+
+        axum_server::bind_rustls(addr, tls_config)
+            .handle(handle)
+            .serve(router.into_make_service())
+            .await
+            .context("axum TLS serve")?;
+    } else {
+        tracing::info!(%addr, "starting HTTP server");
+
+        let listener = TcpListener::bind(addr)
+            .await
+            .with_context(|| format!("binding {addr}"))?;
+
+        axum::serve(listener, router.into_make_service())
+            .with_graceful_shutdown(shutdown::shutdown_signal())
+            .await
+            .context("axum serve")?;
+    }
 
     tracing::info!("server stopped accepting connections; closing engines");
 
     // Best-effort engine shutdown with a bounded budget.
     #[cfg(feature = "chromium")]
     {
-        let shutdown = tokio::time::timeout(shutdown::DEFAULT_DRAIN, chromium_handle.shutdown());
+        let shutdown = tokio::time::timeout(shutdown::DEFAULT_DRAIN, chromium.shutdown());
         if let Err(_e) = shutdown.await {
             tracing::warn!("Chromium shutdown exceeded drain budget");
         }
@@ -166,17 +194,23 @@ fn browser_config_from(config: &ServerConfig) -> BrowserConfig {
     let defaults = BrowserConfig::default();
     BrowserConfig {
         executable: config.chrome_path.clone(),
+        headless: defaults.headless,
+        extra_args: defaults.extra_args.clone(),
         no_sandbox: config.no_sandbox.unwrap_or(defaults.no_sandbox),
         timeout: config.request_timeout,
-        ..defaults
+        auto_start: config.chromium_auto_start,
+        idle_shutdown_timeout: config.chromium_idle_shutdown_timeout,
     }
 }
 
 #[cfg(feature = "libreoffice")]
 fn libreoffice_config_from(config: &ServerConfig) -> LibreOfficeConfig {
+    let defaults = LibreOfficeConfig::default();
     LibreOfficeConfig {
         executable: config.soffice_path.clone(),
         timeout: config.request_timeout,
-        ..LibreOfficeConfig::default()
+        max_concurrency: defaults.max_concurrency,
+        auto_start: config.libreoffice_auto_start,
+        idle_shutdown_timeout: config.libreoffice_idle_shutdown_timeout,
     }
 }
