@@ -136,7 +136,7 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
         let cert_file = config.api_tls_cert_file.as_ref().unwrap();
         let key_file = config.api_tls_key_file.as_ref().unwrap();
 
-        tracing::info!(%addr, cert = %cert_file.display(), key = %key_file.display(), "starting HTTPS server");
+        tracing::info!(%addr, cert = %cert_file.display(), key = %key_file.display(), "starting HTTPS server (listening)");
 
         let tls_config = RustlsConfig::from_pem_file(cert_file, key_file)
             .await
@@ -157,7 +157,7 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
             .await
             .context("axum TLS serve")?;
     } else {
-        tracing::info!(%addr, "starting HTTP server");
+        tracing::info!(%addr, "starting HTTP server (listening)");
 
         let listener = TcpListener::bind(addr)
             .await
