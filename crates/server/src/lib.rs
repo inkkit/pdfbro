@@ -7,6 +7,7 @@
 //! [`config`] (CLI / env resolution).
 
 pub mod app;
+pub mod auth;
 pub mod backend;
 pub mod banner;
 pub mod config;
