@@ -16,6 +16,7 @@ use engine::{Cookie, MediaType, PageRanges, PdfOptions, RequestContext, WaitCond
 
 use crate::error::{ApiError, ApiResult};
 use crate::multipart::FormFields;
+use crate::routes::util::{pdf_response, zip_response};
 use crate::state::AppState;
 
 const INDEX_HTML: &str = "index.html";
@@ -42,6 +43,8 @@ pub async fn chromium_html(State(state): State<AppState>, mp: Multipart) -> ApiR
     let start = Instant::now();
     let result = state
         .chromium
+        .as_ref()
+        .unwrap()
         .html_to_pdf(&html, Some(&base_url), &opts, &ctx)
         .await;
     let duration = start.elapsed().as_secs_f64();
@@ -100,7 +103,7 @@ pub async fn chromium_url(State(state): State<AppState>, mp: Multipart) -> ApiRe
     let ctx = parse_request_context(&form.map)?;
 
     let start = Instant::now();
-    let result = state.chromium.url_to_pdf(&url, &opts, &ctx).await;
+    let result = state.chromium.as_ref().unwrap().url_to_pdf(&url, &opts, &ctx).await;
     let duration = start.elapsed().as_secs_f64();
 
     match &result {
@@ -161,6 +164,8 @@ pub async fn chromium_markdown(
         let start = Instant::now();
         let result = state
             .chromium
+            .as_ref()
+            .unwrap()
             .html_to_pdf(&inlined, Some(&base_url), &opts, &ctx)
             .await;
         let duration = start.elapsed().as_secs_f64();
@@ -211,7 +216,7 @@ pub async fn chromium_markdown(
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     let start = Instant::now();
-    let result = state.chromium.markdown_to_pdf(&md, &opts, &ctx).await;
+    let result = state.chromium.as_ref().unwrap().markdown_to_pdf(&md, &opts, &ctx).await;
     let duration = start.elapsed().as_secs_f64();
 
     match &result {
@@ -554,31 +559,6 @@ async fn acquire_permit(state: &AppState) -> ApiResult<tokio::sync::OwnedSemapho
         .map_err(|e| ApiError::Internal(e.to_string()))
 }
 
-/// Build a `200 OK` response carrying a single PDF.
-pub fn pdf_response(bytes: Vec<u8>, filename: &str) -> Response {
-    binary_response(bytes, "application/pdf", filename)
-}
-
-/// Build a `200 OK` response carrying a ZIP archive.
-pub fn zip_response(bytes: Vec<u8>, filename: &str) -> Response {
-    binary_response(bytes, "application/zip", filename)
-}
-
-pub(crate) fn binary_response(bytes: Vec<u8>, content_type: &str, filename: &str) -> Response {
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_str(content_type)
-            .unwrap_or(HeaderValue::from_static("application/octet-stream")),
-    );
-    headers.insert(
-        header::CONTENT_DISPOSITION,
-        HeaderValue::from_str(&format!("attachment; filename=\"{filename}\""))
-            .unwrap_or(HeaderValue::from_static("attachment")),
-    );
-    (StatusCode::OK, headers, Bytes::from(bytes)).into_response()
-}
-
 fn file_url_for(path: &Path) -> String {
     // Best-effort; we expect tempdir paths to be UTF-8 on the platforms we
     // care about. If conversion fails, fall through to a relative path.
@@ -611,7 +591,7 @@ pub async fn chromium_screenshot_html(State(state): State<AppState>, mp: Multipa
 
     let opts = parse_screenshot_options(&form.map)?;
     let start = Instant::now();
-    let result = state.chromium.html_to_screenshot(&html, &opts).await;
+    let result = state.chromium.as_ref().unwrap().html_to_screenshot(&html, &opts).await;
     let duration = start.elapsed().as_secs_f64();
 
     match &result {
@@ -654,7 +634,7 @@ pub async fn chromium_screenshot_url(State(state): State<AppState>, mp: Multipar
 
     let opts = parse_screenshot_options(&form.map)?;
     let start = Instant::now();
-    let result = state.chromium.url_to_screenshot(url, &opts).await;
+    let result = state.chromium.as_ref().unwrap().url_to_screenshot(url, &opts).await;
     let duration = start.elapsed().as_secs_f64();
 
     match &result {
@@ -704,7 +684,7 @@ pub async fn chromium_screenshot_markdown(State(state): State<AppState>, mp: Mul
     let html = render_markdown_to_html(&md);
     
     let opts = parse_screenshot_options(&form.map)?;
-    let image = state.chromium.html_to_screenshot(&html, &opts).await?;
+    let image = state.chromium.as_ref().unwrap().html_to_screenshot(&html, &opts).await?;
     
     let ext = opts.format.extension();
     let filename = format!("screenshot.{}", ext);
