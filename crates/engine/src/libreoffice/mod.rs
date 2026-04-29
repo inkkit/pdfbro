@@ -64,6 +64,12 @@ pub struct LibreOfficeConfig {
     /// Maximum concurrent subprocess invocations. Default
     /// [`std::thread::available_parallelism`].
     pub max_concurrency: usize,
+    /// Auto-start engine on first request instead of at server startup.
+    /// Default: false (start immediately).
+    pub auto_start: bool,
+    /// Idle shutdown timeout - engine shuts down after this duration of no requests.
+    /// None means no idle shutdown. Default: None.
+    pub idle_shutdown_timeout: Option<Duration>,
 }
 
 impl Default for LibreOfficeConfig {
@@ -74,6 +80,8 @@ impl Default for LibreOfficeConfig {
             max_concurrency: std::thread::available_parallelism()
                 .map(|n| n.get())
                 .unwrap_or(4),
+            auto_start: false,
+            idle_shutdown_timeout: None,
         }
     }
 }
@@ -102,7 +110,7 @@ impl LibreOfficeEngine {
     #[instrument(skip(config), fields(executable = ?config.executable))]
     pub async fn launch(config: LibreOfficeConfig) -> EngineResult<Self> {
         info!("Launching LibreOffice engine");
-        let exe = match config.executable {
+        let exe = match config.executable.as_ref() {
             Some(p) => {
                 if !p.exists() {
                     return Err(EngineError::Internal(format!(
@@ -110,7 +118,7 @@ impl LibreOfficeEngine {
                         p.display()
                     )));
                 }
-                p
+                p.clone()
             }
             None => discover::find_soffice()?,
         };
