@@ -64,6 +64,26 @@ pub struct LibreOfficeConfig {
     /// Maximum concurrent subprocess invocations. Default
     /// [`std::thread::available_parallelism`].
     pub max_concurrency: usize,
+
+    // === Gotenberg Supervision Fields ===
+    /// Restart LibreOffice after N conversions (0 = never restart).
+    /// Default: 0.
+    pub restart_after: u64,
+    /// Maximum LibreOffice request queue size (0 = unlimited).
+    /// Default: 0.
+    pub max_queue_size: usize,
+    /// Auto-start LibreOffice on server startup.
+    /// Default: false.
+    pub auto_start: bool,
+    /// LibreOffice start timeout.
+    /// Default: 20s.
+    pub start_timeout: Duration,
+    /// Disable LibreOffice routes.
+    /// Default: false.
+    pub disable_routes: bool,
+    /// Idle shutdown timeout for LibreOffice (None = disabled).
+    /// Default: None.
+    pub idle_shutdown_timeout: Option<Duration>,
 }
 
 impl Default for LibreOfficeConfig {
@@ -74,6 +94,13 @@ impl Default for LibreOfficeConfig {
             max_concurrency: std::thread::available_parallelism()
                 .map(|n| n.get())
                 .unwrap_or(4),
+            // Gotenberg supervision defaults
+            restart_after: 0,
+            max_queue_size: 0,
+            auto_start: false,
+            start_timeout: Duration::from_secs(20),
+            disable_routes: false,
+            idle_shutdown_timeout: None,
         }
     }
 }

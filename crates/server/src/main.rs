@@ -143,15 +143,30 @@ fn browser_config_from(config: &ServerConfig) -> BrowserConfig {
         executable: config.chrome_path.clone(),
         no_sandbox: config.no_sandbox.unwrap_or(defaults.no_sandbox),
         timeout: config.request_timeout,
+        // Gotenberg supervision fields
+        restart_after: config.chromium_restart_after,
+        max_queue_size: config.chromium_max_queue_size,
+        max_concurrency: config.chromium_max_concurrency,
+        auto_start: config.chromium_auto_start,
+        start_timeout: config.chromium_start_timeout,
+        idle_shutdown_timeout: config.chromium_idle_shutdown_timeout,
         ..defaults
     }
 }
 
 #[cfg(feature = "libreoffice")]
 fn libreoffice_config_from(config: &ServerConfig) -> LibreOfficeConfig {
+    let defaults = LibreOfficeConfig::default();
     LibreOfficeConfig {
         executable: config.soffice_path.clone(),
         timeout: config.request_timeout,
-        ..LibreOfficeConfig::default()
+        max_concurrency: defaults.max_concurrency,
+        // Gotenberg supervision fields
+        restart_after: config.libreoffice_restart_after,
+        max_queue_size: config.libreoffice_max_queue_size,
+        auto_start: config.libreoffice_auto_start,
+        start_timeout: config.libreoffice_start_timeout,
+        disable_routes: config.libreoffice_disable_routes,
+        idle_shutdown_timeout: config.libreoffice_idle_shutdown_timeout,
     }
 }
