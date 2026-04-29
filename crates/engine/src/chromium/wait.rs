@@ -37,6 +37,7 @@ pub(crate) async fn apply(page: &Page, wait: &WaitCondition) -> EngineResult<()>
             tokio::time::sleep(*duration).await;
             Ok(())
         }
+        WaitCondition::WindowStatus { status } => wait_window_status(page, status).await,
     }
 }
 
@@ -100,6 +101,13 @@ async fn poll_truthy(page: &Page, expr: &str) -> EngineResult<()> {
     }
 }
 
+async fn wait_window_status(page: &Page, status: &str) -> EngineResult<()> {
+    let escaped = json_escape(status);
+    // Poll window.status until it matches the expected value.
+    let expr = format!("window.status === \"{escaped}\"");
+    poll_truthy(page, &expr).await
+}
+
 /// Minimal JSON string escape — enough to safely interpolate a CSS
 /// selector into a JS double-quoted string literal.
 fn json_escape(s: &str) -> String {
@@ -135,5 +143,21 @@ mod tests {
         assert_eq!(json_escape("a\\b"), "a\\\\b");
         assert_eq!(json_escape("\n"), "\\n");
         assert_eq!(json_escape("plain"), "plain");
+    }
+
+    #[test]
+    fn json_escape_handles_special_chars() {
+        assert_eq!(json_escape("\r"), "\\r");
+        assert_eq!(json_escape("\t"), "\\t");
+        assert_eq!(json_escape("quote\"here"), "quote\\\"here");
+        assert_eq!(json_escape("back\\slash"), "back\\\\slash");
+    }
+
+    #[test]
+    fn json_escape_window_status_special_chars() {
+        // Window status might contain various characters that need escaping.
+        assert_eq!(json_escape("status:ready"), "status:ready");
+        assert_eq!(json_escape("status=ready"), "status=ready");
+        assert_eq!(json_escape("ready\"injected"), "ready\\\"injected");
     }
 }

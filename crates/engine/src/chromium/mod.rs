@@ -94,6 +94,19 @@ pub struct RequestContext {
     /// with [`crate::EngineError::Navigation`]. Empty means no statuses
     /// fail.
     pub fail_on_status: Vec<u16>,
+    /// HTTP statuses on resources (non-main-frame) that fail the render.
+    /// Empty means no resource statuses fail.
+    pub fail_on_resource_status: Vec<u16>,
+    /// If true, fail the render if any JavaScript console exception is thrown.
+    pub fail_on_console_exceptions: bool,
+    /// If true, fail the render if any resource fails to load (network error).
+    pub fail_on_resource_loading_failed: bool,
+    /// Skip waiting for the `networkIdle` lifecycle event during navigation.
+    /// Speeds up conversion but may result in incomplete rendering.
+    pub skip_network_idle: bool,
+    /// Skip waiting for the `networkAlmostIdle` (networkIdle2) lifecycle event
+    /// during navigation.
+    pub skip_network_almost_idle: bool,
 }
 
 /// A single cookie installed on the page before a render.
@@ -435,4 +448,44 @@ mod assertions {
     assert_impl_all!(ChromiumEngine: Send, Sync, Clone);
     assert_impl_all!(RequestContext: Send, Sync, Clone);
     assert_impl_all!(Cookie: Send, Sync, Clone);
+
+    #[test]
+    fn request_context_default_values() {
+        let ctx = RequestContext::default();
+        assert!(ctx.user_agent.is_none());
+        assert!(ctx.extra_headers.is_empty());
+        assert!(ctx.cookies.is_empty());
+        assert!(ctx.fail_on_status.is_empty());
+        assert!(ctx.fail_on_resource_status.is_empty());
+        assert!(!ctx.fail_on_console_exceptions);
+        assert!(!ctx.fail_on_resource_loading_failed);
+        assert!(!ctx.skip_network_idle);
+        assert!(!ctx.skip_network_almost_idle);
+    }
+
+    #[test]
+    fn request_context_with_all_fail_options() {
+        let ctx = RequestContext {
+            fail_on_status: vec![500, 502, 503],
+            fail_on_resource_status: vec![404, 500],
+            fail_on_console_exceptions: true,
+            fail_on_resource_loading_failed: true,
+            ..RequestContext::default()
+        };
+        assert_eq!(ctx.fail_on_status, vec![500, 502, 503]);
+        assert_eq!(ctx.fail_on_resource_status, vec![404, 500]);
+        assert!(ctx.fail_on_console_exceptions);
+        assert!(ctx.fail_on_resource_loading_failed);
+    }
+
+    #[test]
+    fn request_context_with_skip_options() {
+        let ctx = RequestContext {
+            skip_network_idle: true,
+            skip_network_almost_idle: true,
+            ..RequestContext::default()
+        };
+        assert!(ctx.skip_network_idle);
+        assert!(ctx.skip_network_almost_idle);
+    }
 }

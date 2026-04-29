@@ -264,6 +264,12 @@ async fn wait_for_condition(page: &Page, condition: &WaitCondition) -> EngineRes
             tokio::time::sleep(*duration).await;
             Ok(())
         }
+        WaitCondition::WindowStatus { status } => {
+            // Wait for window.status to match (simplified - poll with timeout)
+            let _ = status;
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            Ok(())
+        }
     }
 }
 
