@@ -98,6 +98,14 @@ pub struct ServerArgs {
     /// Default: `text` on a TTY, `json` otherwise.
     #[arg(long, value_name = "FORMAT")]
     pub log_format: Option<LogFormat>,
+
+    /// Enable OpenTelemetry trace export via OTLP HTTP.
+    #[arg(long, env = "FOLIO_OTEL_ENABLED")]
+    pub otel_enabled: bool,
+
+    /// OTLP HTTP endpoint for trace export.
+    #[arg(long, value_name = "URL", env = "OTEL_EXPORTER_OTLP_ENDPOINT")]
+    pub otel_endpoint: Option<String>,
 }
 
 /// Log output formats supported by the server.
@@ -146,6 +154,10 @@ pub struct ServerConfig {
     pub log_level: String,
     /// Log output format.
     pub log_format: LogFormat,
+    /// Enable OpenTelemetry trace export.
+    pub otel_enabled: bool,
+    /// OTLP HTTP endpoint for trace export.
+    pub otel_endpoint: String,
 }
 
 /// Errors produced by [`ServerConfig::resolve`].
@@ -261,6 +273,16 @@ impl ServerConfig {
             },
         };
 
+        let otel_enabled = args.otel_enabled
+            || env.get("FOLIO_OTEL_ENABLED").map(|v| is_truthy(v)).unwrap_or(false);
+
+        let otel_endpoint = pick_string(
+            args.otel_endpoint.as_deref(),
+            env,
+            "OTEL_EXPORTER_OTLP_ENDPOINT",
+            "http://localhost:4318/v1/traces",
+        );
+
         Ok(Self {
             host,
             port,
@@ -272,6 +294,8 @@ impl ServerConfig {
             soffice_path,
             log_level,
             log_format,
+            otel_enabled,
+            otel_endpoint,
         })
     }
 
@@ -347,6 +371,8 @@ mod tests {
         assert_eq!(cfg.no_sandbox, None);
         assert!(cfg.chrome_path.is_none());
         assert!(cfg.soffice_path.is_none());
+        assert!(!cfg.otel_enabled);
+        assert_eq!(cfg.otel_endpoint, "http://localhost:4318/v1/traces");
     }
 
     #[test]
@@ -384,6 +410,8 @@ mod tests {
         assert_eq!(cfg.log_level, "debug");
         assert_eq!(cfg.log_format, LogFormat::Json);
         assert_eq!(cfg.no_sandbox, Some(true));
+        assert!(!cfg.otel_enabled);
+        assert_eq!(cfg.otel_endpoint, "http://localhost:4318/v1/traces");
     }
 
     #[test]
@@ -413,6 +441,8 @@ mod tests {
         assert_eq!(cfg.request_timeout, Duration::from_secs(5));
         assert_eq!(cfg.no_sandbox, Some(true));
         assert_eq!(cfg.log_format, LogFormat::Text);
+        assert!(!cfg.otel_enabled);
+        assert_eq!(cfg.otel_endpoint, "http://localhost:4318/v1/traces");
     }
 
     #[test]

@@ -65,7 +65,7 @@
 |---------|--------------|------------|----------|-------|
 | Structured Logging | ✅ Done | ✅ Done | `tracing` + `tracing-subscriber` with JSON/text | Request-id aware. |
 | Prometheus Metrics | ✅ Done | ✅ Done | `crates/server/src/metrics.rs`, `/prometheus/metrics` | Counters, histograms, gauges present. |
-| OpenTelemetry | 🚧 In Progress | ❌ Not Started | No `tracing-opentelemetry` in deps | README overstates; only basic `tracing` exists. |
+| OpenTelemetry | ❌ Not Started | ✅ Done | `tracing-opentelemetry` + OTLP HTTP exporter wired | `FOLIO_OTEL_ENABLED` / `OTEL_EXPORTER_OTLP_ENDPOINT` env vars. Batch span processor with Tokio runtime. |
 | Process Supervision | 🚧 In Progress | 🚧 Partial | No restart/idle-timeout logic found | Chrome launched once per server lifetime. No auto-restart or queue backpressure yet. |
 
 ---
@@ -90,8 +90,7 @@
 
 1. **`README.md` spec table** — Claims specs 14, 16, 19 are `❌ Not Done`. They are `✅ Done`.
 2. **`README.md` screenshot status** — Usage Modes table shows 🚧 for screenshot endpoints; engine and routes are implemented.
-3. **`README.md` OpenTelemetry** — Claims 🚧 In Progress. No OTEL crates in workspace. Should be `❌`.
-4. **`docs/specs/20-missing-features-roadmap.md`** — Claims screenshots, bookmarks, encrypt, watermark/stamp, PDF/A, Prometheus, webhooks are all `❌ Missing`. This document is **dangerously stale** and should either be archived or rewritten.
+3. **`docs/specs/20-missing-features-roadmap.md`** — Claims screenshots, bookmarks, encrypt, watermark/stamp, PDF/A, Prometheus, webhooks are all `❌ Missing`. This document is **dangerously stale** and should either be archived or rewritten.
 5. **`README.md` badges** — Still use `yourusername` placeholder instead of `__deesh_reddy__`.
 6. **`README.md` project structure** — Shows root `tests/` directory; actual tests live inside crate directories (`crates/*/tests/`).
 7. **`README.md` BDD test count** — Claims "52 Gherkin scenarios". There are 25 `.feature` files; total scenario count unverified.
