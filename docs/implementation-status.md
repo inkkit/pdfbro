@@ -30,7 +30,7 @@
 | 16 | PDF Bookmarks | ❌ Not Started | **✅ Done** ⚠️ | `crates/engine/src/bookmarks/mod.rs` (397 lines) | Full read/write/flatten with `lopdf`. Routes `/forms/pdfengines/bookmarks/{read,write}` wired. **README is wrong.** |
 | 17 | Watermark | ✅ Done | ✅ Done | Via spec 13 | — |
 | 18 | Screenshots | ✅ Done / 🚧 Mixed | ✅ Done (mostly) | `crates/engine/src/chromium/screenshot.rs` | Engine supports PNG & JPEG. **WebP missing** at engine level (`ScreenshotFormat` only has `Png`, `Jpeg`). Server routes for all three exist. README incorrectly lists 🚧 in the Usage Modes table. |
-| 19 | PDF Encryption | ❌ Not Started | **✅ Done** ⚠️ | `crates/engine/src/encrypt/mod.rs` (326 lines) | AES-128/256 via qpdf. Routes `/forms/pdfengines/{encrypt,decrypt}` wired. **README is wrong.** |
+| 19 | PDF Encryption | ✅ Done | **✅ Done** | `crates/engine/src/encrypt/mod.rs` (326 lines) | AES-128/256 via qpdf. CLI `folio encrypt/decrypt`, server routes `/forms/pdfengines/{encrypt,decrypt}` wired. BDD tests + engine integration tests. |
 
 ---
 
