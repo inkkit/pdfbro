@@ -8,7 +8,7 @@ use tracing::{error, info, warn};
 use uuid::Uuid;
 
 
-use super::{WebhookClient, WebhookConfig, WebhookError, WebhookJob, WebhookOperation, process_webhook_job};
+use super::{WebhookClient, WebhookConfig, WebhookEngineContext, WebhookError, WebhookJob, WebhookOperation, process_webhook_job};
 
 /// Job queue sender handle.
 #[derive(Clone)]
@@ -60,13 +60,16 @@ pub fn start_workers(
     receiver: mpsc::Receiver<WebhookJob>,
     num_workers: usize,
     client: WebhookClient,
+    ctx: WebhookEngineContext,
 ) {
     let client = Arc::new(client);
     let receiver = Arc::new(Mutex::new(receiver));
+    let ctx = Arc::new(ctx);
 
     for worker_id in 0..num_workers {
         let client = Arc::clone(&client);
         let rx = Arc::clone(&receiver);
+        let ctx = Arc::clone(&ctx);
 
         tokio::spawn(async move {
             info!(worker_id, "Webhook worker started");
@@ -90,7 +93,7 @@ pub fn start_workers(
 
                 info!(worker_id, job_id = %job_id, "Processing webhook job");
 
-                match process_webhook_job(job, &client, start_time).await {
+                match process_webhook_job(job, &client, &ctx, start_time).await {
                     Ok(()) => {
                         info!(worker_id, job_id = %job_id, "Webhook job completed");
                     }
