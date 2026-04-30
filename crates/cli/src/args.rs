@@ -321,8 +321,8 @@ pub(crate) struct PdfFlags {
     pub(crate) margin: Option<Margins>,
     #[arg(long, value_name = "FLOAT")]
     pub(crate) scale: Option<f32>,
-    #[arg(long = "no-print-background")]
-    pub(crate) no_print_background: bool,
+    #[arg(long = "print-background")]
+    pub(crate) print_background: bool,
     #[arg(long, value_enum, value_name = "MEDIA")]
     pub(crate) emulate: Option<EmulateMedia>,
     #[arg(long, value_name = "RANGES", value_parser = parse::parse_page_ranges)]

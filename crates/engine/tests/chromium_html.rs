@@ -174,6 +174,7 @@ async fn html_to_pdf_respects_paper_size() {
     engine.shutdown().await.ok();
 }
 
+// Regression test: the default BrowserConfig must not wait for networkIdle, which never fires for most real pages.
 #[tokio::test]
 async fn url_to_pdf_against_local_axum() {
     let router = Router::new().route(
@@ -194,6 +195,60 @@ async fn url_to_pdf_against_local_axum() {
 
     let doc = parse_pdf(&bytes);
     assert_eq!(doc.get_pages().len(), 1);
+    assert!(bytes.len() > 1024, "PDF suspiciously small: {} bytes", bytes.len());
+
+    engine.shutdown().await.ok();
+    let _ = shutdown.send(());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn url_to_pdf_network_idle_timeout_fallback() {
+    // A page that constantly polls /ping — networkIdle will never fire.
+    // With network_idle_timeout: Some(2s), the race should time out and
+    // still return a PDF rather than blocking until the 60s render timeout.
+    let router = Router::new()
+        .route(
+            "/busy",
+            get(|| async {
+                Html(r#"<!doctype html><html><body>
+                    <h1>busy page</h1>
+                    <script>(function loop() { fetch('/ping').then(loop).catch(loop); })();</script>
+                </body></html>"#)
+            }),
+        )
+        .route("/ping", get(|| async { "pong" }));
+    let (addr, shutdown) = spawn_server(router).await;
+
+    let cfg = BrowserConfig {
+        network_idle_timeout: Some(Duration::from_secs(2)),
+        executable: std::env::var("CHROME_PATH").ok().map(PathBuf::from),
+        ..BrowserConfig::default()
+    };
+    let engine = match ChromiumEngine::launch_with(cfg).await {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("skipping: failed to launch Chrome: {e}");
+            let _ = shutdown.send(());
+            return;
+        }
+    };
+
+    // The whole conversion must complete well under the 60s render timeout.
+    let result = tokio::time::timeout(
+        Duration::from_secs(15),
+        engine.url_to_pdf(
+            &format!("http://{addr}/busy"),
+            &PdfOptions::default(),
+            &RequestContext::default(),
+        ),
+    )
+    .await;
+
+    let bytes = result
+        .expect("timed out after 15s — network_idle_timeout fallback did not fire")
+        .expect("render failed");
+
+    assert!(bytes.starts_with(b"%PDF"), "output is not a PDF");
 
     engine.shutdown().await.ok();
     let _ = shutdown.send(());
@@ -323,8 +378,6 @@ async fn cookies_and_headers_round_trip() {
         fail_on_resource_status: vec![],
         fail_on_console_exceptions: false,
         fail_on_resource_loading_failed: false,
-        skip_network_idle: false,
-        skip_network_almost_idle: false,
     };
 
     let bytes = engine

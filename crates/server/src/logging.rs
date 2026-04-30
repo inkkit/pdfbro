@@ -39,8 +39,16 @@ pub fn init_logging(
     otel_enabled: bool,
     otel_endpoint: &str,
 ) -> anyhow::Result<()> {
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(log_level));
+    // When RUST_LOG is set, use it verbatim (user-controlled).
+    // When using the default level, suppress chromiumoxide::handler at warn —
+    // it logs benign "WS Invalid message" noise for CDP events not in its
+    // protocol schema (harmless compatibility gap with newer Chrome versions).
+    let filter = if let Ok(f) = EnvFilter::try_from_default_env() {
+        f
+    } else {
+        EnvFilter::new(log_level)
+            .add_directive("chromiumoxide::handler=error".parse().unwrap())
+    };
 
     let span_events = std::env::var("FOLIO_LOG_SPAN_EVENTS")
         .map(|v| is_truthy(&v))

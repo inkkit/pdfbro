@@ -6,7 +6,7 @@ license.workspace = true
 description = "Folio Node.js bindings (napi-rs)"
 
 [lib]
-name = "folio"
+name = "folio_js"
 crate-type = ["cdylib"]
 
 [dependencies]

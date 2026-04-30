@@ -470,8 +470,8 @@ pub fn parse_pdf_options(map: &HashMap<String, String>) -> ApiResult<PdfOptions>
     }
     if let Some(s) = map.get("emulateMediaType").map(String::as_str) {
         opts.emulate_media = match s.trim().to_ascii_lowercase().as_str() {
-            "print" => MediaType::Print,
-            "screen" => MediaType::Screen,
+            "print" => Some(MediaType::Print),
+            "screen" => Some(MediaType::Screen),
             other => {
                 return Err(ApiError::InvalidField {
                     field: "emulateMediaType",
@@ -535,20 +535,6 @@ pub fn parse_request_context(map: &HashMap<String, String>) -> ApiResult<Request
             message: e.to_string(),
         })?;
         ctx.fail_on_status = parsed;
-    }
-
-    if let Some(s) = nonempty(map, "skipNetworkIdle") {
-        ctx.skip_network_idle = s.parse::<bool>().map_err(|e| ApiError::InvalidField {
-            field: "skipNetworkIdle",
-            message: e.to_string(),
-        })?;
-    }
-
-    if let Some(s) = nonempty(map, "skipNetworkAlmostIdle") {
-        ctx.skip_network_almost_idle = s.parse::<bool>().map_err(|e| ApiError::InvalidField {
-            field: "skipNetworkAlmostIdle",
-            message: e.to_string(),
-        })?;
     }
 
     Ok(ctx)
@@ -937,7 +923,7 @@ mod tests {
         assert!(!opts.print_background);
         assert!(opts.prefer_css_page_size);
         assert!(opts.page_ranges.is_some());
-        assert_eq!(opts.emulate_media, MediaType::Screen);
+        assert_eq!(opts.emulate_media, Some(MediaType::Screen));
         match opts.wait {
             WaitCondition::Delay { duration } => {
                 assert_eq!(duration.as_millis(), 1500);

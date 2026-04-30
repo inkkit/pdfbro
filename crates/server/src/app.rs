@@ -241,6 +241,8 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
         .with_state(state)
         .layer(
             ServiceBuilder::new()
+                .layer(SetRequestIdLayer::new(header_name.clone(), UuidRequestId))
+                .layer(PropagateRequestIdLayer::new(header_name.clone()))
                 .layer(
                     TraceLayer::new_for_http()
                         .make_span_with(RequestIdMakeSpan::new(config))
@@ -251,9 +253,7 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
                             tower_http::trace::DefaultOnFailure::new().level(Level::WARN),
                         ),
                 )
-                .layer(SetRequestIdLayer::new(header_name.clone(), UuidRequestId))
-                .layer(PropagateRequestIdLayer::new(header_name))
-                .layer(CorsLayer::permissive()),
+                .layer(CorsLayer::permissive())
                 // metrics_middleware removed - handlers record metrics directly
         );
 

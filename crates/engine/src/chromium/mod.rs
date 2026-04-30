@@ -101,12 +101,6 @@ pub struct RequestContext {
     pub fail_on_console_exceptions: bool,
     /// If true, fail the render if any resource fails to load (network error).
     pub fail_on_resource_loading_failed: bool,
-    /// Skip waiting for the `networkIdle` lifecycle event during navigation.
-    /// Speeds up conversion but may result in incomplete rendering.
-    pub skip_network_idle: bool,
-    /// Skip waiting for the `networkAlmostIdle` (networkIdle2) lifecycle event
-    /// during navigation.
-    pub skip_network_almost_idle: bool,
 }
 
 /// A single cookie installed on the page before a render.
@@ -459,8 +453,6 @@ mod assertions {
         assert!(ctx.fail_on_resource_status.is_empty());
         assert!(!ctx.fail_on_console_exceptions);
         assert!(!ctx.fail_on_resource_loading_failed);
-        assert!(!ctx.skip_network_idle);
-        assert!(!ctx.skip_network_almost_idle);
     }
 
     #[test]
@@ -478,14 +470,4 @@ mod assertions {
         assert!(ctx.fail_on_resource_loading_failed);
     }
 
-    #[test]
-    fn request_context_with_skip_options() {
-        let ctx = RequestContext {
-            skip_network_idle: true,
-            skip_network_almost_idle: true,
-            ..RequestContext::default()
-        };
-        assert!(ctx.skip_network_idle);
-        assert!(ctx.skip_network_almost_idle);
-    }
 }

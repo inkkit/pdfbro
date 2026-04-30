@@ -215,6 +215,7 @@ fn browser_config_from(config: &ServerConfig) -> BrowserConfig {
         timeout: config.request_timeout,
         lazy_start: config.chromium_lazy_start,
         idle_shutdown_timeout: config.chromium_idle_shutdown_timeout,
+        network_idle_timeout: None,
     }
 }
 
