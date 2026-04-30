@@ -95,7 +95,7 @@ fn check_chrome_version(executable: &Path) {
                         "Chrome version not supported by chromiumoxide. \
                          PDF conversions may timeout or fail. \
                          Install Chrome/Chromium <= {} or use --chrome-path to specify a compatible binary. \
-                         Alternatively, set networkIdleTimeout in the server configuration as a workaround.",
+                         Alternatively, pin to a supported Chrome version for reliable operation.",
                         MAX_SUPPORTED
                     );
                 } else {
