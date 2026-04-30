@@ -6,8 +6,10 @@ pub mod batch_types;
 #[cfg(feature = "chromium")]
 pub mod chromium;
 pub mod debug;
+pub mod estimate;
 pub mod health;
 #[cfg(feature = "libreoffice")]
 pub mod libreoffice;
 pub mod pdfengines;
+pub mod preview;
 pub mod util;
