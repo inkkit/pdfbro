@@ -4,7 +4,6 @@
 
 use axum::body::Body;
 use axum::http::{Request, Response, StatusCode, header};
-use axum::response::IntoResponse;
 use std::sync::Arc;
 use tower::{Layer, Service};
 use std::future::Future;

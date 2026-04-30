@@ -13,7 +13,7 @@ use engine::{BrowserConfig, ChromiumEngine, LibreOfficeConfig, LibreOfficeEngine
 use engine::{EngineError, EngineResult};
 use tokio::sync::Mutex;
 use tokio::time::interval;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 /// Wrapper around ChromiumEngine with auto-start and idle shutdown.
 #[derive(Clone)]

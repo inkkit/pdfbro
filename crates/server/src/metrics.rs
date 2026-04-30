@@ -17,31 +17,43 @@ pub static METRICS: Lazy<FolioMetrics> = Lazy::new(|| {
 /// All Prometheus metrics for the Folio server.
 #[derive(Clone)]
 pub struct FolioMetrics {
-    // Conversion metrics
+    /// Total conversions by engine, endpoint, and status.
     pub conversions_total: CounterVec,
+    /// Conversion duration in seconds.
     pub conversion_duration: HistogramVec,
+    /// Total bytes processed by engine and endpoint.
     pub conversion_bytes: CounterVec,
 
-    // Queue metrics
+    /// Current queue size.
     pub queue_size: Gauge,
+    /// Currently processing jobs.
     pub queue_processing: Gauge,
+    /// Completed jobs by status.
     pub queue_completed: CounterVec,
+    /// Time spent in queue.
     pub queue_wait: HistogramVec,
 
-    // Engine health
+    /// Chromium health status (1=up, 0=down).
     pub chromium_healthy: Gauge,
+    /// LibreOffice health status (1=up, 0=down).
     pub libreoffice_healthy: Gauge,
+    /// Chromium conversion count by endpoint.
     pub chromium_conversions: CounterVec,
+    /// LibreOffice conversion count by endpoint.
     pub libreoffice_conversions: CounterVec,
 
-    // HTTP metrics
+    /// Total HTTP requests by method, route, and status.
     pub http_requests: CounterVec,
+    /// HTTP request duration in seconds.
     pub http_request_duration: HistogramVec,
+    /// Active HTTP requests.
     pub http_active_requests: Gauge,
 
-    // System metrics
+    /// Process start time as Unix timestamp.
     pub process_start_time: Gauge,
+    /// Resident memory size in bytes (RSS).
     pub process_resident_memory: Gauge,
+    /// Virtual memory size in bytes.
     pub process_virtual_memory: Gauge,
 }
 
@@ -315,6 +327,8 @@ impl FolioMetrics {
         }
     }
 
+    /// Update memory metrics by reading /proc/self/status (Linux) or using
+    /// platform-specific APIs.
     #[cfg(not(target_os = "linux"))]
     pub fn update_memory_metrics(&self) {
         // Platform-specific memory metrics not implemented

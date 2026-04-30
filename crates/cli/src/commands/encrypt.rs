@@ -1,6 +1,6 @@
 //! `folio encrypt` / `folio decrypt` — PDF password protection.
 
-use anyhow::{Context, anyhow};
+use anyhow::Context;
 use engine::encrypt::{EncryptionAlgorithm, Permissions, decrypt_pdf, encrypt_pdf};
 
 use crate::args::{DecryptArgs, EncryptAlgorithm, EncryptArgs};

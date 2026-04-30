@@ -5,8 +5,6 @@
 //! - `GET /forms/batch/{id}/status` - Query batch status
 //! - `GET /forms/batch/{id}/download` - Download batch results
 
-use std::path::PathBuf;
-
 use axum::body::Body;
 use axum::extract::{Multipart, Path, State};
 use axum::http::{HeaderMap, StatusCode, header};
@@ -26,7 +24,7 @@ use crate::state::AppState;
 /// Response: `BatchSubmitResponse` with batch ID for polling.
 pub async fn batch_submit(
     State(state): State<AppState>,
-    headers: HeaderMap,
+    _headers: HeaderMap,
     mp: Multipart,
 ) -> ApiResult<Response> {
     // Check max active batches
