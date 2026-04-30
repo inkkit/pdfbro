@@ -265,6 +265,31 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
         .route("/estimate/form", post(estimate::estimate_form))
         .route("/estimate/batch", post(estimate::estimate_batch));
 
+    // OpenAPI spec for Scalar documentation
+    use crate::routes::openapi;
+    untimed = untimed.route("/openapi.json", get(openapi::openapi_spec));
+
+    // Scalar interactive API documentation
+    use scalar_api_reference::axum::router as scalar_router;
+    use serde_json::json;
+    let scalar_config = json!({
+        "url": "/openapi.json",
+        "metaData": {
+            "title": "Folio API",
+            "description": "PDF generation API (Gotenberg-compatible)",
+            "favicon": "https://gotenberg.dev/favicon.ico"
+        },
+        "theme": "purple",
+        "darkMode": true,
+        "layout": "modern",
+        "searchHotKey": "k",
+        "defaultHttpClient": {
+            "targetKey": "curl",
+            "clientKey": "curl"
+        }
+    });
+    untimed = untimed.merge(scalar_router("/docs", &scalar_config));
+
     let header_name = HeaderName::from_bytes(
         config.api_correlation_id_header.as_bytes(),
     )
