@@ -367,7 +367,7 @@ viable shape:
 | Workloads | 5 fixed: chromium HTML small, chromium HTML large w/ web-fonts, chromium URL (local fixture), libreoffice .docx 50 KB, pdfengines merge 5×20-page PDFs | Covers the three engine paths + a pure-PDF-ops path |
 | Profile | 4 concurrent clients, 2 min/workload, 30 s warm-up discarded, 3 reps, report median + flag CV>15 % | Statistical hygiene without a 40-min runtime |
 | Metrics | p50/p95/p99 latency, RPS, error rate, peak container RSS via `docker stats --no-stream` sampling | The four numbers everyone actually quotes |
-| Fairness | Run Gotenberg + Folio under **identical `cpus`/`mem_limit` cgroups**, ideally Folio image **`FROM gotenberg/gotenberg:8.x`** so Chromium / LibreOffice / qpdf are byte-identical | Eliminates tooling-version drift as a confound |
+| Fairness | Run Gotenberg + Folio under **identical `cpus`/`mem_limit` cgroups**. Folio uses its own `Dockerfile` (pinned Chromium 142, same LibreOffice version). Pin Gotenberg's image to the same Chromium/LibreOffice versions via its compose flags. Verify tool versions match before any run. | Eliminates tooling-version drift as a confound without creating a release image that depends on a competitor's base image |
 | PDF quality assertions | `lopdf` page-count + structural diff (not byte-identical, never byte-identical) | qpdf timestamps and IDs are non-deterministic |
 | Output | `bench/results/<ts>/perf.md` — one bar chart, one resource table, mandatory caveats section | No marketing |
 | CI gate | **deferred** per spec 63 §3 | Local-run only for v1 |
@@ -468,12 +468,12 @@ Triage, in priority order:
 | **`downloadFrom` field** on every multipart route | Cross-cutting; unblocks many real workflows | 0.5 day |
 | **`POST /forms/pdfengines/embed` route + step definitions** | Closes one of two missing routes | 0.5 day |
 | **`GET /` root route** | Trivial; Gotenberg responds with HTML index page | 0.25 day |
+| **`omitBackground` field on chromium routes** | Calls `SetDefaultBackgroundColorOverride(RGBA 0,0,0,0)` to make Chrome's default white canvas transparent. Required when compositing PDFs over other content. Must be paired with `printBackground: true` (Gotenberg returns 400 otherwise). Not implemented in Folio at all. | 0.5 day |
 | **Encrypt permissions bitmask** | Documented gap from existing analysis | 0.5 day |
 | **`--api-correlation-id-header`** flag (rename Folio's `X-Request-Id` to honour `Gotenberg-Trace` when set) | Simple compatibility fix | 0.25 day |
 | Decision on `--pdfengines-*-engines` flags (§E) | Document or implement qpdf-fallback | 0.5 day decision + effort TBD |
 
-**Estimated effort:** 2 days for the remaining 5 items (webhook
-delivery removed).
+**Estimated effort:** 2.5 days for the 6 items (webhook delivery removed).
 
 ### Shot 4 (optional) — Modernise (only after Shot 2 baseline)
 
@@ -483,8 +483,7 @@ measured before/after. Not part of the v1 plan.
 
 ### Total estimated effort
 
-**~10.5–12.5 engineer-days** for Shots 1+2+3 (revised up from 8.5 to
-reflect 100 % scenario porting in Shot 1).
+**~11–13 engineer-days** for Shots 1+2+3.
 
 ### Sequencing
 
