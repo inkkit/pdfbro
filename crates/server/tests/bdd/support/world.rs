@@ -47,6 +47,12 @@ pub struct FolioWorld {
     /// Multiple responses from concurrent requests
     pub concurrent_responses: Option<Vec<(u16, Vec<u8>)>>,
 
+    /// Captured log lines from the server (populated by container steps).
+    pub logs: Vec<String>,
+
+    /// Bodies captured by the in-process webhook server.
+    pub webhook_bodies: Vec<Vec<u8>>,
+
     /// Temporary directory for test files
     #[allow(dead_code)]
     pub temp_dir: tempfile::TempDir,
@@ -69,6 +75,8 @@ impl FolioWorld {
             response_headers: None,
             body: None,
             concurrent_responses: None,
+            logs: Vec::new(),
+            webhook_bodies: Vec::new(),
             temp_dir: tempfile::tempdir().unwrap(),
             base_url: None,
             server_process: None,

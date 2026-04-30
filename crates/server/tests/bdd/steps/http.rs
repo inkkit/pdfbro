@@ -334,3 +334,31 @@ pub async fn check_all_status_codes(world: &mut FolioWorld, expected: u16) {
         assert_eq!(*status, expected, "Response {} expected status {}, got {}", i, expected, status);
     }
 }
+
+/// Step: When I make a "GET" request to "/health" with basic auth "user":"pass"
+pub async fn make_request_with_basic_auth(
+    world: &mut FolioWorld,
+    method: String,
+    endpoint: String,
+    username: String,
+    password: String,
+) {
+    let url = format!("{}{}", world.base_url.as_ref().unwrap(), endpoint);
+    let response = world
+        .client
+        .request(reqwest::Method::from_bytes(method.as_bytes()).unwrap(), &url)
+        .basic_auth(username, Some(password))
+        .send()
+        .await
+        .expect("Failed to make HTTP request");
+
+    let status = response.status().as_u16();
+    let mut headers = std::collections::HashMap::new();
+    for (name, value) in response.headers() {
+        headers.insert(name.as_str().to_string(), value.to_str().unwrap_or("").to_string());
+    }
+    let body = response.bytes().await.expect("Failed to read response body").to_vec();
+    world.body = Some(body);
+    world.status_code = Some(status);
+    world.response_headers = Some(headers);
+}

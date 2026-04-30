@@ -22,6 +22,17 @@ pub async fn default_container(world: &mut FolioWorld) {
 /// Table format:
 /// | VAR_NAME | value |
 /// | VAR_NAME2 | value2 |
+/// Step: Then the logs should contain "<substring>"
+pub async fn check_logs_contain(world: &mut FolioWorld, substring: String) {
+    let found = world.logs.iter().any(|line| line.contains(&substring));
+    assert!(
+        found,
+        "Expected logs to contain {:?} but found:\n{}",
+        substring,
+        world.logs.join("\n")
+    );
+}
+
 pub async fn container_with_env(world: &mut FolioWorld, table: &Table) {
     let mut env = HashMap::new();
 

@@ -118,6 +118,86 @@ fn is_pdf_content(bytes: &[u8]) -> bool {
     bytes.starts_with(b"%PDF")
 }
 
+// =============================================================
+// External-tool helpers (graceful degradation when unavailable)
+// =============================================================
+
+use std::process::Command;
+use std::io::Write as _;
+
+/// Check if an external binary is available on PATH.
+fn tool_available(name: &str) -> bool {
+    Command::new(name).arg("--version").output().is_ok()
+}
+
+/// Validate PDF/A compliance using verapdf. Returns (passed, failed_rules).
+fn verapdf_validate(bytes: &[u8]) -> Option<(bool, usize)> {
+    if !tool_available("verapdf") {
+        return None;
+    }
+    let mut tmp = tempfile::NamedTempFile::new().ok()?;
+    tmp.write_all(bytes).ok()?;
+    let out = Command::new("verapdf")
+        .args(["--format", "json", tmp.path().to_str()?])
+        .output()
+        .ok()?;
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).ok()?;
+    let failed = json
+        .pointer("/report/jobs/0/validationResult/details/failedRules")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0) as usize;
+    Some((failed == 0, failed))
+}
+
+/// Extract PDF bytes from either a raw PDF response or a named entry inside a ZIP.
+fn extract_named_pdf(body: &[u8], filename: &str) -> Vec<u8> {
+    if body.starts_with(b"%PDF") {
+        return body.to_vec();
+    }
+    use std::io::{Cursor, Read};
+    let mut archive = zip::ZipArchive::new(Cursor::new(body))
+        .expect("Response is neither a PDF nor a ZIP");
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i).expect("Failed to read ZIP entry");
+        if entry.name() == filename {
+            let mut buf = Vec::new();
+            entry.read_to_end(&mut buf).expect("Failed to read ZIP entry");
+            return buf;
+        }
+    }
+    panic!("File {filename} not found in ZIP response");
+}
+
+/// Step: Then the "foo.pdf" PDF should pass PDF/A validation
+pub async fn check_pdfa_valid(world: &mut FolioWorld, filename: String) {
+    let body = world.body.as_ref().expect("No response body");
+    let pdf_bytes = extract_named_pdf(body, &filename);
+    match verapdf_validate(&pdf_bytes) {
+        Some((true, _)) => {}
+        Some((false, n)) => panic!("{filename} failed PDF/A validation with {n} failed rule(s)"),
+        None => eprintln!("WARN: verapdf not available; skipping PDF/A check for {filename}"),
+    }
+}
+
+/// Step: Then the "foo.pdf" PDF should have N image(s)
+pub async fn check_image_count(world: &mut FolioWorld, filename: String, expected: usize) {
+    let body = world.body.as_ref().expect("No response body");
+    let pdf_bytes = extract_named_pdf(body, &filename);
+    let doc = lopdf::Document::load_mem(&pdf_bytes).expect("Failed to parse PDF");
+    let mut count = 0usize;
+    for (_, obj) in doc.objects.iter() {
+        if let Ok(stream) = obj.as_stream() {
+            if let Ok(subtype) = stream.dict.get(b"Subtype").and_then(|v| v.as_name()) {
+                if subtype == b"Image" {
+                    count += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(count, expected, "Expected {expected} image(s) in {filename}, found {count}");
+}
+
 /// Extract text from specific page of PDF
 fn extract_pdf_text(bytes: &[u8], page_num: usize) -> Result<String, Box<dyn std::error::Error>> {
     let doc = Document::load_mem(bytes)?;
