@@ -39,8 +39,8 @@ pub(crate) fn build_pdf_options(flags: &PdfFlags) -> anyhow::Result<PdfOptions> 
     }
     if let Some(em) = flags.emulate {
         o.emulate_media = match em {
-            EmulateMedia::Print => MediaType::Print,
-            EmulateMedia::Screen => MediaType::Screen,
+            EmulateMedia::Print => Some(MediaType::Print),
+            EmulateMedia::Screen => Some(MediaType::Screen),
         };
     }
     if let Some(pr) = &flags.pages {

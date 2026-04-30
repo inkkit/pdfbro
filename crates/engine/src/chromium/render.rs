@@ -310,12 +310,14 @@ async fn apply_emulated_media(
     page: &Page,
     opts: &PdfOptions,
 ) -> EngineResult<()> {
-    page.execute(SetEmulatedMediaParams {
-        media: Some(media_kind(opts.emulate_media).to_string()),
-        features: None,
-    })
-    .await
-    .map_err(|e| engine.map_cdp_error(e))?;
+    if let Some(media) = opts.emulate_media {
+        page.execute(SetEmulatedMediaParams {
+            media: Some(media_kind(media).to_string()),
+            features: None,
+        })
+        .await
+        .map_err(|e| engine.map_cdp_error(e))?;
+    }
     Ok(())
 }
 

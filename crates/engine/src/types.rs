@@ -202,13 +202,11 @@ impl Margins {
 // MediaType
 // ---------------------------------------------------------------------------
 
-/// CSS media emulation. Defaults to [`MediaType::Print`] which is what most
-/// PDF renderers want.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+/// CSS media emulation passed to `Emulation.setEmulatedMedia`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum MediaType {
-    /// Emulate `@media print`. Default.
-    #[default]
+    /// Emulate `@media print`.
     Print,
     /// Emulate `@media screen`.
     Screen,
@@ -507,8 +505,10 @@ pub struct PdfOptions {
     /// Honor `@page { size: ... }` CSS rules; overrides [`PdfOptions::paper`]
     /// when present.
     pub prefer_css_page_size: bool,
-    /// CSS media to emulate.
-    pub emulate_media: MediaType,
+    /// CSS media to emulate via `Emulation.setEmulatedMedia` before PDF generation.
+    /// `None` (default) skips the call entirely — Chrome applies `@media print`
+    /// internally during `printToPDF`, matching gotenberg's default behaviour.
+    pub emulate_media: Option<MediaType>,
     /// Subset of pages to include in the output.
     pub page_ranges: Option<PageRanges>,
     /// HTML template rendered as the page header.
@@ -528,7 +528,7 @@ impl Default for PdfOptions {
             scale: 1.0,
             print_background: true,
             prefer_css_page_size: false,
-            emulate_media: MediaType::Print,
+            emulate_media: None,
             page_ranges: None,
             header_template: None,
             footer_template: None,
@@ -766,7 +766,7 @@ mod tests {
         assert_eq!(d.scale, 1.0);
         assert!(d.print_background);
         assert!(!d.prefer_css_page_size);
-        assert_eq!(d.emulate_media, MediaType::Print);
+        assert_eq!(d.emulate_media, None);
         assert!(d.page_ranges.is_none());
         assert!(d.header_template.is_none());
         assert!(d.footer_template.is_none());
@@ -869,7 +869,7 @@ mod tests {
             scale: 1.5,
             print_background: false,
             prefer_css_page_size: true,
-            emulate_media: MediaType::Screen,
+            emulate_media: Some(MediaType::Screen),
             page_ranges: Some(PageRanges::parse("1-3").unwrap()),
             header_template: None,
             footer_template: None,

@@ -85,7 +85,7 @@ mod tests {
             scale: 0.75,
             print_background: false,
             prefer_css_page_size: true,
-            emulate_media: MediaType::Screen,
+            emulate_media: Some(MediaType::Screen),
             page_ranges: Some(PageRanges::parse("1-3,5").unwrap()),
             header_template: Some("<h1>Hi</h1>".into()),
             footer_template: Some("<span></span>".into()),
