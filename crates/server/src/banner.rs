@@ -186,9 +186,9 @@ mod tests {
             otel_enabled: false,
             otel_endpoint: "http://localhost:4318/v1/traces".to_string(),
             // Engine supervision
-            chromium_auto_start: false,
+            chromium_lazy_start: false,
             chromium_idle_shutdown_timeout: None,
-            libreoffice_auto_start: false,
+            libreoffice_lazy_start: false,
             libreoffice_idle_shutdown_timeout: None,
             // API server
             api_disable_health_route_telemetry: false,

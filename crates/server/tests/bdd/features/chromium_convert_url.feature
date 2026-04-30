@@ -6,8 +6,9 @@ Feature: /forms/chromium/convert/url
   Scenario: POST /forms/chromium/convert/url
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
-      | url                       | https://google.com | field  |
+      | url                       | https://example.com | field  |
       | Gotenberg-Output-Filename | result              | header |
+      | skipNetworkIdle           | true                | field  |
     Then the response status code should be 200
     Then the response header "Content-Type" should be "application/pdf"
 

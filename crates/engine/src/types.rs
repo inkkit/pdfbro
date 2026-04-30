@@ -454,9 +454,9 @@ pub struct BrowserConfig {
     /// Per-page navigation/render timeout. Default: 60s.
     #[serde(with = "humantime_serde")]
     pub timeout: Duration,
-    /// Auto-start browser on first request instead of at server startup.
-    /// Default: false (start immediately).
-    pub auto_start: bool,
+    /// Use lazy initialization (start on first request).
+    /// Default: false (start eagerly at server startup).
+    pub lazy_start: bool,
     /// Idle shutdown timeout - browser shuts down after this duration of no requests.
     /// None means no idle shutdown. Default: None.
     #[serde(with = "humantime_serde")]
@@ -471,7 +471,7 @@ impl Default for BrowserConfig {
             extra_args: Vec::new(),
             no_sandbox: cfg!(target_os = "linux"),
             timeout: Duration::from_secs(60),
-            auto_start: false,
+            lazy_start: false,
             idle_shutdown_timeout: None,
         }
     }
@@ -972,7 +972,7 @@ mod tests {
             extra_args: vec!["--mute-audio".into()],
             no_sandbox: true,
             timeout: Duration::from_secs(30),
-            auto_start: false,
+            lazy_start: false,
             idle_shutdown_timeout: None,
         };
         let json = serde_json::to_string(&c).unwrap();
@@ -982,7 +982,7 @@ mod tests {
         assert_eq!(back.extra_args, c.extra_args);
         assert_eq!(back.no_sandbox, c.no_sandbox);
         assert_eq!(back.timeout, c.timeout);
-        assert_eq!(back.auto_start, c.auto_start);
+        assert_eq!(back.lazy_start, c.lazy_start);
         assert_eq!(back.idle_shutdown_timeout, c.idle_shutdown_timeout);
     }
 
