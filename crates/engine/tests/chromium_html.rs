@@ -174,6 +174,7 @@ async fn html_to_pdf_respects_paper_size() {
     engine.shutdown().await.ok();
 }
 
+// Regression test: the default BrowserConfig must not wait for networkIdle, which never fires for most real pages.
 #[tokio::test]
 async fn url_to_pdf_against_local_axum() {
     let router = Router::new().route(
@@ -194,36 +195,6 @@ async fn url_to_pdf_against_local_axum() {
 
     let doc = parse_pdf(&bytes);
     assert_eq!(doc.get_pages().len(), 1);
-
-    engine.shutdown().await.ok();
-    let _ = shutdown.send(());
-}
-
-#[tokio::test]
-async fn url_to_pdf_real_network_default() {
-    // Proves that URL-to-PDF works with default BrowserConfig (no networkIdle wait).
-    // This was the main regression: the old default waited for networkIdle, which
-    // never fired for most real pages, causing a 60s timeout.
-    let router = Router::new().route(
-        "/page",
-        get(|| async {
-            Html("<!doctype html><html><body><h1>real network default</h1></body></html>")
-        }),
-    );
-    let (addr, shutdown) = spawn_server(router).await;
-
-    let Some(engine) = launch_engine().await else { return; };
-
-    let bytes = engine
-        .url_to_pdf(
-            &format!("http://{addr}/page"),
-            &PdfOptions::default(),
-            &RequestContext::default(),
-        )
-        .await
-        .expect("url_to_pdf timed out or failed — default must not wait for networkIdle");
-
-    assert!(bytes.starts_with(b"%PDF"), "output is not a PDF");
     assert!(bytes.len() > 1024, "PDF suspiciously small: {} bytes", bytes.len());
 
     engine.shutdown().await.ok();
@@ -241,7 +212,7 @@ async fn url_to_pdf_network_idle_timeout_fallback() {
             get(|| async {
                 Html(r#"<!doctype html><html><body>
                     <h1>busy page</h1>
-                    <script>setInterval(() => fetch('/ping'), 100);</script>
+                    <script>(function loop() { fetch('/ping').then(loop).catch(loop); })();</script>
                 </body></html>"#)
             }),
         )
