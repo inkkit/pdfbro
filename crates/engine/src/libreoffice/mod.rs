@@ -226,10 +226,10 @@ impl LibreOfficeEngine {
         Ok(out)
     }
 
-    /// Returns `true` iff `soffice --version` succeeds within a 5-second
+    /// Returns `true` iff `soffice --version` succeeds within a 30-second
     /// timeout (regardless of the engine's `config.timeout`).
     pub async fn healthy(&self) -> bool {
-        discover::probe(&self.inner.exe, Duration::from_secs(5))
+        discover::probe(&self.inner.exe, Duration::from_secs(30))
             .await
             .is_ok()
     }
