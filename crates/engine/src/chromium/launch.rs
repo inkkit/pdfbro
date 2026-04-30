@@ -189,6 +189,8 @@ const BASELINE_ARGS: &[&str] = &[
     "--hide-scrollbars",
     "--mute-audio",
     "--disable-dev-shm-usage",
+    "--no-zygote",
+    "--font-render-hinting=none",
 ];
 
 /// Names looked up on `$PATH`, in order.
