@@ -47,12 +47,12 @@ pub async fn run_perf(args: PerfArgs) -> anyhow::Result<()> {
         println!("\n=== {} — {} ===", w.name, w.description);
 
         let folio_result = run_workload(
-            w, &args.folio_url, &args.folio_container,
+            w, &args.folio_url, w.folio_route, &args.folio_container,
             args.concurrency, args.warmup_secs, args.duration_secs, args.repetitions,
         ).await?;
 
         let gotenberg_result = run_workload(
-            w, &args.gotenberg_url, &args.gotenberg_container,
+            w, &args.gotenberg_url, w.gotenberg_route, &args.gotenberg_container,
             args.concurrency, args.warmup_secs, args.duration_secs, args.repetitions,
         ).await?;
 
@@ -71,14 +71,13 @@ pub async fn run_perf(args: PerfArgs) -> anyhow::Result<()> {
 async fn run_workload(
     w: &workload::WorkloadDef,
     base_url: &str,
+    route: &str,
     container_name: &str,
     concurrency: usize,
     warmup_secs: u64,
     duration_secs: u64,
     repetitions: usize,
 ) -> anyhow::Result<report::RunResult> {
-    // Use folio_route for folio (port 3001), gotenberg_route for gotenberg (port 3002)
-    let route = if base_url.contains("3001") { w.folio_route } else { w.gotenberg_route };
     let url = format!("{}{}", base_url, route);
 
     // Warm-up

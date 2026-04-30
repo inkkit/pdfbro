@@ -16,6 +16,7 @@ pub async fn drive(
     duration: Duration,
     body_fn: Arc<dyn Fn() -> BoxFuture<anyhow::Result<(String, reqwest::multipart::Form)>> + Send + Sync>,
 ) -> anyhow::Result<DriveResult> {
+    let client = reqwest::Client::new();
     let sem = Arc::new(Semaphore::new(concurrency));
     let errors = Arc::new(AtomicUsize::new(0));
     let start = Instant::now();
@@ -27,6 +28,7 @@ pub async fn drive(
         let permit = sem.clone().acquire_owned().await?;
         let body_fn = body_fn.clone();
         let errors = errors.clone();
+        let client = client.clone();
 
         let handle = tokio::spawn(async move {
             let _permit = permit;
@@ -34,7 +36,6 @@ pub async fn drive(
             let result = body_fn().await;
             match result {
                 Ok((url, form)) => {
-                    let client = reqwest::Client::new();
                     match client.post(&url).multipart(form).send().await {
                         Ok(resp) if resp.status().is_success() => {
                             Some(req_start.elapsed().as_millis() as u64)
