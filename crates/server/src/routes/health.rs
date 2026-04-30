@@ -72,9 +72,9 @@ pub async fn debug(State(state): State<AppState>) -> impl IntoResponse {
             "concurrency": state.config.concurrency,
             "max_body_bytes": state.config.max_body_bytes,
             "request_timeout_secs": state.config.request_timeout.as_secs(),
-            "chromium_auto_start": state.config.chromium_auto_start,
+            "chromium_lazy_start": state.config.chromium_lazy_start,
             "chromium_idle_shutdown_timeout_secs": state.config.chromium_idle_shutdown_timeout.map(|d| d.as_secs()),
-            "libreoffice_auto_start": state.config.libreoffice_auto_start,
+            "libreoffice_lazy_start": state.config.libreoffice_lazy_start,
             "libreoffice_idle_shutdown_timeout_secs": state.config.libreoffice_idle_shutdown_timeout.map(|d| d.as_secs()),
         },
         "features": {

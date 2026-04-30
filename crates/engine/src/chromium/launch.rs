@@ -70,8 +70,8 @@ pub(crate) fn resolve_executable_with(
 }
 
 /// Check Chrome version and warn if it's newer than what chromiumoxide supports.
-/// chromiumoxide 0.9 supports Chrome up to ~135. Newer versions emit warnings
-/// for unknown CDP events but PDF generation still works.
+/// chromiumoxide 0.9.1 supports Chrome up to 142 (PDL r1519099).
+/// Newer versions may cause timeouts or 'WS Invalid message' errors.
 fn check_chrome_version(executable: &Path) {
     let output = std::process::Command::new(executable)
         .arg("--version")
@@ -87,15 +87,16 @@ fn check_chrome_version(executable: &Path) {
                 .and_then(|v| v.split('.').next())
                 .and_then(|m| m.parse::<u32>().ok())
             {
-                const MAX_TESTED: u32 = 135;
-                if major > MAX_TESTED {
+                const MAX_SUPPORTED: u32 = 142;
+                if major > MAX_SUPPORTED {
                     tracing::warn!(
                         chrome_version = %version_str.trim(),
-                        max_tested = MAX_TESTED,
-                        "Chrome version newer than chromiumoxide supports. \
-                         You may see 'WS Invalid message' warnings - PDF generation \
-                         still works, but consider downgrading Chrome or waiting \
-                         for chromiumoxide update."
+                        max_supported = MAX_SUPPORTED,
+                        "Chrome version not supported by chromiumoxide. \
+                         PDF conversions may timeout or fail. \
+                         Install Chrome/Chromium <= {} or use --chrome-path to specify a compatible binary. \
+                         Alternatively, use skipNetworkIdle=true in form data as a workaround.",
+                        MAX_SUPPORTED
                     );
                 } else {
                     tracing::info!(chrome_version = %version_str.trim(), "Chrome version OK");
@@ -105,7 +106,7 @@ fn check_chrome_version(executable: &Path) {
     }
 }
 
-/// Public entrypoint used by `ChromiumEngine::launch_with`.
+/// Check Chrome version and warn if it's newer than what chromiumoxide supports.
 pub(crate) async fn launch_with(config: BrowserConfig) -> EngineResult<ChromiumEngine> {
     let executable = resolve_executable_with(
         config.executable.as_deref(),

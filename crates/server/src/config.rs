@@ -108,17 +108,21 @@ pub struct ServerArgs {
     pub otel_endpoint: Option<String>,
 
     // === Engine Supervision Flags ===
-    /// Auto-start Chromium on first request instead of server startup.
-    #[arg(long, env = "CHROMIUM_AUTO_START", default_value = "true")]
-    pub chromium_auto_start: bool,
+    /// Use lazy initialization for Chromium (start on first request).
+    /// Default is false, meaning Chromium starts eagerly at server startup.
+    /// Set to true to defer startup until the first request is received.
+    #[arg(long, env = "CHROMIUM_LAZY_START", default_value = "false")]
+    pub chromium_lazy_start: bool,
 
     /// Idle shutdown timeout for Chromium (e.g., "10m", "0" to disable).
     #[arg(long, value_name = "DUR", env = "CHROMIUM_IDLE_SHUTDOWN_TIMEOUT")]
     pub chromium_idle_shutdown_timeout: Option<String>,
 
-    /// Auto-start LibreOffice on first request instead of server startup.
-    #[arg(long, env = "LIBREOFFICE_AUTO_START", default_value = "true")]
-    pub libreoffice_auto_start: bool,
+    /// Use lazy initialization for LibreOffice (start on first request).
+    /// Default is false, meaning LibreOffice starts eagerly at server startup.
+    /// Set to true to defer startup until the first request is received.
+    #[arg(long, env = "LIBREOFFICE_LAZY_START", default_value = "false")]
+    pub libreoffice_lazy_start: bool,
 
     /// Idle shutdown timeout for LibreOffice (e.g., "10m", "0" to disable).
     #[arg(long, value_name = "DUR", env = "LIBREOFFICE_IDLE_SHUTDOWN_TIMEOUT")]
@@ -228,12 +232,12 @@ pub struct ServerConfig {
     pub otel_endpoint: String,
 
     // === Engine Supervision Config ===
-    /// Auto-start Chromium on first request.
-    pub chromium_auto_start: bool,
+    /// Use lazy initialization for Chromium (start on first request).
+    pub chromium_lazy_start: bool,
     /// Idle shutdown timeout for Chromium (None = disabled).
     pub chromium_idle_shutdown_timeout: Option<Duration>,
-    /// Auto-start LibreOffice on first request.
-    pub libreoffice_auto_start: bool,
+    /// Use lazy initialization for LibreOffice (start on first request).
+    pub libreoffice_lazy_start: bool,
     /// Idle shutdown timeout for LibreOffice (None = disabled).
     pub libreoffice_idle_shutdown_timeout: Option<Duration>,
 
@@ -404,8 +408,8 @@ impl ServerConfig {
         );
 
         // === Engine Supervision Config Resolution ===
-        let chromium_auto_start = args.chromium_auto_start
-            || env.get("CHROMIUM_AUTO_START").map(|v| is_truthy(v)).unwrap_or(false);
+        let chromium_lazy_start = args.chromium_lazy_start
+            || env.get("CHROMIUM_LAZY_START").map(|v| is_truthy(v)).unwrap_or(false);
         let chromium_idle_shutdown_timeout = args.chromium_idle_shutdown_timeout.as_deref()
             .or_else(|| env.get("CHROMIUM_IDLE_SHUTDOWN_TIMEOUT").map(|v| v.as_str()))
             .and_then(|v| {
@@ -414,8 +418,8 @@ impl ServerConfig {
                     .filter(|d| !d.is_zero())
             });
 
-        let libreoffice_auto_start = args.libreoffice_auto_start
-            || env.get("LIBREOFFICE_AUTO_START").map(|v| is_truthy(v)).unwrap_or(false);
+        let libreoffice_lazy_start = args.libreoffice_lazy_start
+            || env.get("LIBREOFFICE_LAZY_START").map(|v| is_truthy(v)).unwrap_or(false);
         let libreoffice_idle_shutdown_timeout = args.libreoffice_idle_shutdown_timeout.as_deref()
             .or_else(|| env.get("LIBREOFFICE_IDLE_SHUTDOWN_TIMEOUT").map(|v| v.as_str()))
             .and_then(|v| {
@@ -462,9 +466,9 @@ impl ServerConfig {
             batch_storage_path,
             otel_enabled,
             otel_endpoint,
-            chromium_auto_start,
+            chromium_lazy_start,
             chromium_idle_shutdown_timeout,
-            libreoffice_auto_start,
+            libreoffice_lazy_start,
             libreoffice_idle_shutdown_timeout,
             api_disable_health_route_telemetry,
             api_disable_root_route_telemetry,

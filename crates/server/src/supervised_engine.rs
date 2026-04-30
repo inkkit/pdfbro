@@ -1,8 +1,8 @@
-//! Supervised engine wrapper with auto-start and idle shutdown.
+//! Supervised engine wrapper with lazy/eager start and idle shutdown.
 //!
 //! This module provides wrappers around ChromiumEngine and LibreOfficeEngine
 //! that implement:
-//! - Auto-start: Engine starts on first request instead of server startup
+//! - Lazy start: Engine starts on first request (default: eager start at server startup)
 //! - Idle shutdown: Engine automatically shuts down after period of inactivity
 
 use std::sync::Arc;
@@ -22,12 +22,12 @@ pub struct SupervisedChromiumEngine {
 }
 
 struct SupervisedEngineInner<E, C> {
-    /// The engine instance, created lazily if auto_start is true
+    /// The engine instance, created lazily if lazy_start is true
     engine: Mutex<Option<E>>,
     /// Configuration for creating the engine
     config: C,
-    /// Whether to use lazy initialization
-    auto_start: bool,
+    /// Whether to use lazy initialization (start on first request)
+    lazy_start: bool,
     /// Idle timeout duration
     idle_timeout: Option<Duration>,
     /// Last activity timestamp (seconds since epoch)
@@ -39,34 +39,48 @@ struct SupervisedEngineInner<E, C> {
 impl SupervisedChromiumEngine {
     /// Create a new supervised engine wrapper.
     pub fn new(config: BrowserConfig) -> Self {
-        let auto_start = config.auto_start;
+        let lazy_start = config.lazy_start;
         let idle_timeout = config.idle_shutdown_timeout;
-        
+
         Self {
             inner: Arc::new(SupervisedEngineInner {
                 engine: Mutex::new(None),
                 config,
-                auto_start,
+                lazy_start,
                 idle_timeout,
                 last_activity: AtomicU64::new(0),
-                is_running: AtomicBool::new(!auto_start),
+                is_running: AtomicBool::new(false), // Will be set to true after eager start or lazy start
             }),
         }
     }
 
-    /// Get or create the engine, starting it if necessary.
-    async fn get_engine(&self) -> EngineResult<tokio::sync::MutexGuard<'_, Option<ChromiumEngine>>> {
+    /// Eagerly start the engine at server startup.
+    pub async fn start(&self) -> EngineResult<()> {
         let mut guard = self.inner.engine.lock().await;
-        
-        if guard.is_none() && self.inner.auto_start {
-            info!("Auto-starting Chromium engine on first request");
+        if guard.is_none() {
+            info!("Starting Chromium engine");
             let engine = ChromiumEngine::launch_with(self.inner.config.clone()).await?;
             *guard = Some(engine);
             self.inner.is_running.store(true, Ordering::SeqCst);
             self.update_activity();
-            info!("Chromium engine auto-started successfully");
+            info!("Chromium engine started successfully");
         }
-        
+        Ok(())
+    }
+
+    /// Get or create the engine, starting it if necessary (lazy init).
+    async fn get_engine(&self) -> EngineResult<tokio::sync::MutexGuard<'_, Option<ChromiumEngine>>> {
+        let mut guard = self.inner.engine.lock().await;
+
+        if guard.is_none() && self.inner.lazy_start {
+            info!("Lazy-starting Chromium engine on first request");
+            let engine = ChromiumEngine::launch_with(self.inner.config.clone()).await?;
+            *guard = Some(engine);
+            self.inner.is_running.store(true, Ordering::SeqCst);
+            self.update_activity();
+            info!("Chromium engine lazy-started successfully");
+        }
+
         Ok(guard)
     }
 
@@ -211,7 +225,7 @@ impl SupervisedChromiumEngine {
     }
 }
 
-/// Wrapper around LibreOfficeEngine with auto-start and idle shutdown.
+/// Wrapper around LibreOfficeEngine with lazy/eager start and idle shutdown.
 #[derive(Clone)]
 pub struct SupervisedLibreOfficeEngine {
     inner: Arc<SupervisedEngineInner<LibreOfficeEngine, LibreOfficeConfig>>,
@@ -220,34 +234,48 @@ pub struct SupervisedLibreOfficeEngine {
 impl SupervisedLibreOfficeEngine {
     /// Create a new supervised LibreOffice engine wrapper.
     pub fn new(config: LibreOfficeConfig) -> Self {
-        let auto_start = config.auto_start;
+        let lazy_start = config.lazy_start;
         let idle_timeout = config.idle_shutdown_timeout;
-        
+
         Self {
             inner: Arc::new(SupervisedEngineInner {
                 engine: Mutex::new(None),
                 config,
-                auto_start,
+                lazy_start,
                 idle_timeout,
                 last_activity: AtomicU64::new(0),
-                is_running: AtomicBool::new(!auto_start),
+                is_running: AtomicBool::new(false), // Will be set to true after eager start or lazy start
             }),
         }
     }
 
-    /// Get or create the engine, starting it if necessary.
-    async fn get_engine(&self) -> EngineResult<tokio::sync::MutexGuard<'_, Option<LibreOfficeEngine>>> {
+    /// Eagerly start the engine at server startup.
+    pub async fn start(&self) -> EngineResult<()> {
         let mut guard = self.inner.engine.lock().await;
-        
-        if guard.is_none() && self.inner.auto_start {
-            info!("Auto-starting LibreOffice engine on first request");
+        if guard.is_none() {
+            info!("Starting LibreOffice engine");
             let engine = LibreOfficeEngine::launch(self.inner.config.clone()).await?;
             *guard = Some(engine);
             self.inner.is_running.store(true, Ordering::SeqCst);
             self.update_activity();
-            info!("LibreOffice engine auto-started successfully");
+            info!("LibreOffice engine started successfully");
         }
-        
+        Ok(())
+    }
+
+    /// Get or create the engine, starting it if necessary (lazy init).
+    async fn get_engine(&self) -> EngineResult<tokio::sync::MutexGuard<'_, Option<LibreOfficeEngine>>> {
+        let mut guard = self.inner.engine.lock().await;
+
+        if guard.is_none() && self.inner.lazy_start {
+            info!("Lazy-starting LibreOffice engine on first request");
+            let engine = LibreOfficeEngine::launch(self.inner.config.clone()).await?;
+            *guard = Some(engine);
+            self.inner.is_running.store(true, Ordering::SeqCst);
+            self.update_activity();
+            info!("LibreOffice engine lazy-started successfully");
+        }
+
         Ok(guard)
     }
 
