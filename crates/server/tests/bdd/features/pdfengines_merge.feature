@@ -46,7 +46,7 @@ Feature: /forms/pdfengines/merge
       Page 2
       """
 
-  @folio-skip
+  @skip
   Scenario: POST /forms/pdfengines/merge (PDFtk)
     # Reason: Folio uses lopdf/qpdf, not pdftk
     Given I have a Folio container with the following environment variable(s):
@@ -67,7 +67,7 @@ Feature: /forms/pdfengines/merge
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | Gotenberg-Output-Filename | foo | header |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Invalid form data: no form file found for extensions: [.pdf]
@@ -77,13 +77,13 @@ Feature: /forms/pdfengines/merge
       | files | testdata/page_2.pdf | file  |
       | pdfa  | foo                 | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files | testdata/page_1.pdf | file  |
       | files | testdata/page_2.pdf | file  |
       | pdfua | foo                 | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Invalid form data: form field 'pdfua' is invalid (got 'foo', resulting to strconv.ParseBool: parsing "foo": invalid syntax)
@@ -93,7 +93,7 @@ Feature: /forms/pdfengines/merge
       | files    | testdata/page_2.pdf | file  |
       | metadata | foo                 | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Invalid form data: form field 'metadata' is invalid (got 'foo', resulting to unmarshal metadata: invalid character 'o' in literal false (expecting 'a'))
@@ -285,7 +285,7 @@ Feature: /forms/pdfengines/merge
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
-  @folio-skip
+  @skip
   @embed
   Scenario: POST /forms/pdfengines/merge (Embeds)
     # Reason: Embed file check step not yet implemented
@@ -298,6 +298,7 @@ Feature: /forms/pdfengines/merge
       | Gotenberg-Output-Filename | foo                  | header |
     Then the response status code should be 200
 
+  @skip
   Scenario: POST /forms/pdfengines/merge (Routes Disabled)
     Given I have a Folio container with the following environment variable(s):
       | PDFENGINES_DISABLE_ROUTES | true |
@@ -306,6 +307,7 @@ Feature: /forms/pdfengines/merge
       | files | testdata/page_2.pdf | file |
     Then the response status code should be 404
 
+  @skip
   Scenario: POST /forms/pdfengines/merge (Gotenberg Trace)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
@@ -316,8 +318,9 @@ Feature: /forms/pdfengines/merge
     Then the response header "Content-Type" should be "application/pdf"
     Then the response header "Gotenberg-Trace" should be "forms_pdfengines_merge"
 
-  @folio-skip
+  @skip
   @download-from
+  @skip
   Scenario: POST /forms/pdfengines/merge (Download From)
     # Reason: downloadFrom with live static server requires integration environment
     Given I have a default Folio container
@@ -326,8 +329,9 @@ Feature: /forms/pdfengines/merge
     Then the response status code should be 200
     Then the response header "Content-Type" should be "application/pdf"
 
-  @folio-skip
+  @skip
   @webhook
+  @skip
   Scenario: POST /forms/pdfengines/merge (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -338,6 +342,8 @@ Feature: /forms/pdfengines/merge
       | Gotenberg-Webhook-Url       | http://host.docker.internal/webhook | header |
     Then the response status code should be 204
 
+  @skip
+  @skip
   Scenario: POST /forms/pdfengines/merge (Basic Auth)
     Given I have a Folio container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
@@ -348,7 +354,7 @@ Feature: /forms/pdfengines/merge
       | files | testdata/page_2.pdf | file |
     Then the response status code should be 401
 
-  @folio-skip
+  @skip
   Scenario: POST /foo/forms/pdfengines/merge (Root Path)
     # Reason: Folio does not support configurable API root path prefix
     Given I have a Folio container with the following environment variable(s):

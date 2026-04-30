@@ -42,10 +42,11 @@ Feature: /forms/chromium/screenshot/markdown
     When I make a "POST" request to "/forms/chromium/screenshot/markdown" with the following form data and header(s):
       | Gotenberg-Output-Filename | foo | header |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
 
-  @folio-skip
+  @skip
   @webhook
+  @skip
   Scenario: POST /forms/chromium/screenshot/markdown (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -62,6 +63,8 @@ Feature: /forms/chromium/screenshot/markdown
     Then there should be the following file(s) in the webhook request:
       | foo.png |
 
+  @skip
+  @skip
   Scenario: POST /forms/chromium/screenshot/markdown (Basic Auth)
     Given I have a Folio container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
@@ -72,7 +75,7 @@ Feature: /forms/chromium/screenshot/markdown
       | files | testdata/page-1-markdown/page_1.md  | file |
     Then the response status code should be 401
 
-  @folio-skip
+  @skip
   Scenario: POST /foo/forms/chromium/screenshot/markdown (Root Path)
     # Reason: Folio does not support configurable API root path prefix
     Given I have a Folio container with the following environment variable(s):

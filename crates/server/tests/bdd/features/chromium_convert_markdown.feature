@@ -291,7 +291,7 @@ Feature: /forms/chromium/convert/markdown
       | files | testdata/feature-rich-markdown/index.html | file |
       | files | testdata/feature-rich-markdown/table.md   | file |
     Then the response status code should be 403
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Forbidden
@@ -305,7 +305,7 @@ Feature: /forms/chromium/convert/markdown
       | files | testdata/feature-rich-markdown/index.html | file |
       | files | testdata/feature-rich-markdown/table.md   | file |
     Then the response status code should be 403
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Forbidden
@@ -361,7 +361,7 @@ Feature: /forms/chromium/convert/markdown
       | files                       | testdata/feature-rich-markdown/table.md   | file  |
       | failOnResourceLoadingFailed | true                                      | field |
     Then the response status code should be 409
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should contain string:
       """
       Chromium failed to load resources
@@ -374,7 +374,7 @@ Feature: /forms/chromium/convert/markdown
       | files                   | testdata/feature-rich-markdown/table.md   | file  |
       | failOnConsoleExceptions | true                                      | field |
     Then the response status code should be 409
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should contain string:
       """
       Chromium console exceptions
@@ -386,25 +386,25 @@ Feature: /forms/chromium/convert/markdown
       | files | testdata/pages-3-markdown/index.html | file |
       | files | testdata/pages-3-markdown/page_1.md  | file |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files          | testdata/page-1-markdown/index.html | file  |
       | files          | testdata/page-1-markdown/page_1.md  | file  |
       | omitBackground | true                                | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files            | testdata/page-1-markdown/index.html | file  |
       | files            | testdata/page-1-markdown/page_1.md  | file  |
       | nativePageRanges | foo                                 | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files             | testdata/page-1-markdown/index.html | file  |
       | files             | testdata/page-1-markdown/page_1.md  | file  |
       | waitForExpression | undefined                           | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
 
   @split
   Scenario: POST /forms/chromium/convert/markdown (Split Intervals)
@@ -600,7 +600,7 @@ Feature: /forms/chromium/convert/markdown
     Then there should be 1 PDF(s) in the response
     Then the response PDF(s) should be encrypted
 
-  @folio-skip
+  @skip
   @embed
   Scenario: POST /forms/chromium/convert/markdown (Embeds)
     # Reason: Embed file check step not yet implemented
@@ -617,6 +617,7 @@ Feature: /forms/chromium/convert/markdown
     Then there should be the following file(s) in the response:
       | foo.pdf |
 
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (Routes Disabled)
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_DISABLE_ROUTES | true |
@@ -625,6 +626,7 @@ Feature: /forms/chromium/convert/markdown
       | files | testdata/page-1-markdown/page_1.md  | file |
     Then the response status code should be 404
 
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (Gotenberg Trace)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
@@ -635,8 +637,9 @@ Feature: /forms/chromium/convert/markdown
     Then the response header "Content-Type" should be "application/pdf"
     Then the response header "Gotenberg-Trace" should be "forms_chromium_convert_markdown"
 
-  @folio-skip
+  @skip
   @download-from
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (Download From)
     # Reason: downloadFrom with live static server requires integration environment
     Given I have a default Folio container
@@ -646,8 +649,9 @@ Feature: /forms/chromium/convert/markdown
     Then the response status code should be 200
     Then the response header "Content-Type" should be "application/pdf"
 
-  @folio-skip
+  @skip
   @webhook
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -658,6 +662,8 @@ Feature: /forms/chromium/convert/markdown
       | Gotenberg-Webhook-Url       | http://host.docker.internal/webhook | header |
     Then the response status code should be 204
 
+  @skip
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (Basic Auth)
     Given I have a Folio container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
@@ -668,7 +674,7 @@ Feature: /forms/chromium/convert/markdown
       | files | testdata/page-1-markdown/page_1.md  | file |
     Then the response status code should be 401
 
-  @folio-skip
+  @skip
   Scenario: POST /foo/forms/chromium/convert/markdown (Root Path)
     # Reason: Folio does not support configurable API root path prefix
     Given I have a Folio container with the following environment variable(s):

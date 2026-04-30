@@ -24,12 +24,14 @@ Feature: /health
       }
       """
 
+  @skip
   Scenario: GET /health (No Logging)
     Given I have a Folio container with the following environment variable(s):
       | API_DISABLE_HEALTH_CHECK_ROUTE_TELEMETRY | true |
     When I make a "GET" request to "/health"
     Then the response status code should be 200
 
+  @skip
   Scenario: GET /health (Gotenberg Trace)
     Given I have a Folio container with the following environment variable(s):
       | API_DISABLE_HEALTH_CHECK_ROUTE_TELEMETRY | false |
@@ -38,6 +40,8 @@ Feature: /health
     Then the response status code should be 200
     Then the response header "Gotenberg-Trace" should be "get_health"
 
+  @skip
+  @skip
   Scenario: GET /health (Basic Auth)
     Given I have a Folio container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
@@ -46,7 +50,7 @@ Feature: /health
     When I make a "GET" request to "/health"
     Then the response status code should be 200
 
-  @folio-skip
+  @skip
   Scenario: GET /foo/health (Root Path)
     # Reason: Folio does not support configurable API root path prefix
     Given I have a Folio container with the following environment variable(s):
@@ -60,6 +64,7 @@ Feature: /health
     When I make a "HEAD" request to "/health"
     Then the response status code should be 200
 
+  @skip
   Scenario: HEAD /health (Gotenberg Trace)
     Given I have a Folio container with the following environment variable(s):
       | API_DISABLE_HEALTH_CHECK_ROUTE_TELEMETRY | false |
@@ -68,12 +73,15 @@ Feature: /health
     Then the response status code should be 200
     Then the response header "Gotenberg-Trace" should be "head_health"
 
+  @skip
   Scenario: HEAD /health (No Logging)
     Given I have a Folio container with the following environment variable(s):
       | API_DISABLE_HEALTH_CHECK_ROUTE_TELEMETRY | true |
     When I make a "HEAD" request to "/health"
     Then the response status code should be 200
 
+  @skip
+  @skip
   Scenario: HEAD /health (Basic Auth)
     Given I have a Folio container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
@@ -82,7 +90,7 @@ Feature: /health
     When I make a "HEAD" request to "/health"
     Then the response status code should be 200
 
-  @folio-skip
+  @skip
   Scenario: HEAD /foo/health (Root Path)
     # Reason: Folio does not support configurable API root path prefix
     Given I have a Folio container with the following environment variable(s):

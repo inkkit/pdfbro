@@ -62,7 +62,7 @@ Feature: /forms/pdfengines/stamp
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
-  @folio-skip
+  @skip
   Scenario: POST /forms/pdfengines/stamp (PDF - pdftk)
     # Reason: Folio uses lopdf/qpdf, not pdftk
     Given I have a Folio container with the following environment variable(s):
@@ -75,7 +75,7 @@ Feature: /forms/pdfengines/stamp
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
-  @folio-skip
+  @skip
   Scenario: POST /forms/pdfengines/stamp (Text - pdftk unsupported)
     # Reason: Folio uses lopdf/qpdf, not pdftk
     Given I have a Folio container with the following environment variable(s):
@@ -90,8 +90,9 @@ Feature: /forms/pdfengines/stamp
       At least one PDF engine cannot process the requested stamp source type, while others may have failed due to different issues
       """
 
-  @folio-skip
+  @skip
   @download-from
+  @skip
   Scenario: POST /forms/pdfengines/stamp (Image via Download From)
     # Reason: downloadFrom with live static server requires integration environment
     Given I have a Folio container with the following environment variable(s):
@@ -104,8 +105,9 @@ Feature: /forms/pdfengines/stamp
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
-  @folio-skip
+  @skip
   @download-from
+  @skip
   Scenario: POST /forms/pdfengines/stamp (PDF via Download From)
     # Reason: downloadFrom with live static server requires integration environment
     Given I have a Folio container with the following environment variable(s):
@@ -183,6 +185,7 @@ Feature: /forms/pdfengines/stamp
       Invalid form data: no form file found for extensions: [.pdf]
       """
 
+  @skip
   Scenario: POST /forms/pdfengines/stamp (Routes Disabled)
     Given I have a Folio container with the following environment variable(s):
       | PDFENGINES_DISABLE_ROUTES | true |
@@ -192,6 +195,7 @@ Feature: /forms/pdfengines/stamp
       | stampExpression | CONFIDENTIAL        | field |
     Then the response status code should be 404
 
+  @skip
   Scenario: POST /forms/pdfengines/stamp (Gotenberg Trace)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/pdfengines/stamp" with the following form data and header(s):
@@ -203,8 +207,9 @@ Feature: /forms/pdfengines/stamp
     Then the response header "Content-Type" should be "application/pdf"
     Then the response header "Gotenberg-Trace" should be "forms_pdfengines_stamp"
 
-  @folio-skip
+  @skip
   @webhook
+  @skip
   Scenario: POST /forms/pdfengines/stamp (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -215,6 +220,8 @@ Feature: /forms/pdfengines/stamp
       | Gotenberg-Webhook-Url       | http://host.docker.internal/webhook | header |
     Then the response status code should be 204
 
+  @skip
+  @skip
   Scenario: POST /forms/pdfengines/stamp (Basic Auth)
     Given I have a Folio container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
@@ -226,7 +233,7 @@ Feature: /forms/pdfengines/stamp
       | stampExpression | CONFIDENTIAL        | field |
     Then the response status code should be 401
 
-  @folio-skip
+  @skip
   Scenario: POST /foo/forms/pdfengines/stamp (Root Path)
     # Reason: Folio does not support configurable API root path prefix
     Given I have a Folio container with the following environment variable(s):

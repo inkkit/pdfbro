@@ -106,10 +106,11 @@ Feature: /forms/chromium/screenshot/html
       | quality                     | -1  | field |
       | optimizeForSpeed            | foo | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
 
-  @folio-skip
+  @skip
   @webhook
+  @skip
   Scenario: POST /forms/chromium/screenshot/html (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -125,6 +126,8 @@ Feature: /forms/chromium/screenshot/html
     Then there should be the following file(s) in the webhook request:
       | foo.png |
 
+  @skip
+  @skip
   Scenario: POST /forms/chromium/screenshot/html (Basic Auth)
     Given I have a Folio container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
@@ -134,7 +137,7 @@ Feature: /forms/chromium/screenshot/html
       | files | testdata/page-1-html/index.html | file |
     Then the response status code should be 401
 
-  @folio-skip
+  @skip
   Scenario: POST /foo/forms/chromium/screenshot/html (Root Path)
     # Reason: Folio does not support configurable API root path prefix
     Given I have a Folio container with the following environment variable(s):

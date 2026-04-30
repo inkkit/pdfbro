@@ -29,18 +29,22 @@ pub async fn health(State(state): State<AppState>) -> impl IntoResponse {
     state.metrics.update_engine_health(chromium_up, lo_up);
 
     let uptime_secs = state.started_at.elapsed().as_secs();
-    Json(json!({
+    let body = json!({
         "status": "up",
         "uptime_secs": uptime_secs,
         "chromium": if chromium_up { "up" } else { "down" },
         "libreoffice": if lo_up { "up" } else { "down" },
-    }))
+    });
+    (
+        [(header::CONTENT_TYPE, "application/json; charset=utf-8")],
+        Json(body),
+    )
 }
 
 /// Crate version, plain text.
 pub async fn version() -> impl IntoResponse {
     (
-        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        [(header::CONTENT_TYPE, "text/plain; charset=UTF-8")],
         env!("CARGO_PKG_VERSION"),
     )
 }
@@ -52,7 +56,7 @@ pub async fn metrics_handler() -> impl IntoResponse {
         .status(axum::http::StatusCode::OK)
         .header(
             header::CONTENT_TYPE,
-            "text/plain; version=0.0.4; charset=utf-8",
+            "text/plain; version=0.0.4; charset=utf-8; escaping=underscores",
         )
         .body(metrics)
         .unwrap()
@@ -91,9 +95,19 @@ GET /forms/batch/{id}/status
 GET /forms/batch/{id}/download
 ";
     (
-        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        [(header::CONTENT_TYPE, "text/html; charset=UTF-8")],
         ROUTES,
     )
+}
+
+/// `GET /favicon.ico` — returns 204 No Content (matching Gotenberg's convention).
+pub async fn favicon() -> impl IntoResponse {
+    axum::http::StatusCode::NO_CONTENT
+}
+
+/// `HEAD /health` — same as GET but with no body.
+pub async fn health_head() -> impl IntoResponse {
+    axum::http::StatusCode::OK
 }
 
 /// Debug endpoint - exposes server configuration and state.

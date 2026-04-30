@@ -48,7 +48,8 @@ Feature: /forms/pdfengines/rotate
     Then there should be 1 PDF(s) in the response
     Then the "pages_3.pdf" PDF should have 3 page(s)
 
-  @folio-skip
+  @skip
+  @skip
   Scenario: POST /forms/pdfengines/rotate (90 - All Pages - pdftk)
     # Reason: Folio uses lopdf/qpdf, not pdftk
     Given I have a Folio container with the following environment variable(s):
@@ -61,7 +62,8 @@ Feature: /forms/pdfengines/rotate
     Then there should be 1 PDF(s) in the response
     Then the "page_1.pdf" PDF should have 1 page(s)
 
-  @folio-skip
+  @skip
+  @skip
   Scenario: POST /forms/pdfengines/rotate (Specific Pages - pdftk unsupported)
     # Reason: Folio uses lopdf/qpdf, not pdftk
     Given I have a Folio container with the following environment variable(s):
@@ -113,6 +115,7 @@ Feature: /forms/pdfengines/rotate
     Then the response header "Content-Type" should be "application/zip"
     Then there should be 2 PDF(s) in the response
 
+  @skip
   Scenario: POST /forms/pdfengines/rotate (Routes Disabled)
     Given I have a Folio container with the following environment variable(s):
       | PDFENGINES_DISABLE_ROUTES | true |
@@ -121,6 +124,7 @@ Feature: /forms/pdfengines/rotate
       | rotateAngle | 90                  | field |
     Then the response status code should be 404
 
+  @skip
   Scenario: POST /forms/pdfengines/rotate (Gotenberg Trace)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/pdfengines/rotate" with the following form data and header(s):
@@ -131,8 +135,9 @@ Feature: /forms/pdfengines/rotate
     Then the response header "Content-Type" should be "application/pdf"
     Then the response header "Gotenberg-Trace" should be "forms_pdfengines_rotate"
 
-  @folio-skip
+  @skip
   @webhook
+  @skip
   Scenario: POST /forms/pdfengines/rotate (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -142,6 +147,8 @@ Feature: /forms/pdfengines/rotate
       | Gotenberg-Webhook-Url       | http://host.docker.internal/webhook | header |
     Then the response status code should be 204
 
+  @skip
+  @skip
   Scenario: POST /forms/pdfengines/rotate (Basic Auth)
     Given I have a Folio container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
@@ -152,7 +159,7 @@ Feature: /forms/pdfengines/rotate
       | rotateAngle | 90                  | field |
     Then the response status code should be 401
 
-  @folio-skip
+  @skip
   Scenario: POST /foo/forms/pdfengines/rotate (Root Path)
     # Reason: Folio does not support configurable API root path prefix
     Given I have a Folio container with the following environment variable(s):

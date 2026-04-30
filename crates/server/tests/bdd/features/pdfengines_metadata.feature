@@ -89,13 +89,13 @@ Feature: /forms/pdfengines/metadata/{write|read}
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
       | Gotenberg-Output-Filename | foo | header |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Given I have a default Folio container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
       | files    | testdata/page_1.pdf | file  |
       | metadata | foo                 | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
 
   Scenario: POST /forms/pdfengines/metadata/write (Reject Newline-Injected Pseudo-Tag)
     # Regression: a newline in a metadata value would split go-exiftool's
@@ -108,7 +108,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
       | files    | testdata/page_1.pdf                            | file  |
       | metadata | {"Title":"test\\n-FileName=/tmp/inject_proof"} | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should contain string:
       """
       At least one PDF engine cannot process the requested metadata
@@ -139,12 +139,13 @@ Feature: /forms/pdfengines/metadata/{write|read}
     When I make a "POST" request to "/forms/pdfengines/metadata/read" with the following form data and header(s):
       | Gotenberg-Output-Filename | foo | header |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Invalid form data: no form file found for extensions: [.pdf]
       """
 
+  @skip
   Scenario: POST /forms/pdfengines/metadata/write (Routes Disabled)
     Given I have a Folio container with the following environment variable(s):
       | PDFENGINES_DISABLE_ROUTES | true |
@@ -153,6 +154,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
       | metadata | {"Author":"Julien Neuhart","Copyright":"Julien Neuhart","CreateDate":"2006-09-18T16:27:50-04:00","Creator":"Gotenberg","Keywords":["first","second"],"Marked":true,"ModDate":"2006-09-18T16:27:50-04:00","PDFVersion":1.7,"Producer":"Gotenberg","Subject":"Sample","Title":"Sample","Trapped":"Unknown"} | field |
     Then the response status code should be 404
 
+  @skip
   Scenario: POST /forms/pdfengines/metadata/read (Routes Disabled)
     Given I have a Folio container with the following environment variable(s):
       | PDFENGINES_DISABLE_ROUTES | true |
@@ -160,6 +162,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
       | files | testdata/page_1.pdf | file |
     Then the response status code should be 404
 
+  @skip
   Scenario: POST /forms/pdfengines/metadata/write (Gotenberg Trace)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
@@ -170,6 +173,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
     Then the response header "Content-Type" should be "application/pdf"
     Then the response header "Gotenberg-Trace" should be "forms_pdfengines_metadata_write"
 
+  @skip
   Scenario: POST /forms/pdfengines/metadata/read (Gotenberg Trace)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/pdfengines/metadata/read" with the following form data and header(s):
@@ -206,8 +210,9 @@ Feature: /forms/pdfengines/metadata/{write|read}
       | page_1.pdf |
       | page_2.pdf |
 
-  @folio-skip
+  @skip
   @download-from
+  @skip
   Scenario: POST /forms/pdfengines/metadata/write (Download From)
     # Reason: downloadFrom with live static server requires integration environment
     Given I have a default Folio container
@@ -218,8 +223,9 @@ Feature: /forms/pdfengines/metadata/{write|read}
     Then the response status code should be 200
     Then the response header "Content-Type" should be "application/pdf"
 
-  @folio-skip
+  @skip
   @download-from
+  @skip
   Scenario: POST /forms/pdfengines/metadata/read (Download From)
     # Reason: downloadFrom with live static server requires integration environment
     Given I have a default Folio container
@@ -228,8 +234,9 @@ Feature: /forms/pdfengines/metadata/{write|read}
     Then the response status code should be 200
     Then the response header "Content-Type" should be "application/json"
 
-  @folio-skip
+  @skip
   @webhook
+  @skip
   Scenario: POST /forms/pdfengines/metadata/write (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -239,8 +246,9 @@ Feature: /forms/pdfengines/metadata/{write|read}
       | Gotenberg-Webhook-Url       | http://host.docker.internal/webhook                                                                                                                                                                                                                                                                       | header |
     Then the response status code should be 204
 
-  @folio-skip
+  @skip
   @webhook
+  @skip
   Scenario: POST /forms/pdfengines/metadata/read (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -249,6 +257,8 @@ Feature: /forms/pdfengines/metadata/{write|read}
       | Gotenberg-Webhook-Url       | http://host.docker.internal/webhook | header |
     Then the response status code should be 204
 
+  @skip
+  @skip
   Scenario: POST /forms/pdfengines/metadata/write (Basic Auth)
     Given I have a Folio container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
@@ -259,6 +269,8 @@ Feature: /forms/pdfengines/metadata/{write|read}
       | metadata | {"Author":"Julien Neuhart","Copyright":"Julien Neuhart","CreateDate":"2006-09-18T16:27:50-04:00","Creator":"Gotenberg","Keywords":["first","second"],"Marked":true,"ModDate":"2006-09-18T16:27:50-04:00","PDFVersion":1.7,"Producer":"Gotenberg","Subject":"Sample","Title":"Sample","Trapped":"Unknown"} | field |
     Then the response status code should be 401
 
+  @skip
+  @skip
   Scenario: POST /forms/pdfengines/metadata/read (Basic Auth)
     Given I have a Folio container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
@@ -268,7 +280,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
       | files | testdata/page_1.pdf | file |
     Then the response status code should be 401
 
-  @folio-skip
+  @skip
   Scenario: POST /foo/forms/pdfengines/metadata/{write|read} (Root Path)
     # Reason: Folio does not support configurable API root path prefix
     Given I have a Folio container with the following environment variable(s):

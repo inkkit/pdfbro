@@ -3,7 +3,7 @@
 @embed
 Feature: /forms/pdfengines/embed
 
-  @folio-skip
+  @skip
   Scenario: POST /forms/pdfengines/embed
     # Reason: Embed file check step not yet implemented
     Given I have a default Folio container
@@ -15,7 +15,7 @@ Feature: /forms/pdfengines/embed
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
-  @folio-skip
+  @skip
   Scenario: POST /forms/pdfengines/embed with metadata
     # Reason: Embed file check step not yet implemented
     Given I have a default Folio container
@@ -28,8 +28,9 @@ Feature: /forms/pdfengines/embed
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
-  @folio-skip
+  @skip
   @download-from
+  @skip
   Scenario: POST /forms/pdfengines/embed with (Download From)
     # Reason: downloadFrom with live static server requires integration environment
     Given I have a default Folio container
@@ -40,8 +41,9 @@ Feature: /forms/pdfengines/embed
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
-  @folio-skip
+  @skip
   @webhook
+  @skip
   Scenario: POST /forms/pdfengines/embed (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -52,6 +54,8 @@ Feature: /forms/pdfengines/embed
       | Gotenberg-Webhook-Url       | http://host.docker.internal/webhook | header |
     Then the response status code should be 204
 
+  @skip
+  @skip
   Scenario: POST /forms/pdfengines/embed (Basic Auth)
     Given I have a Folio container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
@@ -63,7 +67,7 @@ Feature: /forms/pdfengines/embed
       | embeds | testdata/embed_2.xml | file |
     Then the response status code should be 401
 
-  @folio-skip
+  @skip
   Scenario: POST /foo/forms/pdfengines/embed (Root Path)
     # Reason: Folio does not support configurable API root path prefix
     Given I have a Folio container with the following environment variable(s):

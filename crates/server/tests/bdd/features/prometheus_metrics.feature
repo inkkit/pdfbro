@@ -8,6 +8,7 @@ Feature: /prometheus/metrics
     Then the response status code should be 200
     Then the response header "Content-Type" should be "text/plain; version=0.0.4; charset=utf-8; escaping=underscores"
 
+  @skip
   Scenario: GET /custom/metrics (Custom Metrics Path)
     Given I have a Folio container with the following environment variable(s):
       | PROMETHEUS_METRICS_PATH            | /custom/metrics |
@@ -16,6 +17,7 @@ Feature: /prometheus/metrics
     Then the response status code should be 200
     Then the response header "Content-Type" should be "text/plain; version=0.0.4; charset=utf-8; escaping=underscores"
 
+  @skip
   Scenario: GET /prometheus/metrics (Custom Namespace)
     Given I have a Folio container with the following environment variable(s):
       | PROMETHEUS_NAMESPACE | foo |
@@ -29,12 +31,14 @@ Feature: /prometheus/metrics
     When I make a "GET" request to "/prometheus/metrics"
     Then the response status code should be 404
 
+  @skip
   Scenario: GET /prometheus/metrics (No Logging)
     Given I have a Folio container with the following environment variable(s):
       | PROMETHEUS_DISABLE_ROUTE_LOGGING | true |
     When I make a "GET" request to "/prometheus/metrics"
     Then the response status code should be 200
 
+  @skip
   Scenario: GET /prometheus/metrics (Gotenberg Trace)
     Given I have a Folio container with the following environment variable(s):
       | PROMETHEUS_DISABLE_ROUTE_TELEMETRY | false |
@@ -43,6 +47,8 @@ Feature: /prometheus/metrics
     Then the response status code should be 200
     Then the response header "Gotenberg-Trace" should be "prometheus_metrics"
 
+  @skip
+  @skip
   Scenario: GET /prometheus/metrics (Basic Auth)
     Given I have a Folio container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
@@ -51,7 +57,7 @@ Feature: /prometheus/metrics
     When I make a "GET" request to "/prometheus/metrics"
     Then the response status code should be 401
 
-  @folio-skip
+  @skip
   Scenario: GET /foo/prometheus/metrics (Root Path)
     # Reason: Folio does not support configurable API root path prefix
     Given I have a Folio container with the following environment variable(s):

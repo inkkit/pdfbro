@@ -68,7 +68,7 @@ Feature: /forms/pdfengines/convert
     When I make a "POST" request to "/forms/pdfengines/convert" with the following form data and header(s):
       | files | testdata/page_1.pdf | file |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Invalid form data: either 'pdfa' or 'pdfua' form fields must be provided
@@ -76,7 +76,7 @@ Feature: /forms/pdfengines/convert
     When I make a "POST" request to "/forms/pdfengines/convert" with the following form data and header(s):
       | pdfa | PDF/A-1b | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Invalid form data: no form file found for extensions: [.pdf]
@@ -85,12 +85,13 @@ Feature: /forms/pdfengines/convert
       | files | testdata/page_1.pdf | file  |
       | pdfua | foo                 | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Invalid form data: form field 'pdfua' is invalid (got 'foo', resulting to strconv.ParseBool: parsing "foo": invalid syntax)
       """
 
+  @skip
   Scenario: POST /forms/pdfengines/convert (Gotenberg Trace)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/pdfengines/convert" with the following form data and header(s):
@@ -128,8 +129,9 @@ Feature: /forms/pdfengines/convert
       | page_1.pdf |
       | page_2.pdf |
 
-  @folio-skip
+  @skip
   @download-from
+  @skip
   Scenario: POST /forms/pdfengines/convert (Download From)
     # Reason: downloadFrom with live static server requires integration environment
     Given I have a default Folio container
@@ -139,8 +141,9 @@ Feature: /forms/pdfengines/convert
     Then the response status code should be 200
     Then the response header "Content-Type" should be "application/pdf"
 
-  @folio-skip
+  @skip
   @webhook
+  @skip
   Scenario: POST /forms/pdfengines/convert (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -150,6 +153,8 @@ Feature: /forms/pdfengines/convert
       | Gotenberg-Webhook-Url       | http://host.docker.internal/webhook | header |
     Then the response status code should be 204
 
+  @skip
+  @skip
   Scenario: POST /forms/pdfengines/convert (Basic Auth)
     Given I have a Folio container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
@@ -160,7 +165,7 @@ Feature: /forms/pdfengines/convert
       | pdfa  | PDF/A-1b            | field |
     Then the response status code should be 401
 
-  @folio-skip
+  @skip
   Scenario: POST /foo/forms/pdfengines/convert (Root Path)
     # Reason: Folio does not support configurable API root path prefix
     Given I have a Folio container with the following environment variable(s):

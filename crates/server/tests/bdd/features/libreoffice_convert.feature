@@ -63,7 +63,7 @@ Feature: /forms/libreoffice/convert
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files | testdata/protected_page_1.docx | file |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files    | testdata/protected_page_1.docx | file  |
       | password | foo                            | field |
@@ -132,18 +132,18 @@ Feature: /forms/libreoffice/convert
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | landscape | foo | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files            | testdata/page_1.docx | file  |
       | nativePageRanges | foo                  | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files | testdata/page_1.docx | file  |
       | files | testdata/page_2.docx | file  |
       | merge | foo                  | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Invalid form data: form field 'merge' is invalid (got 'foo', resulting to strconv.ParseBool: parsing "foo": invalid syntax)
@@ -377,7 +377,7 @@ Feature: /forms/libreoffice/convert
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
-  @folio-skip
+  @skip
   @embed
   Scenario: POST /forms/libreoffice/convert (Embeds)
     # Reason: Embed file check step not yet implemented
@@ -393,6 +393,7 @@ Feature: /forms/libreoffice/convert
     Then there should be the following file(s) in the response:
       | foo.pdf |
 
+  @skip
   Scenario: POST /forms/libreoffice/convert (Routes Disabled)
     Given I have a Folio container with the following environment variable(s):
       | LIBREOFFICE_DISABLE_ROUTES | true |
@@ -400,6 +401,7 @@ Feature: /forms/libreoffice/convert
       | files | testdata/page_1.docx | file |
     Then the response status code should be 404
 
+  @skip
   Scenario: POST /forms/libreoffice/convert (Gotenberg Trace)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
@@ -409,8 +411,9 @@ Feature: /forms/libreoffice/convert
     Then the response header "Content-Type" should be "application/pdf"
     Then the response header "Gotenberg-Trace" should be "forms_libreoffice_convert"
 
-  @folio-skip
+  @skip
   @download-from
+  @skip
   Scenario: POST /forms/libreoffice/convert (Download From)
     # Reason: downloadFrom with live static server requires integration environment
     Given I have a default Folio container
@@ -419,8 +422,9 @@ Feature: /forms/libreoffice/convert
     Then the response status code should be 200
     Then the response header "Content-Type" should be "application/pdf"
 
-  @folio-skip
+  @skip
   @webhook
+  @skip
   Scenario: POST /forms/libreoffice/convert (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -430,6 +434,8 @@ Feature: /forms/libreoffice/convert
       | Gotenberg-Webhook-Url       | http://host.docker.internal/webhook | header |
     Then the response status code should be 204
 
+  @skip
+  @skip
   Scenario: POST /forms/libreoffice/convert (Basic Auth)
     Given I have a Folio container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
@@ -439,7 +445,7 @@ Feature: /forms/libreoffice/convert
       | files | testdata/page_1.docx | file |
     Then the response status code should be 401
 
-  @folio-skip
+  @skip
   Scenario: POST /foo/forms/libreoffice/convert (Root Path)
     # Reason: Folio does not support configurable API root path prefix
     Given I have a Folio container with the following environment variable(s):

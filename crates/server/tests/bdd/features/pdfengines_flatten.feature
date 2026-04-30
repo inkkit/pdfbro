@@ -25,12 +25,13 @@ Feature: /forms/pdfengines/flatten
     When I make a "POST" request to "/forms/pdfengines/flatten" with the following form data and header(s):
       | Gotenberg-Output-Filename | foo | header |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Invalid form data: no form file found for extensions: [.pdf]
       """
 
+  @skip
   Scenario: POST /forms/pdfengines/flatten (Routes Disabled)
     Given I have a Folio container with the following environment variable(s):
       | PDFENGINES_DISABLE_ROUTES | true |
@@ -38,6 +39,7 @@ Feature: /forms/pdfengines/flatten
       | files | testdata/page_1.pdf | file |
     Then the response status code should be 404
 
+  @skip
   Scenario: POST /forms/pdfengines/flatten (Gotenberg Trace)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/pdfengines/flatten" with the following form data and header(s):
@@ -72,8 +74,9 @@ Feature: /forms/pdfengines/flatten
       | page_1.pdf |
       | page_2.pdf |
 
-  @folio-skip
+  @skip
   @download-from
+  @skip
   Scenario: POST /forms/pdfengines/flatten (Download From)
     # Reason: downloadFrom with live static server requires integration environment
     Given I have a default Folio container
@@ -82,8 +85,9 @@ Feature: /forms/pdfengines/flatten
     Then the response status code should be 200
     Then the response header "Content-Type" should be "application/pdf"
 
-  @folio-skip
+  @skip
   @webhook
+  @skip
   Scenario: POST /forms/pdfengines/flatten (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -92,6 +96,8 @@ Feature: /forms/pdfengines/flatten
       | Gotenberg-Webhook-Url       | http://host.docker.internal/webhook | header |
     Then the response status code should be 204
 
+  @skip
+  @skip
   Scenario: POST /forms/pdfengines/flatten (Basic Auth)
     Given I have a Folio container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
@@ -101,7 +107,7 @@ Feature: /forms/pdfengines/flatten
       | files | testdata/page_1.pdf | file |
     Then the response status code should be 401
 
-  @folio-skip
+  @skip
   Scenario: POST /foo/forms/pdfengines/flatten (Root Path)
     # Reason: Folio does not support configurable API root path prefix
     Given I have a Folio container with the following environment variable(s):

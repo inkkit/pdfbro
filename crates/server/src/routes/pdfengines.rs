@@ -5,12 +5,12 @@ use std::collections::{BTreeMap, HashMap};
 use axum::extract::{Multipart, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use engine::PageRanges;
+use engine::{EngineError, PageRanges};
 use engine::pdfops::{self, Metadata, SplitMode};
 
 use crate::error::{ApiError, ApiResult};
 use crate::multipart::{FormFields, UploadedFile};
-use crate::routes::util::{build_zip, pdf_response, zip_response};
+use crate::routes::util::{build_zip, output_filename, pdf_response, zip_response};
 use crate::state::AppState;
 use engine::Bookmark;
 use engine::PdfAProfile;
@@ -464,14 +464,21 @@ pub async fn pdfengines_rotate(
     }
     let bytes = read_one(files[0]).await?;
 
-    let angle_str = form.map.get("rotate").ok_or(ApiError::MissingField("rotate"))?;
+    // Gotenberg uses `rotateAngle`; accept that as well as the shorter `rotate` alias.
+    let angle_str = form.map.get("rotateAngle")
+        .or_else(|| form.map.get("rotate"))
+        .ok_or(ApiError::MissingField("rotateAngle"))?;
     let angle: u16 = angle_str.parse().map_err(|e| ApiError::InvalidField {
-        field: "rotate",
+        field: "rotateAngle",
         message: format!("expected integer angle: {e}"),
     })?;
 
-    // Default to all pages ("1-" is open-ended, covers every page after clamping).
-    let pages = PageRanges::parse("1-").map_err(|e| ApiError::Internal(e.to_string()))?;
+    // Gotenberg uses `rotatePages` for page selection; default to all pages.
+    let pages = if let Some(rp) = form.map.get("rotatePages") {
+        PageRanges::parse(rp).map_err(|e| ApiError::Engine(EngineError::InvalidPageRange(e.to_string())))?
+    } else {
+        PageRanges::parse("1-").map_err(|e| ApiError::Internal(e.to_string()))?
+    };
 
     if let Some(resp) = crate::webhook::maybe_spawn_webhook(
         &headers,
@@ -587,18 +594,6 @@ async fn read_one(file: &UploadedFile) -> ApiResult<Vec<u8>> {
     tokio::fs::read(&file.path)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))
-}
-
-/// Extract `Gotenberg-Output-Filename` from HTTP headers.
-/// Strips any trailing `.pdf` and re-adds it.
-fn output_filename(headers: &HeaderMap, default: &str) -> String {
-    let raw = headers
-        .get("Gotenberg-Output-Filename")
-        .and_then(|v| v.to_str().ok());
-    match raw {
-        Some(s) => format!("{}.pdf", s.trim_end_matches(".pdf")),
-        None => format!("{}.pdf", default.trim_end_matches(".pdf")),
-    }
 }
 
 async fn acquire_permit(state: &AppState) -> ApiResult<tokio::sync::OwnedSemaphorePermit> {
@@ -798,14 +793,26 @@ pub async fn pdfengines_watermark(
     }
     let pdf_bytes = read_one(files[0]).await?;
 
-    // Parse watermark text
-    let text = form.map.get("watermark")
+    // Gotenberg API: watermarkSource=text, watermarkExpression=TEXT
+    // Legacy Folio API: watermark=TEXT or text=TEXT
+    let source = form.map.get("watermarkSource").map(|s| s.as_str()).unwrap_or("text");
+    if source == "pdf" {
+        let has_watermark_file = form.files.iter().any(|f| f.field_name == "watermark");
+        if !has_watermark_file {
+            return Err(ApiError::InvalidField {
+                field: "watermarkSource",
+                message: "watermarkSource=pdf requires a 'watermark' file upload".to_string(),
+            });
+        }
+    }
+    let text = form.map.get("watermarkExpression")
+        .or_else(|| form.map.get("watermark"))
         .or_else(|| form.map.get("text"))
-        .ok_or(ApiError::MissingField("watermark"))?;
+        .ok_or(ApiError::MissingField("watermarkExpression"))?;
 
     let opts = parse_watermark_options(&form.map, WatermarkKind::Text {
         text: text.clone(),
-        font: None, // Use default Helvetica
+        font: None,
         font_size: 48.0,
         color: [0.5, 0.5, 0.5, 0.5],
     })?;
@@ -827,11 +834,7 @@ pub async fn pdfengines_watermark(
         .map_err(|e| ApiError::Internal(e.to_string()))?
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let filename = form
-        .map
-        .get("Gotenberg-Output-Filename")
-        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| files[0].filename.clone());
+    let filename = output_filename(&headers, &files[0].filename.trim_end_matches(".pdf"));
 
     Ok(pdf_response(output, &filename))
 }
@@ -854,14 +857,26 @@ pub async fn pdfengines_stamp(
     }
     let pdf_bytes = read_one(files[0]).await?;
 
-    // Parse stamp text
-    let text = form.map.get("stamp")
+    // Gotenberg API: stampSource=text, stampExpression=TEXT
+    // Legacy Folio API: stamp=TEXT or text=TEXT
+    let source = form.map.get("stampSource").map(|s| s.as_str()).unwrap_or("text");
+    if source == "pdf" {
+        let has_stamp_file = form.files.iter().any(|f| f.field_name == "stamp");
+        if !has_stamp_file {
+            return Err(ApiError::InvalidField {
+                field: "stampSource",
+                message: "stampSource=pdf requires a 'stamp' file upload".to_string(),
+            });
+        }
+    }
+    let text = form.map.get("stampExpression")
+        .or_else(|| form.map.get("stamp"))
         .or_else(|| form.map.get("text"))
-        .ok_or(ApiError::MissingField("stamp"))?;
+        .ok_or(ApiError::MissingField("stampExpression"))?;
 
     let opts = parse_watermark_options(&form.map, WatermarkKind::Text {
         text: text.clone(),
-        font: None, // Use default Helvetica
+        font: None,
         font_size: 48.0,
         color: [0.5, 0.5, 0.5, 0.5],
     })?;

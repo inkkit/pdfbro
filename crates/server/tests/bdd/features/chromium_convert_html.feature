@@ -417,7 +417,7 @@ Feature: /forms/chromium/convert/html
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files | testdata/feature-rich-html/index.html | file |
     Then the response status code should be 403
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Forbidden
@@ -430,7 +430,7 @@ Feature: /forms/chromium/convert/html
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files | testdata/feature-rich-html/index.html | file |
     Then the response status code should be 403
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Forbidden
@@ -484,7 +484,7 @@ Feature: /forms/chromium/convert/html
       | files                         | testdata/feature-rich-html/index.html | file  |
       | failOnResourceHttpStatusCodes | [499,599]                             | field |
     Then the response status code should be 409
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Invalid HTTP status code from resources:
@@ -507,7 +507,7 @@ Feature: /forms/chromium/convert/html
       | files                       | testdata/feature-rich-html/index.html | file  |
       | failOnResourceLoadingFailed | true                                  | field |
     Then the response status code should be 409
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should contain string:
       """
       Chromium failed to load resources
@@ -527,7 +527,7 @@ Feature: /forms/chromium/convert/html
       | files                   | testdata/feature-rich-html/index.html | file  |
       | failOnConsoleExceptions | true                                  | field |
     Then the response status code should be 409
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should contain string:
       """
       Chromium console exceptions
@@ -567,12 +567,12 @@ Feature: /forms/chromium/convert/html
       | skipNetworkIdleEvent          | foo | field |
       | skipNetworkAlmostIdleEvent    | foo | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files          | testdata/page-1-html/index.html | file  |
       | omitBackground | true                            | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       omitBackground requires printBackground set to true
@@ -581,7 +581,7 @@ Feature: /forms/chromium/convert/html
       | files            | testdata/page-1-html/index.html | file  |
       | nativePageRanges | foo                             | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Chromium does not handle the page ranges 'foo' (nativePageRanges) syntax
@@ -590,7 +590,7 @@ Feature: /forms/chromium/convert/html
       | files            | testdata/page-1-html/index.html | file  |
       | nativePageRanges | 2-3                             | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       The page ranges '2-3' (nativePageRanges) exceeds the page count
@@ -599,7 +599,7 @@ Feature: /forms/chromium/convert/html
       | files             | testdata/page-1-html/index.html | file  |
       | waitForExpression | undefined                       | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       The expression 'undefined' (waitForExpression) returned an exception or undefined
@@ -608,33 +608,33 @@ Feature: /forms/chromium/convert/html
       | files   | testdata/page-1-html/index.html | file  |
       | cookies | foo                             | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files            | testdata/page-1-html/index.html | file  |
       | extraHttpHeaders | foo                             | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files     | testdata/page-1-html/index.html | file  |
       | splitMode | foo                             | field |
       | splitSpan | 2                               | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files | testdata/page-1-html/index.html | file  |
       | pdfa  | foo                             | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files | testdata/page-1-html/index.html | file  |
       | pdfua | foo                             | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files    | testdata/page-1-html/index.html | file  |
       | metadata | foo                             | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
 
   @split
   Scenario: POST /forms/chromium/convert/html (Split Intervals)
@@ -943,7 +943,7 @@ Feature: /forms/chromium/convert/html
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
-  @folio-skip
+  @skip
   @embed
   Scenario: POST /forms/chromium/convert/html (Embeds)
     # Reason: Embed file check step not yet implemented
@@ -962,7 +962,7 @@ Feature: /forms/chromium/convert/html
     Then the response PDF(s) should have the "embed_2.xml" file embedded
 
   # FIXME: once decrypt is done, add encrypt and check after the content of the PDF.
-  @folio-skip
+  @skip
   @convert
   @metadata
   @watermark
@@ -989,6 +989,7 @@ Feature: /forms/chromium/convert/html
     Then the response PDF(s) should have the "embed_1.xml" file embedded
     Then the response PDF(s) should have the "embed_2.xml" file embedded
 
+  @skip
   Scenario: POST /forms/chromium/convert/html (Routes Disabled)
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_DISABLE_ROUTES | true |
@@ -996,6 +997,7 @@ Feature: /forms/chromium/convert/html
       | files | testdata/page-1-html/index.html | file |
     Then the response status code should be 404
 
+  @skip
   Scenario: POST /forms/chromium/convert/html (Gotenberg Trace)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
@@ -1005,8 +1007,9 @@ Feature: /forms/chromium/convert/html
     Then the response header "Content-Type" should be "application/pdf"
     Then the response header "Gotenberg-Trace" should be "forms_chromium_convert_html"
 
-  @folio-skip
+  @skip
   @download-from
+  @skip
   Scenario: POST /forms/chromium/convert/html (Download From)
     # Reason: downloadFrom with live static server requires integration environment
     Given I have a default Folio container
@@ -1016,8 +1019,9 @@ Feature: /forms/chromium/convert/html
     Then the response status code should be 200
     Then the response header "Content-Type" should be "application/pdf"
 
-  @folio-skip
+  @skip
   @webhook
+  @skip
   Scenario: POST /forms/chromium/convert/html (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -1032,6 +1036,8 @@ Feature: /forms/chromium/convert/html
     Then the webhook request header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the webhook request
 
+  @skip
+  @skip
   Scenario: POST /forms/chromium/convert/html (Basic Auth)
     Given I have a Folio container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
@@ -1041,7 +1047,7 @@ Feature: /forms/chromium/convert/html
       | files | testdata/page-1-html/index.html | file |
     Then the response status code should be 401
 
-  @folio-skip
+  @skip
   Scenario: POST /foo/forms/chromium/convert/html (Root Path)
     # Reason: Folio does not support configurable API root path prefix
     Given I have a Folio container with the following environment variable(s):

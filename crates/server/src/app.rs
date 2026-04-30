@@ -231,8 +231,10 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
     let mut untimed = Router::new()
         .route("/", get(health::root))
         .route("/health", get(health::health))
+        .route("/health", axum::routing::head(health::health_head))
         .route("/version", get(health::version))
-        .route("/prometheus/metrics", get(health::metrics_handler));
+        .route("/prometheus/metrics", get(health::metrics_handler))
+        .route("/favicon.ico", get(health::favicon));
 
     // Conditionally add debug route
     if config.api_enable_debug_route {

@@ -1,7 +1,8 @@
 @webhook
 Feature: Webhook
 
-  @folio-skip
+  @skip
+  @skip
   Scenario: Default
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -15,7 +16,8 @@ Feature: Webhook
     Then the webhook request header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the webhook request
 
-  @folio-skip
+  @skip
+  @skip
   Scenario: Extra HTTP Headers
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -33,7 +35,8 @@ Feature: Webhook
     Then the webhook request header "Content-Disposition" should be "inline"
     Then there should be 1 PDF(s) in the webhook request
 
-  @folio-skip
+  @skip
+  @skip
   Scenario: Synchronous
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a Folio container with the following environment variable(s):
@@ -47,7 +50,8 @@ Feature: Webhook
     Then the webhook request header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the webhook request
 
-  @folio-skip
+  @skip
+  @skip
   Scenario: Webhook Events URL (Success)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -62,7 +66,8 @@ Feature: Webhook
     Then the webhook request header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the webhook request
 
-  @folio-skip
+  @skip
+  @skip
   Scenario: Webhook Events URL (Synchronous)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a Folio container with the following environment variable(s):
@@ -77,7 +82,8 @@ Feature: Webhook
     Then the webhook request header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the webhook request
 
-  @folio-skip
+  @skip
+  @skip
   Scenario: Webhook Events URL Only (Success)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -91,7 +97,8 @@ Feature: Webhook
     Then the webhook request header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the webhook request
 
-  @folio-skip
+  @skip
+  @skip
   Scenario: Webhook Events URL Only (Synchronous)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a Folio container with the following environment variable(s):

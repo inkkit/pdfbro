@@ -1,14 +1,14 @@
 @debug
 Feature: /debug
 
-  @folio-skip
+  @skip
   Scenario: GET /debug (Disabled)
     # Reason: Folio has no pprof or Go debug endpoints
     Given I have a default Folio container
     When I make a "GET" request to "/debug"
     Then the response status code should be 404
 
-  @folio-skip
+  @skip
   Scenario: GET /debug (Enabled)
     # Reason: Folio has no pprof or Go debug endpoints
     Given I have a Folio container with the following environment variable(s):
@@ -17,7 +17,7 @@ Feature: /debug
     Then the response status code should be 200
     Then the response header "Content-Type" should be "application/json"
 
-  @folio-skip
+  @skip
   Scenario: GET /debug (Environment based timezone)
     # Reason: Folio has no pprof or Go debug endpoints
     Given I have a Folio container with the following environment variable(s):
@@ -26,7 +26,7 @@ Feature: /debug
     When I make a "GET" request to "/debug"
     Then the response status code should be 200
 
-  @folio-skip
+  @skip
   Scenario: GET /debug (No Debug Data)
     # Reason: Folio has no pprof or Go debug endpoints
     Given I have a Folio container with the following environment variable(s):
@@ -35,7 +35,7 @@ Feature: /debug
     When I make a "GET" request to "/debug"
     Then the response status code should be 200
 
-  @folio-skip
+  @skip
   Scenario: GET /debug (Gotenberg Trace)
     # Reason: Folio has no pprof or Go debug endpoints
     Given I have a Folio container with the following environment variable(s):
@@ -46,7 +46,8 @@ Feature: /debug
     Then the response status code should be 200
     Then the response header "Gotenberg-Trace" should be "debug"
 
-  @folio-skip
+  @skip
+  @skip
   Scenario: GET /debug (Basic Auth)
     # Reason: Folio has no pprof or Go debug endpoints
     Given I have a Folio container with the following environment variable(s):
@@ -57,7 +58,7 @@ Feature: /debug
     When I make a "GET" request to "/debug"
     Then the response status code should be 401
 
-  @folio-skip
+  @skip
   Scenario: GET /foo/debug (Root Path)
     # Reason: Folio does not support configurable API root path prefix
     Given I have a Folio container with the following environment variable(s):

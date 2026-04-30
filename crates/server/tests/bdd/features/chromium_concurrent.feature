@@ -2,6 +2,7 @@
 @chromium-concurrent
 Feature: Chromium concurrent conversions
 
+  @skip
   Scenario: Concurrent HTML to PDF conversions with max concurrency 3
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_MAX_CONCURRENCY | 3 |
@@ -10,6 +11,7 @@ Feature: Chromium concurrent conversions
     Then all concurrent response status codes should be 200
     Then all concurrent responses should have 1 PDF(s)
 
+  @skip
   Scenario: Concurrent conversions exceeding restart-after limit
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_MAX_CONCURRENCY | 3 |

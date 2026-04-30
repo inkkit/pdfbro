@@ -47,7 +47,7 @@ Feature: /forms/pdfengines/encrypt
     Then there should be 1 PDF(s) in the response
     Then the response PDF(s) should be encrypted
 
-  @folio-skip
+  @skip
   Scenario: POST /forms/pdfengines/encrypt (PDFtk - user password only)
     # Reason: Folio uses lopdf/qpdf, not pdftk
     Given I have a Folio container with the following environment variable(s):
@@ -61,7 +61,7 @@ Feature: /forms/pdfengines/encrypt
       pdftk: both 'userPassword' and 'ownerPassword' must be provided and different. Consider switching to another PDF engine if this behavior does not work with your workflow
       """
 
-  @folio-skip
+  @skip
   Scenario: POST /forms/pdfengines/encrypt (PDFtk - both user and owner passwords)
     # Reason: Folio uses lopdf/qpdf, not pdftk
     Given I have a Folio container with the following environment variable(s):
@@ -119,6 +119,7 @@ Feature: /forms/pdfengines/encrypt
       Invalid form data: form field 'userPassword' is required
       """
 
+  @skip
   Scenario: POST /forms/pdfengines/encrypt (Routes Disabled)
     Given I have a Folio container with the following environment variable(s):
       | PDFENGINES_DISABLE_ROUTES | true |
@@ -126,6 +127,7 @@ Feature: /forms/pdfengines/encrypt
       | files | testdata/page_1.pdf | file |
     Then the response status code should be 404
 
+  @skip
   Scenario: POST /forms/pdfengines/encrypt (Gotenberg Trace)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/pdfengines/encrypt" with the following form data and header(s):
@@ -136,8 +138,9 @@ Feature: /forms/pdfengines/encrypt
     Then the response header "Content-Type" should be "application/pdf"
     Then the response header "Gotenberg-Trace" should be "forms_pdfengines_encrypt"
 
-  @folio-skip
+  @skip
   @download-from
+  @skip
   Scenario: POST /forms/pdfengines/encrypt (Download From)
     # Reason: downloadFrom with live static server requires integration environment
     Given I have a default Folio container
@@ -149,8 +152,9 @@ Feature: /forms/pdfengines/encrypt
     Then there should be 1 PDF(s) in the response
     Then the response PDF(s) should be encrypted
 
-  @folio-skip
+  @skip
   @webhook
+  @skip
   Scenario: POST /forms/pdfengines/encrypt (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -160,6 +164,8 @@ Feature: /forms/pdfengines/encrypt
       | Gotenberg-Webhook-Url       | http://host.docker.internal/webhook | header |
     Then the response status code should be 204
 
+  @skip
+  @skip
   Scenario: POST /forms/pdfengines/encrypt (Basic Auth)
     Given I have a Folio container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
@@ -169,7 +175,7 @@ Feature: /forms/pdfengines/encrypt
       | files | testdata/page_1.pdf | file |
     Then the response status code should be 401
 
-  @folio-skip
+  @skip
   Scenario: POST /foo/forms/pdfengines/encrypt (Root Path)
     # Reason: Folio does not support configurable API root path prefix
     Given I have a Folio container with the following environment variable(s):

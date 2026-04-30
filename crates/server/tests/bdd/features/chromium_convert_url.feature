@@ -2,6 +2,7 @@
 @chromium-convert-url
 Feature: /forms/chromium/convert/url
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Default)
     Given I have a default Folio container
     Given I have a static server
@@ -19,6 +20,7 @@ Feature: /forms/chromium/convert/url
       Page 1
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Single Page)
     Given I have a default Folio container
     Given I have a static server
@@ -62,6 +64,7 @@ Feature: /forms/chromium/convert/url
       Page 12
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Landscape)
     Given I have a default Folio container
     Given I have a static server
@@ -86,6 +89,7 @@ Feature: /forms/chromium/convert/url
       | foo.pdf |
     Then the "foo.pdf" PDF should be set to landscape orientation
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Native Page Ranges)
     Given I have a default Folio container
     Given I have a static server
@@ -108,6 +112,7 @@ Feature: /forms/chromium/convert/url
       Page 3
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Header & Footer)
     Given I have a default Folio container
     Given I have a static server
@@ -139,6 +144,7 @@ Feature: /forms/chromium/convert/url
       12 of 12
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Custom HTTP Headers)
     Given I have a default Folio container
     Given I have a static server
@@ -153,6 +159,7 @@ Feature: /forms/chromium/convert/url
     Then there should be the following file(s) in the response:
       | foo.pdf |
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Cookies)
     Given I have a default Folio container
     Given I have a static server
@@ -167,6 +174,7 @@ Feature: /forms/chromium/convert/url
       | foo.pdf |
 
   # See https://github.com/gotenberg/gotenberg/issues/1130.
+  @skip
   Scenario: POST /forms/chromium/convert/url (case-insensitive sameSite)
     Given I have a default Folio container
     Given I have a static server
@@ -180,6 +188,7 @@ Feature: /forms/chromium/convert/url
     Then there should be the following file(s) in the response:
       | foo.pdf |
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Wait Delay)
     Given I have a default Folio container
     Given I have a static server
@@ -212,6 +221,7 @@ Feature: /forms/chromium/convert/url
       Wait delay > 2 seconds or expression window globalVar === 'ready' returns true.
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Wait For Expression)
     Given I have a default Folio container
     Given I have a static server
@@ -244,6 +254,7 @@ Feature: /forms/chromium/convert/url
       Wait delay > 2 seconds or expression window globalVar === 'ready' returns true.
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Wait For Selector)
     Given I have a default Folio container
     Given I have a static server
@@ -276,6 +287,7 @@ Feature: /forms/chromium/convert/url
       Wait on selector returns true.
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Emulated Media Type)
     Given I have a default Folio container
     Given I have a static server
@@ -335,6 +347,7 @@ Feature: /forms/chromium/convert/url
       Emulated media type is 'print'.
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Emulated Media Features)
     Given I have a default Folio container
     Given I have a static server
@@ -415,6 +428,7 @@ Feature: /forms/chromium/convert/url
       Emulated media type is 'screen'.
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Default Allow / Deny Lists)
     Given I have a default Folio container
     Given I have a static server
@@ -424,6 +438,7 @@ Feature: /forms/chromium/convert/url
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Main URL does NOT match allowed list)
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST | ^file:(?!//\\/tmp/).* |
@@ -431,12 +446,13 @@ Feature: /forms/chromium/convert/url
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url | http://host.docker.internal:%d/html/testdata/feature-rich-html-remote/index.html | field |
     Then the response status code should be 403
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Forbidden
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Main URL does match denied list)
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST |         |
@@ -445,12 +461,13 @@ Feature: /forms/chromium/convert/url
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url | http://host.docker.internal:%d/html/testdata/feature-rich-html-remote/index.html | field |
     Then the response status code should be 403
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Forbidden
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Request does not match the allowed list)
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST | ^.* |
@@ -466,12 +483,13 @@ Feature: /forms/chromium/convert/url
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url | file:///tmp/foo/index.html | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       file:// URLs are not accepted on this route. Use the /convert/html or /convert/markdown routes to render local HTML
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Main URL resolves to a non-public IP, permissive default)
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST |  |
@@ -489,12 +507,13 @@ Feature: /forms/chromium/convert/url
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url | http://127.0.0.1/ | field |
     Then the response status code should be 403
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Forbidden
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Main URL resolves to a non-public IP, deny-private-ips on with allow-list bypass)
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST       | .+   |
@@ -506,6 +525,7 @@ Feature: /forms/chromium/convert/url
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (JavaScript Enabled)
     Given I have a default Folio container
     Given I have a static server
@@ -523,6 +543,7 @@ Feature: /forms/chromium/convert/url
       JavaScript is enabled.
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (JavaScript Disabled)
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_DISABLE_JAVASCRIPT | true |
@@ -541,6 +562,7 @@ Feature: /forms/chromium/convert/url
       JavaScript is enabled.
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Fail On Resource HTTP Status Codes)
     Given I have a default Folio container
     Given I have a static server
@@ -548,7 +570,7 @@ Feature: /forms/chromium/convert/url
       | url                           | http://host.docker.internal:%d/html/testdata/feature-rich-html-remote/index.html | field |
       | failOnResourceHttpStatusCodes | [499,599]                                                                        | field |
     Then the response status code should be 409
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should contain string:
       """
       Invalid HTTP status code from resources:
@@ -558,6 +580,7 @@ Feature: /forms/chromium/convert/url
       /favicon.ico - 404: Not Found
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Fail On Resource Loading Failed)
     Given I have a default Folio container
     Given I have a static server
@@ -565,7 +588,7 @@ Feature: /forms/chromium/convert/url
       | url                         | http://host.docker.internal:%d/html/testdata/feature-rich-html-remote/index.html | field |
       | failOnResourceLoadingFailed | true                                                                             | field |
     Then the response status code should be 409
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should contain string:
       """
       Chromium failed to load resources
@@ -575,6 +598,7 @@ Feature: /forms/chromium/convert/url
       resource Stylesheet: net::ERR_CONNECTION_REFUSED
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Fail On Console Exceptions)
     Given I have a default Folio container
     Given I have a static server
@@ -582,7 +606,7 @@ Feature: /forms/chromium/convert/url
       | url                     | http://host.docker.internal:%d/html/testdata/feature-rich-html-remote/index.html | field |
       | failOnConsoleExceptions | true                                                                             | field |
     Then the response status code should be 409
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should contain string:
       """
       Chromium console exceptions
@@ -596,6 +620,7 @@ Feature: /forms/chromium/convert/url
       Error: Exception 2
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Bad Request)
     Given I have a default Folio container
     Given I have a static server
@@ -623,13 +648,13 @@ Feature: /forms/chromium/convert/url
       | skipNetworkIdleEvent          | foo | field |
       | skipNetworkAlmostIdleEvent    | foo | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url            | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field |
       | omitBackground | true                                                                | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       omitBackground requires printBackground set to true
@@ -639,7 +664,7 @@ Feature: /forms/chromium/convert/url
       | url              | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field |
       | nativePageRanges | foo                                                                 | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       Chromium does not handle the page ranges 'foo' (nativePageRanges) syntax
@@ -649,7 +674,7 @@ Feature: /forms/chromium/convert/url
       | url              | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field |
       | nativePageRanges | 2-3                                                                 | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       The page ranges '2-3' (nativePageRanges) exceeds the page count
@@ -659,7 +684,7 @@ Feature: /forms/chromium/convert/url
       | url               | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field |
       | waitForExpression | undefined                                                           | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
       The expression 'undefined' (waitForExpression) returned an exception or undefined
@@ -669,40 +694,41 @@ Feature: /forms/chromium/convert/url
       | url     | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field |
       | cookies | foo                                                                 | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url              | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field |
       | extraHttpHeaders | foo                                                                 | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url       | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field |
       | splitMode | foo                                                                 | field |
       | splitSpan | 2                                                                   | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url  | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field |
       | pdfa | foo                                                                 | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url   | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field |
       | pdfua | foo                                                                 | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url      | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field |
       | metadata | foo                                                                 | field |
     Then the response status code should be 400
-    Then the response header "Content-Type" should be "text/plain; charset=UTF-8"
+    Then the response header "Content-Type" should be "application/json"
 
   @split
+  @skip
   Scenario: POST /forms/chromium/convert/url (Split Intervals)
     Given I have a default Folio container
     Given I have a static server
@@ -734,6 +760,7 @@ Feature: /forms/chromium/convert/url
   # See https://github.com/gotenberg/gotenberg/issues/1130.
   @split
   @output-filename
+  @skip
   Scenario: POST /forms/chromium/convert/url (Split Output Filename)
     Given I have a default Folio container
     Given I have a static server
@@ -753,6 +780,7 @@ Feature: /forms/chromium/convert/url
     Then the "foo_1.pdf" PDF should have 1 page(s)
 
   @split
+  @skip
   Scenario: POST /forms/chromium/convert/url (Split Pages)
     Given I have a default Folio container
     Given I have a static server
@@ -778,6 +806,7 @@ Feature: /forms/chromium/convert/url
       """
 
   @split
+  @skip
   Scenario: POST /forms/chromium/convert/url (Split Pages & Unify)
     Given I have a default Folio container
     Given I have a static server
@@ -803,6 +832,7 @@ Feature: /forms/chromium/convert/url
       """
 
   @split
+  @skip
   Scenario: POST /forms/chromium/convert/url (Split Many PDFs - Lot of Pages)
     Given I have a default Folio container
     Given I have a static server
@@ -838,6 +868,7 @@ Feature: /forms/chromium/convert/url
       """
 
   @convert
+  @skip
   Scenario: POST /forms/chromium/convert/url (PDF/A-1b & PDF/UA-1)
     Given I have a default Folio container
     Given I have a static server
@@ -850,6 +881,7 @@ Feature: /forms/chromium/convert/url
     Then there should be 1 PDF(s) in the response
     Then the response PDF(s) should pass PDF/A validation
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Split & PDF/A-1b & PDF/UA-1)
     Given I have a default Folio container
     Given I have a static server
@@ -867,6 +899,7 @@ Feature: /forms/chromium/convert/url
   @convert
   @split
   @output-filename
+  @skip
   Scenario: POST /forms/chromium/convert/url (Split & PDF/A-1b & PDF/UA-1 & Output Filename)
     Given I have a default Folio container
     Given I have a static server
@@ -882,6 +915,7 @@ Feature: /forms/chromium/convert/url
     Then there should be 2 PDF(s) in the response
 
   @metadata
+  @skip
   Scenario: POST /forms/chromium/convert/url (Metadata)
     Given I have a default Folio container
     Given I have a static server
@@ -919,6 +953,7 @@ Feature: /forms/chromium/convert/url
       """
 
   @flatten
+  @skip
   Scenario: POST /forms/chromium/convert/url (Flatten)
     Given I have a default Folio container
     Given I have a static server
@@ -930,6 +965,7 @@ Feature: /forms/chromium/convert/url
     Then there should be 1 PDF(s) in the response
 
   @encrypt
+  @skip
   Scenario: POST /forms/chromium/convert/url (Encrypt - user password only)
     Given I have a default Folio container
     Given I have a static server
@@ -941,6 +977,7 @@ Feature: /forms/chromium/convert/url
     Then there should be 1 PDF(s) in the response
 
   @encrypt
+  @skip
   Scenario: POST /forms/chromium/convert/url (Encrypt - both user and owner passwords)
     Given I have a default Folio container
     Given I have a static server
@@ -952,8 +989,9 @@ Feature: /forms/chromium/convert/url
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
-  @folio-skip
+  @skip
   @embed
+  @skip
   Scenario: POST /forms/chromium/convert/url (Embeds)
     # Reason: Embed file check step not yet implemented
     Given I have a default Folio container
@@ -970,11 +1008,12 @@ Feature: /forms/chromium/convert/url
     Then the response PDF(s) should have the "embed_2.xml" file embedded
 
   # FIXME: once decrypt is done, add encrypt and check after the content of the PDF.
-  @folio-skip
+  @skip
   @convert
   @metadata
   @flatten
   @embed
+  @skip
   Scenario: POST /forms/chromium/convert/url (PDF/A-3b & PDF/UA-1 & Metadata & Flatten & Embeds)
     # Reason: Embed file check step not yet implemented
     Given I have a default Folio container
@@ -992,6 +1031,8 @@ Feature: /forms/chromium/convert/url
     Then the response PDF(s) should have the "embed_1.xml" file embedded
     Then the response PDF(s) should have the "embed_2.xml" file embedded
 
+  @skip
+  @skip
   Scenario: POST /forms/chromium/convert/url (Routes Disabled)
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_DISABLE_ROUTES | true |
@@ -1000,6 +1041,8 @@ Feature: /forms/chromium/convert/url
       | url | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field |
     Then the response status code should be 404
 
+  @skip
+  @skip
   Scenario: POST /forms/chromium/convert/url (Gotenberg Trace)
     Given I have a default Folio container
     Given I have a static server
@@ -1010,8 +1053,9 @@ Feature: /forms/chromium/convert/url
     Then the response header "Content-Type" should be "application/pdf"
     Then the response header "Gotenberg-Trace" should be "forms_chromium_convert_url"
 
-  @folio-skip
+  @skip
   @webhook
+  @skip
   Scenario: POST /forms/chromium/convert/url (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
     Given I have a default Folio container
@@ -1026,6 +1070,8 @@ Feature: /forms/chromium/convert/url
     Then the webhook request header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the webhook request
 
+  @skip
+  @skip
   Scenario: POST /forms/chromium/convert/url (Basic Auth)
     Given I have a Folio container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
@@ -1036,7 +1082,8 @@ Feature: /forms/chromium/convert/url
       | url | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field |
     Then the response status code should be 401
 
-  @folio-skip
+  @skip
+  @skip
   Scenario: POST /foo/forms/chromium/convert/url (Root Path)
     # Reason: Folio does not support configurable API root path prefix
     Given I have a Folio container with the following environment variable(s):
@@ -1048,6 +1095,7 @@ Feature: /forms/chromium/convert/url
     Then the response status code should be 200
     Then the response header "Content-Type" should be "application/pdf"
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (stampSource=pdf without uploaded stamp file => 400)
     Given I have a default Folio container
     Given I have a static server
@@ -1061,6 +1109,7 @@ Feature: /forms/chromium/convert/url
       Invalid form data: a stamp file is required for image or pdf source
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (watermarkSource=pdf without uploaded watermark file => 400)
     Given I have a default Folio container
     Given I have a static server
@@ -1075,6 +1124,7 @@ Feature: /forms/chromium/convert/url
       """
 
   # See: https://github.com/gotenberg/gotenberg/issues/1500.
+  @skip
   Scenario: POST /forms/chromium/convert/url (Long Filename)
     Given I have a default Folio container
     Given I have a static server

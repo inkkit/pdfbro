@@ -15,7 +15,7 @@ use engine::{Cookie, MediaType, PageRanges, PdfOptions, RequestContext, WaitCond
 
 use crate::error::{ApiError, ApiResult};
 use crate::multipart::FormFields;
-use crate::routes::util::pdf_response;
+use crate::routes::util::{output_filename, pdf_response};
 use crate::state::AppState;
 
 const INDEX_HTML: &str = "index.html";
@@ -92,7 +92,7 @@ pub async fn chromium_html(
     }
 
     let pdf = result?;
-    Ok(pdf_response(pdf, "result.pdf"))
+    Ok(pdf_response(pdf, &output_filename(&headers, "result")))
 }
 
 /// `POST /forms/chromium/convert/url`.
@@ -167,7 +167,7 @@ pub async fn chromium_url(
     }
 
     let pdf = result?;
-    Ok(pdf_response(pdf, "result.pdf"))
+    Ok(pdf_response(pdf, &output_filename(&headers, "result")))
 }
 
 /// `POST /forms/chromium/convert/markdown`.
@@ -247,7 +247,7 @@ pub async fn chromium_markdown(
         }
 
         let pdf = result?;
-        return Ok(pdf_response(pdf, "result.pdf"));
+        return Ok(pdf_response(pdf, &output_filename(&headers, "result")));
     }
 
     // Simple form: render the first .md file directly.
@@ -311,7 +311,7 @@ pub async fn chromium_markdown(
     }
 
     let pdf = result?;
-    Ok(pdf_response(pdf, "result.pdf"))
+    Ok(pdf_response(pdf, &output_filename(&headers, "result")))
 }
 
 // ---------------------------------------------------------------------------
@@ -718,7 +718,7 @@ pub async fn chromium_screenshot_html(
 
     let image = result?;
     let ext = opts.format.extension();
-    let filename = format!("screenshot.{}", ext);
+    let filename = screenshot_filename(&headers, "screenshot", ext);
 
     Ok(image_response(image, &filename, opts.format.content_type()))
 }
@@ -779,7 +779,7 @@ pub async fn chromium_screenshot_url(
 
     let image = result?;
     let ext = opts.format.extension();
-    let filename = format!("screenshot.{}", ext);
+    let filename = screenshot_filename(&headers, "screenshot", ext);
 
     Ok(image_response(image, &filename, opts.format.content_type()))
 }
@@ -820,9 +820,18 @@ pub async fn chromium_screenshot_markdown(
     let image = state.chromium.as_ref().unwrap().html_to_screenshot(&html, &opts).await?;
 
     let ext = opts.format.extension();
-    let filename = format!("screenshot.{}", ext);
+    let filename = screenshot_filename(&headers, "screenshot", ext);
 
     Ok(image_response(image, &filename, opts.format.content_type()))
+}
+
+fn screenshot_filename(headers: &HeaderMap, default_stem: &str, ext: &str) -> String {
+    let stem = headers
+        .get("Gotenberg-Output-Filename")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.trim_end_matches(&format!(".{ext}")))
+        .unwrap_or(default_stem);
+    format!("{stem}.{ext}")
 }
 
 fn parse_screenshot_options(map: &HashMap<String, String>) -> ApiResult<ScreenshotOptions> {
