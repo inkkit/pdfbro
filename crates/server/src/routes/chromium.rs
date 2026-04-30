@@ -537,20 +537,6 @@ pub fn parse_request_context(map: &HashMap<String, String>) -> ApiResult<Request
         ctx.fail_on_status = parsed;
     }
 
-    if let Some(s) = nonempty(map, "skipNetworkIdle") {
-        ctx.skip_network_idle = s.parse::<bool>().map_err(|e| ApiError::InvalidField {
-            field: "skipNetworkIdle",
-            message: e.to_string(),
-        })?;
-    }
-
-    if let Some(s) = nonempty(map, "skipNetworkAlmostIdle") {
-        ctx.skip_network_almost_idle = s.parse::<bool>().map_err(|e| ApiError::InvalidField {
-            field: "skipNetworkAlmostIdle",
-            message: e.to_string(),
-        })?;
-    }
-
     Ok(ctx)
 }
 
