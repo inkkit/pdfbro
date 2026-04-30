@@ -58,6 +58,44 @@ pub async fn metrics_handler() -> impl IntoResponse {
         .unwrap()
 }
 
+/// `GET /` — lists all registered routes, matching Gotenberg's convention.
+pub async fn root() -> impl IntoResponse {
+    const ROUTES: &str = "\
+GET /
+GET /health
+GET /version
+GET /prometheus/metrics
+POST /forms/chromium/convert/html
+POST /forms/chromium/convert/url
+POST /forms/chromium/convert/markdown
+POST /forms/chromium/screenshot/html
+POST /forms/chromium/screenshot/url
+POST /forms/chromium/screenshot/markdown
+POST /forms/libreoffice/convert
+POST /forms/pdfengines/merge
+POST /forms/pdfengines/split
+POST /forms/pdfengines/flatten
+POST /forms/pdfengines/convert
+POST /forms/pdfengines/metadata/read
+POST /forms/pdfengines/metadata/write
+POST /forms/pdfengines/bookmarks/read
+POST /forms/pdfengines/bookmarks/write
+POST /forms/pdfengines/watermark
+POST /forms/pdfengines/stamp
+POST /forms/pdfengines/encrypt
+POST /forms/pdfengines/decrypt
+POST /forms/pdfengines/rotate
+POST /forms/pdfengines/embed
+POST /forms/batch/submit
+GET /forms/batch/{id}/status
+GET /forms/batch/{id}/download
+";
+    (
+        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        ROUTES,
+    )
+}
+
 /// Debug endpoint - exposes server configuration and state.
 /// Only available when --api-enable-debug-route is set.
 pub async fn debug(State(state): State<AppState>) -> impl IntoResponse {
@@ -82,4 +120,23 @@ pub async fn debug(State(state): State<AppState>) -> impl IntoResponse {
             "libreoffice": cfg!(feature = "libreoffice"),
         }
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::body::to_bytes;
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
+
+    #[tokio::test]
+    async fn root_returns_200_with_route_list() {
+        let resp = super::root().await.into_response();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = to_bytes(resp.into_body(), 64 * 1024).await.unwrap();
+        let text = std::str::from_utf8(&body).unwrap();
+        assert!(text.contains("/health"), "missing /health in root listing");
+        assert!(text.contains("/forms/chromium/convert/html"), "missing html route");
+        assert!(text.contains("/forms/pdfengines/merge"), "missing merge route");
+        assert!(text.contains("/forms/pdfengines/embed"), "missing embed route");
+    }
 }

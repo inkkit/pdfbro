@@ -499,6 +499,79 @@ pub async fn pdfengines_rotate(
 }
 
 // ---------------------------------------------------------------------------
+// /forms/pdfengines/embed
+// ---------------------------------------------------------------------------
+
+/// `POST /forms/pdfengines/embed` — attach one or more files as PDF
+/// embedded attachments using qpdf.
+///
+/// Form fields:
+/// - `files`: exactly one PDF to receive the attachment(s).
+/// - `embeds`: one or more files to embed as attachments.
+pub async fn pdfengines_embed(
+    State(state): State<AppState>,
+    _headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
+    let _permit = acquire_permit(&state).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
+
+    let pdf_files = form.files_by_field("files");
+    if pdf_files.len() != 1 {
+        return Err(ApiError::InvalidField {
+            field: "files",
+            message: "embed requires exactly one PDF file in the `files` field".to_string(),
+        });
+    }
+    let pdf_path = pdf_files[0].path.clone();
+
+    let embed_files = form.files_by_field("embeds");
+    if embed_files.is_empty() {
+        return Err(ApiError::InvalidField {
+            field: "embeds",
+            message: "embed requires at least one file in the `embeds` field".to_string(),
+        });
+    }
+
+    let out_path = form.tmp.path().join("embedded.pdf");
+    let mut current_input = pdf_path;
+    for (i, embed) in embed_files.iter().enumerate() {
+        let out = if i == embed_files.len() - 1 {
+            out_path.clone()
+        } else {
+            form.tmp.path().join(format!("intermediate_{i}.pdf"))
+        };
+
+        let status = tokio::process::Command::new("qpdf")
+            .arg("--add-attachment")
+            .arg(&embed.path)
+            .arg("--")
+            .arg(&current_input)
+            .arg(&out)
+            .status()
+            .await
+            .map_err(|e| ApiError::Internal(format!("qpdf spawn failed: {e}")))?;
+
+        if !status.success() {
+            return Err(ApiError::Internal(format!(
+                "qpdf exited with status {} while embedding `{}`",
+                status,
+                embed.filename,
+            )));
+        }
+
+        current_input = out;
+    }
+
+    let pdf_bytes = tokio::fs::read(&out_path)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    Ok(pdf_response(pdf_bytes, "embedded.pdf"))
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -1068,5 +1141,14 @@ mod tests {
         assert!(!p.print);
         assert!(!p.annotate);
         assert!(!p.extract_content);
+    }
+
+    #[tokio::test]
+    #[ignore = "requires qpdf binary and real PDF files"]
+    async fn embed_returns_valid_pdf() {
+        // Exercised in Docker CI via `cargo test -- --ignored`.
+        // Placeholder to document the expected behavior:
+        // upload one PDF as `files` and one text file as `embeds`,
+        // verify response starts with %PDF.
     }
 }

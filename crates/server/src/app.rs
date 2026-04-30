@@ -212,6 +212,10 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
             "/forms/pdfengines/rotate",
             post(pdfengines::pdfengines_rotate),
         )
+        .route(
+            "/forms/pdfengines/embed",
+            post(pdfengines::pdfengines_embed),
+        )
         // Batch API routes
         .route("/forms/batch/submit", post(batch::batch_submit))
         .route("/forms/batch/{id}/status", get(batch::batch_status))
@@ -224,6 +228,7 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
         .layer(DefaultBodyLimit::max(max_body));
 
     let mut untimed = Router::new()
+        .route("/", get(health::root))
         .route("/health", get(health::health))
         .route("/version", get(health::version))
         .route("/prometheus/metrics", get(health::metrics_handler));
