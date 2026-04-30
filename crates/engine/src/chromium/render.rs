@@ -100,6 +100,7 @@ async fn render_html_on(
     }
 
     apply_emulated_media(engine, page, opts).await?;
+    inject_print_color_adjust(engine, page, opts.print_background).await?;
     wait::apply(page, &opts.wait).await?;
     print_to_pdf(engine, page, opts).await
 }
@@ -154,7 +155,7 @@ async fn render_url_on(
 
     // Navigate with lifecycle event waits.
     debug!("render_url_on: navigating to {}" , url);
-    navigate_with_lifecycle(page, url, request.skip_network_idle, request.skip_network_almost_idle)
+    navigate_with_lifecycle(page, url, engine.inner().config.network_idle_timeout)
         .await
         .map_err(|e| navigation_error(url, e))?;
     debug!("render_url_on: navigation complete");
@@ -214,6 +215,7 @@ async fn render_url_on(
 
     debug!("render_url_on: applying emulated media");
     apply_emulated_media(engine, page, opts).await?;
+    inject_print_color_adjust(engine, page, opts.print_background).await?;
     debug!("render_url_on: applying wait condition {:?}", opts.wait);
     wait::apply(page, &opts.wait).await?;
     debug!("render_url_on: printing to PDF");
@@ -310,12 +312,43 @@ async fn apply_emulated_media(
     page: &Page,
     opts: &PdfOptions,
 ) -> EngineResult<()> {
-    page.execute(SetEmulatedMediaParams {
-        media: Some(media_kind(opts.emulate_media).to_string()),
-        features: None,
-    })
-    .await
-    .map_err(|e| engine.map_cdp_error(e))?;
+    if let Some(media) = opts.emulate_media {
+        page.execute(SetEmulatedMediaParams {
+            media: Some(media_kind(media).to_string()),
+            features: None,
+        })
+        .await
+        .map_err(|e| engine.map_cdp_error(e))?;
+    }
+    Ok(())
+}
+
+/// Inject CSS that matches gotenberg's `forceExactColorsActionFunc`:
+/// - Always sets `-webkit-print-color-adjust: exact` so Chrome honours the
+///   `printToPDF` `print_background` flag (without it, the property defaults
+///   to `economy` and Chrome may strip backgrounds regardless of the flag).
+/// - When `print_background` is false, also injects
+///   `html, body { background: none !important }` to clear any page-level
+///   background colour (e.g. example.com's `body { background: #eee }`).
+async fn inject_print_color_adjust(
+    engine: &ChromiumEngine,
+    page: &Page,
+    print_background: bool,
+) -> EngineResult<()> {
+    let mut css = "html { -webkit-print-color-adjust: exact !important; }".to_string();
+    if !print_background {
+        css.push_str(" html, body { background: none !important; }");
+    }
+    let script = format!(
+        r#"(() => {{
+    const s = document.createElement('style');
+    s.appendChild(document.createTextNode('{css}'));
+    document.head.appendChild(s);
+}})()"#
+    );
+    page.evaluate(script)
+        .await
+        .map_err(|e| engine.map_cdp_error(e))?;
     Ok(())
 }
 
@@ -446,51 +479,48 @@ async fn spawn_resource_status_capture(
 }
 
 /// Navigate to URL and wait for lifecycle events.
-/// If `skip_network_idle` is false, waits for the `networkIdle` event.
-/// If `skip_network_almost_idle` is false, waits for the `networkIdle2` event.
+///
+/// Always waits for `domContentLoaded` and `load`.
+/// If `network_idle_timeout` is `Some(t)`, races `networkIdle` against `t`
+/// after load — proceeds whichever fires first.
+/// If `None`, skips networkIdle entirely (default, matches gotenberg).
 async fn navigate_with_lifecycle(
     page: &Page,
     url: &str,
-    skip_network_idle: bool,
-    skip_network_almost_idle: bool,
+    network_idle_timeout: Option<std::time::Duration>,
 ) -> Result<(), chromiumoxide::error::CdpError> {
     debug!("navigate_with_lifecycle: registering event listeners");
-    // Start listening for lifecycle events before navigation.
     let mut dom_content_events = page.event_listener::<EventDomContentEventFired>().await?;
     let mut load_events = page.event_listener::<EventLoadEventFired>().await?;
     debug!("navigate_with_lifecycle: listeners registered");
 
-    // Navigate.
     debug!("navigate_with_lifecycle: calling page.goto({})", url);
     page.goto(url).await?;
     debug!("navigate_with_lifecycle: page.goto returned");
 
-    // Always wait for domContentLoaded and load events.
     debug!("navigate_with_lifecycle: waiting for domContentLoaded and load events");
     let dom_fut = async {
-        debug!("navigate_with_lifecycle: polling domContentLoaded event");
         dom_content_events.next().await;
         debug!("navigate_with_lifecycle: domContentLoaded received");
     };
     let load_fut = async {
-        debug!("navigate_with_lifecycle: polling load event");
         load_events.next().await;
         debug!("navigate_with_lifecycle: load event received");
     };
-
     tokio::join!(dom_fut, load_fut);
     debug!("navigate_with_lifecycle: domContentLoaded and load done");
 
-    // Conditionally wait for network idle events.
-    if !skip_network_idle {
-        debug!("navigate_with_lifecycle: waiting for networkIdle");
-        wait_lifecycle_event(page, "networkIdle").await?;
-        debug!("navigate_with_lifecycle: networkIdle received");
-    }
-    if !skip_network_almost_idle {
-        debug!("navigate_with_lifecycle: waiting for networkAlmostIdle");
-        wait_lifecycle_event(page, "networkAlmostIdle").await?;
-        debug!("navigate_with_lifecycle: networkAlmostIdle received");
+    if let Some(timeout) = network_idle_timeout {
+        debug!("navigate_with_lifecycle: racing networkIdle against {:?}", timeout);
+        tokio::select! {
+            result = wait_lifecycle_event(page, "networkIdle") => {
+                result?;
+                debug!("navigate_with_lifecycle: networkIdle fired");
+            }
+            _ = tokio::time::sleep(timeout) => {
+                debug!("navigate_with_lifecycle: networkIdle timeout, proceeding");
+            }
+        }
     }
 
     debug!("navigate_with_lifecycle: complete");

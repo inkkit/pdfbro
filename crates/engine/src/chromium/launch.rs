@@ -95,7 +95,7 @@ fn check_chrome_version(executable: &Path) {
                         "Chrome version not supported by chromiumoxide. \
                          PDF conversions may timeout or fail. \
                          Install Chrome/Chromium <= {} or use --chrome-path to specify a compatible binary. \
-                         Alternatively, use skipNetworkIdle=true in form data as a workaround.",
+                         Alternatively, pin to a supported Chrome version for reliable operation.",
                         MAX_SUPPORTED
                     );
                 } else {
@@ -189,6 +189,8 @@ const BASELINE_ARGS: &[&str] = &[
     "--hide-scrollbars",
     "--mute-audio",
     "--disable-dev-shm-usage",
+    "--no-zygote",
+    "--font-render-hinting=none",
 ];
 
 /// Names looked up on `$PATH`, in order.

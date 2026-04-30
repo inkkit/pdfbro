@@ -6,7 +6,7 @@ license.workspace = true
 description = "Folio Python bindings (PyO3)"
 
 [lib]
-name = "folio"
+name = "folio_py"
 crate-type = ["cdylib"]
 
 [dependencies]

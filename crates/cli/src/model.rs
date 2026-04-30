@@ -31,16 +31,16 @@ pub(crate) fn build_pdf_options(flags: &PdfFlags) -> anyhow::Result<PdfOptions> 
     if let Some(s) = flags.scale {
         o.scale = s;
     }
-    if flags.no_print_background {
-        o.print_background = false;
+    if flags.print_background {
+        o.print_background = true;
     }
     if flags.prefer_css_page_size {
         o.prefer_css_page_size = true;
     }
     if let Some(em) = flags.emulate {
         o.emulate_media = match em {
-            EmulateMedia::Print => MediaType::Print,
-            EmulateMedia::Screen => MediaType::Screen,
+            EmulateMedia::Print => Some(MediaType::Print),
+            EmulateMedia::Screen => Some(MediaType::Screen),
         };
     }
     if let Some(pr) = &flags.pages {

@@ -60,7 +60,7 @@ mod tests {
 
         assert_eq!(p.landscape, Some(false));
         assert_eq!(p.display_header_footer, Some(false));
-        assert_eq!(p.print_background, Some(true));
+        assert_eq!(p.print_background, Some(false));
         assert_eq!(p.scale, Some(1.0));
         assert!((p.paper_width.unwrap() - 8.27).abs() < 1e-3);
         assert!((p.paper_height.unwrap() - 11.69).abs() < 1e-3);
@@ -85,7 +85,7 @@ mod tests {
             scale: 0.75,
             print_background: false,
             prefer_css_page_size: true,
-            emulate_media: MediaType::Screen,
+            emulate_media: Some(MediaType::Screen),
             page_ranges: Some(PageRanges::parse("1-3,5").unwrap()),
             header_template: Some("<h1>Hi</h1>".into()),
             footer_template: Some("<span></span>".into()),
