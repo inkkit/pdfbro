@@ -980,6 +980,7 @@ mod tests {
             timeout: Duration::from_secs(30),
             lazy_start: false,
             idle_shutdown_timeout: None,
+            network_idle_timeout: None,
         };
         let json = serde_json::to_string(&c).unwrap();
         let back: BrowserConfig = serde_json::from_str(&json).unwrap();
@@ -990,6 +991,7 @@ mod tests {
         assert_eq!(back.timeout, c.timeout);
         assert_eq!(back.lazy_start, c.lazy_start);
         assert_eq!(back.idle_shutdown_timeout, c.idle_shutdown_timeout);
+        assert_eq!(back.network_idle_timeout, c.network_idle_timeout);
     }
 
     // --- Sanity: types are Send + Sync where expected ---------------------
