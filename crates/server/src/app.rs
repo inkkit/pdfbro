@@ -243,6 +243,13 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
         untimed = untimed.route("/debug", get(health::debug));
     }
 
+    // Font Doctor diagnostic routes (always enabled)
+    use crate::routes::debug;
+    untimed = untimed
+        .route("/debug/fonts", get(debug::debug_list_fonts))
+        .route("/debug/validate-fonts", post(debug::debug_validate_fonts))
+        .route("/debug/diagnose-html", post(debug::debug_diagnose_html));
+
     let header_name = HeaderName::from_bytes(
         config.api_correlation_id_header.as_bytes(),
     )

@@ -59,15 +59,15 @@ tracing-opentelemetry = { workspace = true }
 # Time / duration parsing
 humantime = { workspace = true }
 
+# Regex for font extraction and URL pattern matching
+regex = "1"
+
 # Webhook HTTP client
 reqwest = { workspace = true, features = ["json", "multipart"] }
 url = { workspace = true }
 
 # PDF inspection (page counts for split expansion)
 lopdf = { workspace = true }
-
-# URL pattern matching for downloadFrom allow/deny lists
-regex = "1"
 
 # CLI
 clap = { workspace = true }
