@@ -480,7 +480,8 @@ async fn navigate_with_lifecycle(
     if let Some(timeout) = network_idle_timeout {
         debug!("navigate_with_lifecycle: racing networkIdle against {:?}", timeout);
         tokio::select! {
-            _ = wait_lifecycle_event(page, "networkIdle") => {
+            result = wait_lifecycle_event(page, "networkIdle") => {
+                result?;
                 debug!("navigate_with_lifecycle: networkIdle fired");
             }
             _ = tokio::time::sleep(timeout) => {
