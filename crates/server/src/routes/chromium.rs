@@ -8,15 +8,14 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use axum::body::Bytes;
 use axum::extract::{Multipart, State};
-use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
-use axum::response::{IntoResponse, Response};
+use axum::http::{HeaderMap, StatusCode, header};
+use axum::response::Response;
 use engine::{Cookie, MediaType, PageRanges, PdfOptions, RequestContext, WaitCondition, CaptureMode, ScreenshotFormat, ScreenshotOptions};
 
 use crate::error::{ApiError, ApiResult};
 use crate::multipart::FormFields;
-use crate::routes::util::{pdf_response, zip_response};
+use crate::routes::util::pdf_response;
 use crate::state::AppState;
 
 const INDEX_HTML: &str = "index.html";

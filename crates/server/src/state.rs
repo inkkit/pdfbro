@@ -15,7 +15,6 @@ use crate::metrics::FolioMetrics;
 use crate::routes::batch_state::BatchStateManager;
 use crate::supervised_engine::SupervisedLibreOfficeEngine;
 use crate::webhook::WebhookQueue;
-use prometheus;
 
 /// Per-process server state.
 #[derive(Clone)]
