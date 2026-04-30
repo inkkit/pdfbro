@@ -7,6 +7,9 @@ ARG RUST_VERSION=1.88
 ARG FOLIO_VERSION=0.1.0
 ARG FOLIO_USER_UID=1001
 ARG FOLIO_USER_GID=1001
+# Chromium version - pinned for reproducible builds
+# See: https://snapshot.debian.org/package/chromium/142.0.7444.175-1/
+ARG CHROMIUM_VERSION=142.0.7444.175-1
 
 # =============================================================================
 # Stage 1: Chef (prepares dependency recipe)
@@ -26,10 +29,11 @@ RUN cargo chef prepare --recipe-path recipe.json
 # Stage 3: Builder
 # =============================================================================
 FROM rust:${RUST_VERSION} AS builder
+ARG CHROMIUM_VERSION
 
 WORKDIR /app
 
-# Install build dependencies
+# Install build dependencies (Chromium installed below with version pinning)
 RUN apt-get update -qq && apt-get upgrade -yqq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
     libgtk-3-0 libx11-xcb1 libxcomposite1 libxcursor1 \
@@ -37,9 +41,29 @@ RUN apt-get update -qq && apt-get upgrade -yqq && \
     libxrandr2 libasound2 libatk1.0-0 libatk-bridge2.0-0 \
     libpangocairo-1.0-0 libpango-1.0-0 libcairo2 \
     libgdk-pixbuf2.0-0 libgconf-2-4 libgdm1 libglib2.0-0 \
-    libgl1-mesa-glx fonts-liberation xdg-utils wget curl unzip \
-    chromium libreoffice \
+    libgl1-mesa-glx fonts-liberation xdg-utils wget curl unzip ca-certificates \
+    libreoffice \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Install Chromium with version pinning
+RUN /bin/bash -c \
+    'set -e &&\
+    if [[ "$CHROMIUM_VERSION" != "latest" && -n "$CHROMIUM_VERSION" ]]; then \
+      apt-get update -qq &&\
+      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends devscripts &&\
+      debsnap chromium-common "$CHROMIUM_VERSION" -v --force --binary --architecture $(dpkg --print-architecture) &&\
+      debsnap chromium "$CHROMIUM_VERSION" -v --force --binary --architecture $(dpkg --print-architecture) &&\
+      dpkg -i --force-depends \
+        "./binary-chromium-common/chromium-common_${CHROMIUM_VERSION}_$(dpkg --print-architecture).deb" \
+        "./binary-chromium/chromium_${CHROMIUM_VERSION}_$(dpkg --print-architecture).deb" &&\
+      apt-get install -f -y -qq --no-install-recommends || true &&\
+      DEBIAN_FRONTEND=noninteractive apt-get purge -y -qq devscripts &&\
+      rm -rf ./binary-chromium-common/* ./binary-chromium/* /var/lib/apt/lists/* /tmp/* /var/tmp/*; \
+    else \
+      apt-get update -qq &&\
+      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends chromium &&\
+      rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*; \
+    fi'
 
 ENV CHROME_PATH=/usr/bin/chromium
 RUN cargo install cargo-chef --locked
@@ -62,6 +86,7 @@ FROM debian:bookworm-slim
 ARG FOLIO_VERSION
 ARG FOLIO_USER_UID
 ARG FOLIO_USER_GID
+ARG CHROMIUM_VERSION
 
 # Metadata
 LABEL org.opencontainers.image.title="Folio" \
@@ -84,6 +109,7 @@ RUN groupadd --gid "${FOLIO_USER_GID}" folio && \
     chown -R folio:folio /home/folio /app
 
 # Install runtime dependencies with comprehensive font support
+# Note: Chromium is installed below with version pinning
 RUN apt-get update -qq && apt-get upgrade -yqq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
     # Init system for proper zombie process reaping
@@ -91,8 +117,6 @@ RUN apt-get update -qq && apt-get upgrade -yqq && \
     # Health checks
     curl \
     ca-certificates \
-    # Chromium dependencies
-    chromium \
     # LibreOffice components
     libreoffice-writer \
     libreoffice-calc \
@@ -114,7 +138,7 @@ RUN apt-get update -qq && apt-get upgrade -yqq && \
     # PDF tools
     qpdf \
     ghostscript \
-    # Chromium runtime libs
+    # Chromium runtime libs (without chromium binary)
     libgtk-3-0 libx11-xcb1 libxcomposite1 libxcursor1 \
     libxdamage1 libxi6 libxtst6 libnss3 libcups2 libxss1 \
     libxrandr2 libasound2 libatk1.0-0 libatk-bridge2.0-0 \
@@ -122,6 +146,26 @@ RUN apt-get update -qq && apt-get upgrade -yqq && \
     libgdk-pixbuf2.0-0 libglib2.0-0 libgl1-mesa-glx \
     # Cleanup
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Install Chromium with version pinning
+RUN /bin/bash -c \
+    'set -e &&\
+    if [[ "$CHROMIUM_VERSION" != "latest" && -n "$CHROMIUM_VERSION" ]]; then \
+      apt-get update -qq &&\
+      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends devscripts &&\
+      debsnap chromium-common "$CHROMIUM_VERSION" -v --force --binary --architecture $(dpkg --print-architecture) &&\
+      debsnap chromium "$CHROMIUM_VERSION" -v --force --binary --architecture $(dpkg --print-architecture) &&\
+      dpkg -i --force-depends \
+        "./binary-chromium-common/chromium-common_${CHROMIUM_VERSION}_$(dpkg --print-architecture).deb" \
+        "./binary-chromium/chromium_${CHROMIUM_VERSION}_$(dpkg --print-architecture).deb" &&\
+      apt-get install -f -y -qq --no-install-recommends || true &&\
+      DEBIAN_FRONTEND=noninteractive apt-get purge -y -qq devscripts &&\
+      rm -rf ./binary-chromium-common/* ./binary-chromium/* /var/lib/apt/lists/* /tmp/* /var/tmp/*; \
+    else \
+      apt-get update -qq &&\
+      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends chromium &&\
+      rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*; \
+    fi'
 
 # Copy binaries with explicit ownership
 COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" --from=builder \
