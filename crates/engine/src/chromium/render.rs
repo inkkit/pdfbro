@@ -100,6 +100,7 @@ async fn render_html_on(
     }
 
     apply_emulated_media(engine, page, opts).await?;
+    inject_print_color_adjust(engine, page, opts.print_background).await?;
     wait::apply(page, &opts.wait).await?;
     print_to_pdf(engine, page, opts).await
 }
@@ -214,6 +215,7 @@ async fn render_url_on(
 
     debug!("render_url_on: applying emulated media");
     apply_emulated_media(engine, page, opts).await?;
+    inject_print_color_adjust(engine, page, opts.print_background).await?;
     debug!("render_url_on: applying wait condition {:?}", opts.wait);
     wait::apply(page, &opts.wait).await?;
     debug!("render_url_on: printing to PDF");
@@ -318,6 +320,35 @@ async fn apply_emulated_media(
         .await
         .map_err(|e| engine.map_cdp_error(e))?;
     }
+    Ok(())
+}
+
+/// Inject CSS that matches gotenberg's `forceExactColorsActionFunc`:
+/// - Always sets `-webkit-print-color-adjust: exact` so Chrome honours the
+///   `printToPDF` `print_background` flag (without it, the property defaults
+///   to `economy` and Chrome may strip backgrounds regardless of the flag).
+/// - When `print_background` is false, also injects
+///   `html, body { background: none !important }` to clear any page-level
+///   background colour (e.g. example.com's `body { background: #eee }`).
+async fn inject_print_color_adjust(
+    engine: &ChromiumEngine,
+    page: &Page,
+    print_background: bool,
+) -> EngineResult<()> {
+    let mut css = "html { -webkit-print-color-adjust: exact !important; }".to_string();
+    if !print_background {
+        css.push_str(" html, body { background: none !important; }");
+    }
+    let script = format!(
+        r#"(() => {{
+    const s = document.createElement('style');
+    s.appendChild(document.createTextNode('{css}'));
+    document.head.appendChild(s);
+}})()"#
+    );
+    page.evaluate(script)
+        .await
+        .map_err(|e| engine.map_cdp_error(e))?;
     Ok(())
 }
 

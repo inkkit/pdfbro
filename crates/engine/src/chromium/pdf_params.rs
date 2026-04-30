@@ -60,7 +60,7 @@ mod tests {
 
         assert_eq!(p.landscape, Some(false));
         assert_eq!(p.display_header_footer, Some(false));
-        assert_eq!(p.print_background, Some(true));
+        assert_eq!(p.print_background, Some(false));
         assert_eq!(p.scale, Some(1.0));
         assert!((p.paper_width.unwrap() - 8.27).abs() < 1e-3);
         assert!((p.paper_height.unwrap() - 11.69).abs() < 1e-3);

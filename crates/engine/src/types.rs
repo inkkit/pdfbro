@@ -526,7 +526,7 @@ impl Default for PdfOptions {
             margin: Margins::DEFAULT,
             landscape: false,
             scale: 1.0,
-            print_background: true,
+            print_background: false,
             prefer_css_page_size: false,
             emulate_media: None,
             page_ranges: None,
@@ -764,7 +764,7 @@ mod tests {
         assert_eq!(d.margin, Margins::DEFAULT);
         assert!(!d.landscape);
         assert_eq!(d.scale, 1.0);
-        assert!(d.print_background);
+        assert!(!d.print_background);
         assert!(!d.prefer_css_page_size);
         assert_eq!(d.emulate_media, None);
         assert!(d.page_ranges.is_none());

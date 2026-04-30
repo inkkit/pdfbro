@@ -31,8 +31,8 @@ pub(crate) fn build_pdf_options(flags: &PdfFlags) -> anyhow::Result<PdfOptions> 
     if let Some(s) = flags.scale {
         o.scale = s;
     }
-    if flags.no_print_background {
-        o.print_background = false;
+    if flags.print_background {
+        o.print_background = true;
     }
     if flags.prefer_css_page_size {
         o.prefer_css_page_size = true;
