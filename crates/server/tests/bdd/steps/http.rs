@@ -15,33 +15,60 @@ use crate::support::world::FolioWorld;
 
 /// Step: When I make a "GET" request to "/health"
 pub async fn make_request(world: &mut FolioWorld, method: String, endpoint: String) {
+    make_request_with_request_headers(world, method, endpoint, &[]).await;
+}
+
+/// Step: When I make a "GET" request to "/health" with the following header(s):
+pub async fn make_request_with_headers(
+    world: &mut FolioWorld,
+    method: String,
+    endpoint: String,
+    table: &cucumber::gherkin::Table,
+) {
+    let extra: Vec<(String, String)> = table
+        .rows
+        .iter()
+        .filter(|row| row.len() >= 2)
+        .map(|row| (row[0].clone(), row[1].clone()))
+        .collect();
+    make_request_with_request_headers(world, method, endpoint, &extra).await;
+}
+
+async fn make_request_with_request_headers(
+    world: &mut FolioWorld,
+    method: String,
+    endpoint: String,
+    extra_headers: &[(String, String)],
+) {
     let url = format!("{}{}", world.base_url.as_ref().unwrap(), endpoint);
 
-    let response = match method.as_str() {
-        "GET" => world.client.get(&url).send().await,
-        "POST" => world.client.post(&url).send().await,
-        "PUT" => world.client.put(&url).send().await,
-        "DELETE" => world.client.delete(&url).send().await,
+    let mut req = match method.as_str() {
+        "GET" => world.client.get(&url),
+        "POST" => world.client.post(&url),
+        "PUT" => world.client.put(&url),
+        "DELETE" => world.client.delete(&url),
+        "HEAD" => world.client.head(&url),
         _ => panic!("Unsupported HTTP method: {}", method),
     };
 
-    let response = response.expect("Failed to make HTTP request");
+    for (name, value) in extra_headers {
+        req = req.header(name.as_str(), value.as_str());
+    }
+
+    let response = req.send().await.expect("Failed to make HTTP request");
     let status = response.status().as_u16();
 
-    // Collect headers
     let mut headers = std::collections::HashMap::new();
     for (name, value) in response.headers() {
         headers.insert(name.as_str().to_string(), value.to_str().unwrap_or("").to_string());
     }
 
-    // Read body - need to take ownership
     let body = response
         .bytes()
         .await
         .expect("Failed to read response body")
         .to_vec();
 
-    // Store body, status, and headers
     world.body = Some(body);
     world.status_code = Some(status);
     world.response_headers = Some(headers);
@@ -150,20 +177,26 @@ async fn build_form_and_headers_from_table(
 
             match field_type.as_str() {
                 "file" => {
-                    // Read file from testdata directory
-                    let file_path = format!(
-                        "tests/bdd/testdata/{}",
-                        field_value
-                    );
+                    // Strip optional "testdata/" prefix (Gotenberg-style paths)
+                    let relative = field_value
+                        .strip_prefix("testdata/")
+                        .unwrap_or(field_value);
+                    let file_path = format!("tests/bdd/testdata/{}", relative);
                     let content = tokio::fs::read(&file_path)
                         .await
-                        .expect(&format!("Failed to read file: {}", file_path));
+                        .unwrap_or_else(|e| panic!("Failed to read file {file_path}: {e}"));
 
-                    // Guess mime type from extension
-                    let mime = guess_mime_type(field_value);
+                    // Use basename as the multipart filename
+                    let file_name = std::path::Path::new(relative)
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or(relative)
+                        .to_string();
+
+                    let mime = guess_mime_type(&file_name);
 
                     let part = reqwest::multipart::Part::bytes(content)
-                        .file_name(field_value.clone())
+                        .file_name(file_name)
                         .mime_str(&mime)
                         .unwrap();
 

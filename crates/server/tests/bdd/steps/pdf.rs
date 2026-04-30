@@ -67,6 +67,85 @@ pub async fn check_page_count(world: &mut FolioWorld, filename: String, expected
     );
 }
 
+/// Step: Then the "foo.pdf" PDF should NOT have the following content at page 1:
+pub async fn check_page_not_contain(
+    world: &mut FolioWorld,
+    filename: String,
+    page_num: usize,
+    excluded: String,
+) {
+    let body = world.body.as_ref().expect("No response body");
+    let text = extract_pdf_text(body, page_num).unwrap_or_default();
+    let normalized = excluded.trim().replace("\r\n", "\n");
+    assert!(
+        !text.trim().replace("\r\n", "\n").contains(&normalized),
+        "PDF {} page {} unexpectedly contains:\n{}\n\nActual:\n{}",
+        filename,
+        page_num,
+        normalized,
+        text
+    );
+}
+
+/// Step: Then the "foo.pdf" PDF should be set to landscape orientation
+pub async fn check_landscape(world: &mut FolioWorld, filename: String) {
+    let body = world.body.as_ref().expect("No response body");
+    let pdf_bytes = extract_named_pdf(body, &filename);
+    let doc = lopdf::Document::load_mem(&pdf_bytes).expect("Failed to parse PDF");
+    let pages = doc.get_pages();
+    let oid = *pages.values().next().expect("PDF has no pages");
+    let page_obj = doc.get_object(oid).expect("Missing page object");
+    if let Ok(dict) = page_obj.as_dict() {
+        if let Ok(mb) = dict.get(b"MediaBox").and_then(|v| v.as_array()) {
+            if mb.len() == 4 {
+                let w = mb[2].as_float().unwrap_or(0.0);
+                let h = mb[3].as_float().unwrap_or(0.0);
+                assert!(w > h, "Expected {filename} to be landscape (width {w} > height {h})");
+                return;
+            }
+        }
+    }
+    panic!("Could not determine page orientation for {filename}");
+}
+
+/// Step: Then the "foo.pdf" PDF should NOT be set to landscape orientation
+pub async fn check_not_landscape(world: &mut FolioWorld, filename: String) {
+    let body = world.body.as_ref().expect("No response body");
+    let pdf_bytes = extract_named_pdf(body, &filename);
+    let doc = lopdf::Document::load_mem(&pdf_bytes).expect("Failed to parse PDF");
+    let pages = doc.get_pages();
+    let oid = *pages.values().next().expect("PDF has no pages");
+    let page_obj = doc.get_object(oid).expect("Missing page object");
+    if let Ok(dict) = page_obj.as_dict() {
+        if let Ok(mb) = dict.get(b"MediaBox").and_then(|v| v.as_array()) {
+            if mb.len() == 4 {
+                let w = mb[2].as_float().unwrap_or(0.0);
+                let h = mb[3].as_float().unwrap_or(0.0);
+                assert!(w <= h, "Expected {filename} to be portrait (width {w} <= height {h})");
+                return;
+            }
+        }
+    }
+    panic!("Could not determine page orientation for {filename}");
+}
+
+/// Step: Then all concurrent responses should have N PDF(s)
+pub async fn check_concurrent_pdf_count(world: &mut FolioWorld, expected: usize) {
+    let responses = world.concurrent_responses.as_ref().expect("No concurrent responses");
+    for (i, (_, body)) in responses.iter().enumerate() {
+        if expected == 1 {
+            assert!(
+                is_pdf_content(body),
+                "Concurrent response {} is not a PDF",
+                i
+            );
+        } else {
+            let count = count_pdfs_in_zip(body);
+            assert_eq!(count, expected, "Concurrent response {i} expected {expected} PDF(s), got {count}");
+        }
+    }
+}
+
 /// Step: Then the "foo.pdf" PDF should have the following content at page 1:
 /// """
 /// Expected text
