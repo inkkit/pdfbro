@@ -200,6 +200,90 @@ async fn url_to_pdf_against_local_axum() {
 }
 
 #[tokio::test]
+async fn url_to_pdf_real_network_default() {
+    // Proves that URL-to-PDF works with default BrowserConfig (no networkIdle wait).
+    // This was the main regression: the old default waited for networkIdle, which
+    // never fired for most real pages, causing a 60s timeout.
+    let router = Router::new().route(
+        "/page",
+        get(|| async {
+            Html("<!doctype html><html><body><h1>real network default</h1></body></html>")
+        }),
+    );
+    let (addr, shutdown) = spawn_server(router).await;
+
+    let Some(engine) = launch_engine().await else { return; };
+
+    let bytes = engine
+        .url_to_pdf(
+            &format!("http://{addr}/page"),
+            &PdfOptions::default(),
+            &RequestContext::default(),
+        )
+        .await
+        .expect("url_to_pdf timed out or failed — default must not wait for networkIdle");
+
+    assert!(bytes.starts_with(b"%PDF"), "output is not a PDF");
+    assert!(bytes.len() > 1024, "PDF suspiciously small: {} bytes", bytes.len());
+
+    engine.shutdown().await.ok();
+    let _ = shutdown.send(());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn url_to_pdf_network_idle_timeout_fallback() {
+    // A page that constantly polls /ping — networkIdle will never fire.
+    // With network_idle_timeout: Some(2s), the race should time out and
+    // still return a PDF rather than blocking until the 60s render timeout.
+    let router = Router::new()
+        .route(
+            "/busy",
+            get(|| async {
+                Html(r#"<!doctype html><html><body>
+                    <h1>busy page</h1>
+                    <script>setInterval(() => fetch('/ping'), 100);</script>
+                </body></html>"#)
+            }),
+        )
+        .route("/ping", get(|| async { "pong" }));
+    let (addr, shutdown) = spawn_server(router).await;
+
+    let cfg = BrowserConfig {
+        network_idle_timeout: Some(Duration::from_secs(2)),
+        executable: std::env::var("CHROME_PATH").ok().map(PathBuf::from),
+        ..BrowserConfig::default()
+    };
+    let engine = match ChromiumEngine::launch_with(cfg).await {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("skipping: failed to launch Chrome: {e}");
+            let _ = shutdown.send(());
+            return;
+        }
+    };
+
+    // The whole conversion must complete well under the 60s render timeout.
+    let result = tokio::time::timeout(
+        Duration::from_secs(15),
+        engine.url_to_pdf(
+            &format!("http://{addr}/busy"),
+            &PdfOptions::default(),
+            &RequestContext::default(),
+        ),
+    )
+    .await;
+
+    let bytes = result
+        .expect("timed out after 15s — network_idle_timeout fallback did not fire")
+        .expect("render failed");
+
+    assert!(bytes.starts_with(b"%PDF"), "output is not a PDF");
+
+    engine.shutdown().await.ok();
+    let _ = shutdown.send(());
+}
+
+#[tokio::test]
 async fn wait_selector_completes_when_element_appears() {
     let Some(engine) = launch_engine().await else { return; };
     let html = r#"
@@ -323,8 +407,6 @@ async fn cookies_and_headers_round_trip() {
         fail_on_resource_status: vec![],
         fail_on_console_exceptions: false,
         fail_on_resource_loading_failed: false,
-        skip_network_idle: false,
-        skip_network_almost_idle: false,
     };
 
     let bytes = engine
