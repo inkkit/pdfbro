@@ -461,6 +461,11 @@ pub struct BrowserConfig {
     /// None means no idle shutdown. Default: None.
     #[serde(with = "humantime_serde")]
     pub idle_shutdown_timeout: Option<Duration>,
+    /// When `Some(t)`, after `load` events fire, race `networkIdle` against
+    /// this timeout — whichever fires first wins. When `None` (default),
+    /// networkIdle is skipped entirely, matching gotenberg's default.
+    #[serde(with = "humantime_serde")]
+    pub network_idle_timeout: Option<Duration>,
 }
 
 impl Default for BrowserConfig {
@@ -473,6 +478,7 @@ impl Default for BrowserConfig {
             timeout: Duration::from_secs(60),
             lazy_start: false,
             idle_shutdown_timeout: None,
+            network_idle_timeout: None,
         }
     }
 }
