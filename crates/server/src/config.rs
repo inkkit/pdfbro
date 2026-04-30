@@ -167,11 +167,11 @@ pub struct ServerArgs {
 
     /// Comma-separated list of allowed URL regex patterns for downloadFrom
     /// (empty = allow all).
-    #[arg(long, value_name = "PATTERN", num_args = 0.., env = "API_DOWNLOAD_FROM_ALLOW_LIST")]
+    #[arg(long, value_name = "PATTERN", num_args = 0..)]
     pub api_download_from_allow_list: Vec<String>,
 
     /// Comma-separated list of denied URL regex patterns for downloadFrom.
-    #[arg(long, value_name = "PATTERN", num_args = 0.., env = "API_DOWNLOAD_FROM_DENY_LIST")]
+    #[arg(long, value_name = "PATTERN", num_args = 0..)]
     pub api_download_from_deny_list: Vec<String>,
 
     /// Maximum number of download retries per URL for downloadFrom (default 3).

@@ -116,8 +116,13 @@ pub async fn inject_downloads(
             });
         }
 
-        // Derive filename from URL path.
-        let filename = url_to_filename(&item.url);
+        // Derive filename from URL path, then sanitise to prevent path traversal.
+        let raw_name = url_to_filename(&item.url);
+        let filename = crate::multipart::sanitise_filename(&raw_name)
+            .ok_or_else(|| ApiError::InvalidField {
+                field: "downloadFrom",
+                message: format!("URL `{}` produces an unsafe filename", item.url),
+            })?;
 
         // Retry loop.
         let mut last_err = None;
@@ -139,8 +144,17 @@ pub async fn inject_downloads(
                         }
                     }
                 }
-                Ok(resp) => {
+                Ok(resp) if resp.status().is_server_error() => {
+                    // 5xx: transient, retry
                     last_err = Some(format!("HTTP {}", resp.status()));
+                }
+                Ok(resp) => {
+                    // 4xx or other: permanent client error, fail immediately
+                    return Err(ApiError::Internal(format!(
+                        "downloadFrom: URL `{}` returned permanent error {}",
+                        item.url,
+                        resp.status(),
+                    )));
                 }
                 Err(e) => {
                     last_err = Some(e.to_string());
@@ -259,6 +273,22 @@ mod tests {
     fn url_to_filename_basic() {
         assert_eq!(url_to_filename("https://example.com/docs/report.pdf"), "report.pdf");
         assert_eq!(url_to_filename("https://example.com/file.pdf?token=abc"), "file.pdf");
+    }
+
+    #[test]
+    fn url_to_filename_trailing_slash_returns_download() {
+        // Empty last segment falls back to "download".
+        assert_eq!(url_to_filename("https://example.com/"), "download");
+    }
+
+    #[test]
+    fn url_to_filename_path_traversal_rejected_by_sanitise() {
+        // url_to_filename returns ".." but sanitise_filename must reject it.
+        let raw = url_to_filename("http://evil.com/..");
+        assert_eq!(raw, "..");
+        // When used through the full flow, sanitise_filename catches it.
+        // Test that sanitise_filename rejects the output.
+        assert!(crate::multipart::sanitise_filename(&raw).is_none());
     }
 
     #[test]
