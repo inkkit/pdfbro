@@ -66,6 +66,9 @@ url = { workspace = true }
 # PDF inspection (page counts for split expansion)
 lopdf = { workspace = true }
 
+# URL pattern matching for downloadFrom allow/deny lists
+regex = "1"
+
 # CLI
 clap = { workspace = true }
 

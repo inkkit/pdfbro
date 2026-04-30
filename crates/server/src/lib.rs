@@ -12,6 +12,7 @@ pub mod backend;
 pub mod banner;
 pub mod batch_worker;
 pub mod config;
+pub mod download;
 pub mod error;
 pub mod logging;
 pub mod metrics;
