@@ -1035,6 +1035,124 @@ pub async fn pdfengines_decrypt(
     Ok(pdf_response(output, &filename))
 }
 
+// ---------------------------------------------------------------------------
+// /forms/pdfengines/optimise
+// ---------------------------------------------------------------------------
+
+use engine::{optimise_pdf, OptimiseBackend, OptimisePreset};
+
+/// `POST /forms/pdfengines/optimise`.
+pub async fn pdfengines_optimise(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
+    let _permit = acquire_permit(&state).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
+    let files = form.files_by_field("files");
+    if files.len() != 1 {
+        return Err(ApiError::InvalidField {
+            field: "files",
+            message: "optimise requires exactly one file".to_string(),
+        });
+    }
+
+    // Get preset (default: screen for max compression)
+    let preset_str = form.map.get("preset").map(|s| s.as_str()).unwrap_or("screen");
+    let preset = OptimisePreset::from_str(preset_str)
+        .ok_or_else(|| ApiError::InvalidField {
+            field: "preset",
+            message: format!(
+                "Invalid preset '{}'. Use: screen, ebook, printer",
+                preset_str
+            ),
+        })?;
+
+    // Optional: force specific backend
+    let preferred_backend = form.map.get("backend").and_then(|b| match b.as_str() {
+        "ghostscript" => Some(OptimiseBackend::Ghostscript),
+        "qpdf" => Some(OptimiseBackend::Qpdf),
+        _ => None,
+    });
+
+    let pdf_bytes = read_one(files[0]).await?;
+
+    // Check for async webhook mode before processing.
+    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+        &headers,
+        &state,
+        crate::webhook::WebhookOperation::PdfOptimise,
+        crate::webhook::JobData::PdfOptimise {
+            file: pdf_bytes.clone(),
+            preset: preset_str.to_string(),
+            backend: preferred_backend.map(|b| format!("{:?}", b).to_lowercase()),
+        },
+    )
+    .await?
+    {
+        return Ok(resp);
+    }
+
+    // Run optimisation
+    let optimise_result = optimise_pdf(&pdf_bytes, preset, preferred_backend)
+        .await
+        .map_err(ApiError::from)?;
+
+    // Build response with headers
+    let mut resp_headers = HeaderMap::new();
+
+    // Original size header
+    resp_headers.insert(
+        header::HeaderName::from_static("x-original-size"),
+        HeaderValue::from(optimise_result.original_size),
+    );
+
+    // Optimised size header
+    resp_headers.insert(
+        header::HeaderName::from_static("x-optimised-size"),
+        HeaderValue::from(optimise_result.optimised_size),
+    );
+
+    // Compression ratio
+    resp_headers.insert(
+        header::HeaderName::from_static("x-compression-ratio"),
+        HeaderValue::from_str(&format!("{:.2}", optimise_result.compression_ratio())).unwrap(),
+    );
+
+    // Reduction percentage
+    resp_headers.insert(
+        header::HeaderName::from_static("x-reduction-percent"),
+        HeaderValue::from_str(&format!("{:.1}%", optimise_result.reduction_percent())).unwrap(),
+    );
+
+    // Backend used
+    resp_headers.insert(
+        header::HeaderName::from_static("x-backend-used"),
+        HeaderValue::from_str(&format!("{:?}", optimise_result.backend).to_lowercase()).unwrap(),
+    );
+
+    // Content disposition
+    let filename = output_filename(&headers, &files[0].filename);
+    let output_filename = filename.replace(".pdf", "_optimised.pdf");
+    resp_headers.insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_str(&format!("attachment; filename=\"{}\"", output_filename)).unwrap(),
+    );
+
+    resp_headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/pdf"),
+    );
+
+    Ok((
+        StatusCode::OK,
+        resp_headers,
+        axum::body::Body::from(optimise_result.data),
+    )
+        .into_response())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

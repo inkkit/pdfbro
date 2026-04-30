@@ -210,6 +210,10 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
             post(pdfengines::pdfengines_decrypt),
         )
         .route(
+            "/forms/pdfengines/optimise",
+            post(pdfengines::pdfengines_optimise),
+        )
+        .route(
             "/forms/pdfengines/rotate",
             post(pdfengines::pdfengines_rotate),
         )
