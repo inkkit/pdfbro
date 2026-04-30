@@ -360,11 +360,24 @@ impl Default for WebhookClient {
 #[derive(Debug, Clone)]
 pub enum WebhookPayload {
     /// Single PDF file attachment.
-    Pdf { data: Vec<u8>, filename: String },
+    Pdf {
+        /// PDF file bytes.
+        data: Vec<u8>,
+        /// Output filename.
+        filename: String,
+    },
     /// ZIP archive attachment.
-    Zip { data: Vec<u8>, filename: String },
+    Zip {
+        /// ZIP archive bytes.
+        data: Vec<u8>,
+        /// Output filename.
+        filename: String,
+    },
     /// JSON-only payload (no attachment).
-    Json { data: serde_json::Value },
+    Json {
+        /// JSON response data.
+        data: serde_json::Value,
+    },
 }
 
 impl WebhookPayload {

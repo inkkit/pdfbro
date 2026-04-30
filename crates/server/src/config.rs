@@ -109,7 +109,7 @@ pub struct ServerArgs {
 
     // === Engine Supervision Flags ===
     /// Auto-start Chromium on first request instead of server startup.
-    #[arg(long, env = "CHROMIUM_AUTO_START")]
+    #[arg(long, env = "CHROMIUM_AUTO_START", default_value = "true")]
     pub chromium_auto_start: bool,
 
     /// Idle shutdown timeout for Chromium (e.g., "10m", "0" to disable).
@@ -117,7 +117,7 @@ pub struct ServerArgs {
     pub chromium_idle_shutdown_timeout: Option<String>,
 
     /// Auto-start LibreOffice on first request instead of server startup.
-    #[arg(long, env = "LIBREOFFICE_AUTO_START")]
+    #[arg(long, env = "LIBREOFFICE_AUTO_START", default_value = "true")]
     pub libreoffice_auto_start: bool,
 
     /// Idle shutdown timeout for LibreOffice (e.g., "10m", "0" to disable).

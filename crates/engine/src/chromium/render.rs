@@ -19,6 +19,7 @@ use chromiumoxide::cdp::browser_protocol::page::{EventDomContentEventFired, Even
 use chromiumoxide::cdp::js_protocol::runtime::EventExceptionThrown;
 use futures_util::StreamExt;
 use tokio::task::JoinHandle;
+use tracing::debug;
 
 use crate::types::{EngineError, EngineResult, PdfOptions};
 
@@ -122,7 +123,9 @@ async fn render_url_on(
     opts: &PdfOptions,
     request: &RequestContext,
 ) -> EngineResult<Vec<u8>> {
+    debug!("render_url_on: start");
     apply_request_context(engine, page, request).await?;
+    debug!("render_url_on: request context applied");
 
     // Set up event listeners before navigation.
     let main_frame_status = if request.fail_on_status.is_empty() {
@@ -150,9 +153,11 @@ async fn render_url_on(
     };
 
     // Navigate with lifecycle event waits.
+    debug!("render_url_on: navigating to {}" , url);
     navigate_with_lifecycle(page, url, request.skip_network_idle, request.skip_network_almost_idle)
         .await
         .map_err(|e| navigation_error(url, e))?;
+    debug!("render_url_on: navigation complete");
 
     // Check main frame status.
     if let Some((status, task)) = main_frame_status {
@@ -207,8 +212,11 @@ async fn render_url_on(
         }
     }
 
+    debug!("render_url_on: applying emulated media");
     apply_emulated_media(engine, page, opts).await?;
+    debug!("render_url_on: applying wait condition {:?}", opts.wait);
     wait::apply(page, &opts.wait).await?;
+    debug!("render_url_on: printing to PDF");
     print_to_pdf(engine, page, opts).await
 }
 
@@ -446,31 +454,46 @@ async fn navigate_with_lifecycle(
     skip_network_idle: bool,
     skip_network_almost_idle: bool,
 ) -> Result<(), chromiumoxide::error::CdpError> {
+    debug!("navigate_with_lifecycle: registering event listeners");
     // Start listening for lifecycle events before navigation.
     let mut dom_content_events = page.event_listener::<EventDomContentEventFired>().await?;
     let mut load_events = page.event_listener::<EventLoadEventFired>().await?;
+    debug!("navigate_with_lifecycle: listeners registered");
 
     // Navigate.
+    debug!("navigate_with_lifecycle: calling page.goto({})", url);
     page.goto(url).await?;
+    debug!("navigate_with_lifecycle: page.goto returned");
 
     // Always wait for domContentLoaded and load events.
+    debug!("navigate_with_lifecycle: waiting for domContentLoaded and load events");
     let dom_fut = async {
+        debug!("navigate_with_lifecycle: polling domContentLoaded event");
         dom_content_events.next().await;
+        debug!("navigate_with_lifecycle: domContentLoaded received");
     };
     let load_fut = async {
+        debug!("navigate_with_lifecycle: polling load event");
         load_events.next().await;
+        debug!("navigate_with_lifecycle: load event received");
     };
 
     tokio::join!(dom_fut, load_fut);
+    debug!("navigate_with_lifecycle: domContentLoaded and load done");
 
     // Conditionally wait for network idle events.
     if !skip_network_idle {
+        debug!("navigate_with_lifecycle: waiting for networkIdle");
         wait_lifecycle_event(page, "networkIdle").await?;
+        debug!("navigate_with_lifecycle: networkIdle received");
     }
     if !skip_network_almost_idle {
+        debug!("navigate_with_lifecycle: waiting for networkAlmostIdle");
         wait_lifecycle_event(page, "networkAlmostIdle").await?;
+        debug!("navigate_with_lifecycle: networkAlmostIdle received");
     }
 
+    debug!("navigate_with_lifecycle: complete");
     Ok(())
 }
 
@@ -480,11 +503,16 @@ async fn wait_lifecycle_event(
     event_name: &str,
 ) -> Result<(), chromiumoxide::error::CdpError> {
     use chromiumoxide::cdp::browser_protocol::page::EventLifecycleEvent;
+    debug!("wait_lifecycle_event: registering listener for {}", event_name);
     let mut events = page.event_listener::<EventLifecycleEvent>().await?;
+    debug!("wait_lifecycle_event: polling for {}", event_name);
     while let Some(ev) = events.next().await {
+        debug!("wait_lifecycle_event: received lifecycle event name={}", ev.name);
         if ev.name == event_name {
+            debug!("wait_lifecycle_event: matched {}", event_name);
             return Ok(());
         }
     }
+    debug!("wait_lifecycle_event: stream ended without {}", event_name);
     Ok(())
 }

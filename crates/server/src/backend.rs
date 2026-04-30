@@ -8,8 +8,6 @@
 //! tests in `tests/router.rs` exercise every code path without spawning
 //! Chrome.
 
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use engine::{EngineResult, PdfOptions};
 
