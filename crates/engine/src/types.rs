@@ -992,6 +992,15 @@ mod tests {
         assert_eq!(back.lazy_start, c.lazy_start);
         assert_eq!(back.idle_shutdown_timeout, c.idle_shutdown_timeout);
         assert_eq!(back.network_idle_timeout, c.network_idle_timeout);
+
+        // Verify Some(Duration) round-trips correctly through humantime_serde
+        let c2 = BrowserConfig {
+            network_idle_timeout: Some(Duration::from_secs(5)),
+            ..BrowserConfig::default()
+        };
+        let json2 = serde_json::to_string(&c2).unwrap();
+        let back2: BrowserConfig = serde_json::from_str(&json2).unwrap();
+        assert_eq!(back2.network_idle_timeout, c2.network_idle_timeout);
     }
 
     // --- Sanity: types are Send + Sync where expected ---------------------
