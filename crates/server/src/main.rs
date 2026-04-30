@@ -13,6 +13,7 @@ use server::routes::batch_state::{BatchStateManager, spawn_cleanup_task};
 use server::webhook::{WebhookClient, WebhookEngineContext, WebhookQueue, start_workers};
 use server::{AppState, ServerArgs, ServerConfig, banner, build_router, shutdown};
 use server::supervised_engine::{SupervisedChromiumEngine, SupervisedLibreOfficeEngine};
+use tracing::warn;
 
 #[cfg(feature = "chromium")]
 use engine::BrowserConfig;
@@ -58,7 +59,7 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
     #[cfg(feature = "libreoffice")]
     let lo_cfg = libreoffice_config_from(&config);
 
-    // Create supervised engines with auto-start and idle shutdown support
+    // Create supervised engines with lazy/eager start and idle shutdown support
     #[cfg(feature = "chromium")]
     let chromium = SupervisedChromiumEngine::new(browser_cfg);
     #[cfg(feature = "chromium")]
@@ -73,7 +74,21 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
     #[cfg(not(feature = "libreoffice"))]
     let _libreoffice: Option<()> = None;
 
-    // Check health - for auto-start engines, this will start them if not already running
+    // Eagerly start engines at server startup (unless lazy_start is enabled)
+    #[cfg(feature = "chromium")]
+    if !config.chromium_lazy_start {
+        if let Err(e) = chromium.start().await {
+            warn!(error = %e, "Failed to start Chromium engine at startup");
+        }
+    }
+    #[cfg(feature = "libreoffice")]
+    if !config.libreoffice_lazy_start {
+        if let Err(e) = libreoffice.start().await {
+            warn!(error = %e, "Failed to start LibreOffice engine at startup");
+        }
+    }
+
+    // Check health
     #[cfg(feature = "chromium")]
     let chromium_ready = chromium.healthy().await;
     #[cfg(not(feature = "chromium"))]
@@ -198,7 +213,7 @@ fn browser_config_from(config: &ServerConfig) -> BrowserConfig {
         extra_args: defaults.extra_args.clone(),
         no_sandbox: config.no_sandbox.unwrap_or(defaults.no_sandbox),
         timeout: config.request_timeout,
-        auto_start: config.chromium_auto_start,
+        lazy_start: config.chromium_lazy_start,
         idle_shutdown_timeout: config.chromium_idle_shutdown_timeout,
     }
 }
@@ -210,7 +225,7 @@ fn libreoffice_config_from(config: &ServerConfig) -> LibreOfficeConfig {
         executable: config.soffice_path.clone(),
         timeout: config.request_timeout,
         max_concurrency: defaults.max_concurrency,
-        auto_start: config.libreoffice_auto_start,
+        lazy_start: config.libreoffice_lazy_start,
         idle_shutdown_timeout: config.libreoffice_idle_shutdown_timeout,
     }
 }
