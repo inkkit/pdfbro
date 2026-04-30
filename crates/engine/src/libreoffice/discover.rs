@@ -116,10 +116,27 @@ fn is_executable(p: &Path) -> bool {
 
 /// Run `soffice --headless --version` under `timeout`. Empty stdout or a
 /// non-zero exit status is reported as `EngineError::Internal`.
+///
+/// Each call gets its own `UserInstallation` tempdir so concurrent probes
+/// (e.g. parallel test runs) never race for the default profile lock.
 pub(super) async fn probe(exe: &Path, timeout: Duration) -> EngineResult<()> {
+    let tmp = tempfile::tempdir()?;
+    let user_dir = tmp.path().join("probe");
+    std::fs::create_dir_all(&user_dir)?;
+    let user_url = if cfg!(windows) {
+        format!("file:///{}", user_dir.to_string_lossy().replace('\\', "/"))
+    } else {
+        format!("file://{}", user_dir.to_string_lossy())
+    };
+
     let mut cmd = tokio::process::Command::new(exe);
     cmd.arg("--headless")
+        .arg("--norestore")
+        .arg("--nologo")
+        .arg("--nodefault")
+        .arg("--nofirststartwizard")
         .arg("--version")
+        .arg(format!("-env:UserInstallation={user_url}"))
         .kill_on_drop(true)
         .stdin(std::process::Stdio::null());
 
