@@ -181,6 +181,12 @@ pub struct ServerArgs {
     /// Disable the downloadFrom multipart field entirely.
     #[arg(long, env = "API_DISABLE_DOWNLOAD_FROM")]
     pub api_disable_download_from: bool,
+
+    /// Override the request-correlation header name (default: `x-request-id`).
+    /// Must be a valid HTTP header name. When set, Folio reads this header from
+    /// incoming requests and propagates it to responses and trace spans.
+    #[arg(long, value_name = "HEADER", env = "API_CORRELATION_ID_HEADER")]
+    pub api_correlation_id_header: Option<String>,
 }
 
 /// Log output formats supported by the server.
@@ -285,6 +291,8 @@ pub struct ServerConfig {
     pub api_download_from_max_retry: u32,
     /// Whether downloadFrom is disabled.
     pub api_disable_download_from: bool,
+    /// Request-correlation header name.
+    pub api_correlation_id_header: String,
 }
 
 /// Errors produced by [`ServerConfig::resolve`].
@@ -500,6 +508,19 @@ impl ServerConfig {
         let api_disable_download_from = args.api_disable_download_from
             || env.get("API_DISABLE_DOWNLOAD_FROM").map(|v| is_truthy(v)).unwrap_or(false);
 
+        let api_correlation_id_header = args.api_correlation_id_header
+            .clone()
+            .or_else(|| env.get("API_CORRELATION_ID_HEADER").cloned())
+            .unwrap_or_else(|| "x-request-id".to_string());
+
+        // Validate the header name early so the server refuses to start on
+        // invalid config rather than panicking at request time.
+        axum::http::HeaderName::from_bytes(api_correlation_id_header.as_bytes())
+            .map_err(|_| ConfigError::Parse {
+                field: "api_correlation_id_header",
+                message: format!("`{}` is not a valid HTTP header name", api_correlation_id_header),
+            })?;
+
         Ok(Self {
             host,
             port,
@@ -535,6 +556,7 @@ impl ServerConfig {
             api_download_from_deny_list,
             api_download_from_max_retry,
             api_disable_download_from,
+            api_correlation_id_header,
         })
     }
 
@@ -830,5 +852,35 @@ mod tests {
         assert!(cfg.api_disable_health_route_telemetry);
         assert!(cfg.api_enable_debug_route);
         assert_eq!(cfg.api_basic_auth_username, Some("superuser".to_string()));
+    }
+
+    #[test]
+    fn correlation_id_header_defaults_to_x_request_id() {
+        let args = ServerArgs::default();
+        let cfg = ServerConfig::resolve(&args, &env(&[])).unwrap();
+        assert_eq!(cfg.api_correlation_id_header, "x-request-id");
+    }
+
+    #[test]
+    fn correlation_id_header_custom_value() {
+        let args = ServerArgs::default();
+        let cfg = ServerConfig::resolve(
+            &args,
+            &env(&[("API_CORRELATION_ID_HEADER", "x-trace-id")]),
+        )
+        .unwrap();
+        assert_eq!(cfg.api_correlation_id_header, "x-trace-id");
+    }
+
+    #[test]
+    fn correlation_id_header_invalid_value_rejected() {
+        let args = ServerArgs::default();
+        let err = ServerConfig::resolve(
+            &args,
+            &env(&[("API_CORRELATION_ID_HEADER", "has spaces bad")]),
+        )
+        .unwrap_err();
+        let ConfigError::Parse { field, .. } = err;
+        assert_eq!(field, "api_correlation_id_header");
     }
 }

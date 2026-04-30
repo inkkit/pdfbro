@@ -38,8 +38,6 @@ use crate::routes::chromium;
 use crate::routes::libreoffice;
 use crate::state::AppState;
 
-const REQUEST_ID_HEADER: &str = "x-request-id";
-
 /// Generates a UUIDv4 for every incoming request that did not already
 /// carry an `X-Request-Id` header.
 #[derive(Clone, Default)]
@@ -65,6 +63,8 @@ struct RequestIdMakeSpan {
     disable_debug: bool,
     /// Whether to disable telemetry for version route.
     disable_version: bool,
+    /// Header name to read the request ID from.
+    header_name: String,
 }
 
 impl RequestIdMakeSpan {
@@ -74,6 +74,7 @@ impl RequestIdMakeSpan {
             disable_root: config.api_disable_root_route_telemetry,
             disable_debug: config.api_disable_debug_route_telemetry,
             disable_version: config.api_disable_version_route_telemetry,
+            header_name: config.api_correlation_id_header.clone(),
         }
     }
 
@@ -99,7 +100,7 @@ impl<B> MakeSpan<B> for RequestIdMakeSpan {
 
         let request_id = request
             .headers()
-            .get(REQUEST_ID_HEADER)
+            .get(self.header_name.as_str())
             .and_then(|v| v.to_str().ok())
             .unwrap_or("unknown")
             .to_string();
@@ -238,7 +239,10 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
         untimed = untimed.route("/debug", get(health::debug));
     }
 
-    let header_name = HeaderName::from_static(REQUEST_ID_HEADER);
+    let header_name = HeaderName::from_bytes(
+        config.api_correlation_id_header.as_bytes(),
+    )
+    .expect("api_correlation_id_header was validated in ServerConfig::resolve");
 
     let mut router = Router::new()
         .merge(timed)
