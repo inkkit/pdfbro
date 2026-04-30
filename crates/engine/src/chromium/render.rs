@@ -10,7 +10,10 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use chromiumoxide::Page;
-use chromiumoxide::cdp::browser_protocol::emulation::SetEmulatedMediaParams;
+use chromiumoxide::cdp::browser_protocol::dom::Rgba;
+use chromiumoxide::cdp::browser_protocol::emulation::{
+    SetDefaultBackgroundColorOverrideParams, SetEmulatedMediaParams,
+};
 use chromiumoxide::cdp::browser_protocol::network::{
     CookieParam, EventLoadingFailed, EventResponseReceived, Headers, ResourceType,
     SetExtraHttpHeadersParams, SetUserAgentOverrideParams,
@@ -100,6 +103,7 @@ async fn render_html_on(
     }
 
     apply_emulated_media(engine, page, opts).await?;
+    apply_omit_background(engine, page, opts.omit_background).await?;
     inject_print_color_adjust(engine, page, opts.print_background).await?;
     wait::apply(page, &opts.wait).await?;
     print_to_pdf(engine, page, opts).await
@@ -215,6 +219,7 @@ async fn render_url_on(
 
     debug!("render_url_on: applying emulated media");
     apply_emulated_media(engine, page, opts).await?;
+    apply_omit_background(engine, page, opts.omit_background).await?;
     inject_print_color_adjust(engine, page, opts.print_background).await?;
     debug!("render_url_on: applying wait condition {:?}", opts.wait);
     wait::apply(page, &opts.wait).await?;
@@ -349,6 +354,29 @@ async fn inject_print_color_adjust(
     page.evaluate(script)
         .await
         .map_err(|e| engine.map_cdp_error(e))?;
+    Ok(())
+}
+
+/// Override the default background color to transparent (RGBA 0,0,0,0) when
+/// `omit_background` is `true`. This is the CDP equivalent of Puppeteer's
+/// `page.setBackgroundColor({r:0,g:0,b:0,a:0})` that Gotenberg uses.
+async fn apply_omit_background(
+    engine: &ChromiumEngine,
+    page: &Page,
+    omit_background: bool,
+) -> EngineResult<()> {
+    if omit_background {
+        page.execute(SetDefaultBackgroundColorOverrideParams {
+            color: Some(Rgba {
+                r: 0,
+                g: 0,
+                b: 0,
+                a: Some(0.0),
+            }),
+        })
+        .await
+        .map_err(|e| engine.map_cdp_error(e))?;
+    }
     Ok(())
 }
 

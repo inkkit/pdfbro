@@ -452,6 +452,19 @@ pub fn parse_pdf_options(map: &HashMap<String, String>) -> ApiResult<PdfOptions>
     if let Some(v) = opt_bool(map, "printBackground")? {
         opts.print_background = v;
     }
+
+    if let Some(v) = opt_bool(map, "omitBackground")? {
+        opts.omit_background = v;
+    }
+
+    // Gotenberg parity: omitBackground requires printBackground=true.
+    if opts.omit_background && !opts.print_background {
+        return Err(ApiError::InvalidField {
+            field: "omitBackground",
+            message: "omitBackground=true requires printBackground=true".to_string(),
+        });
+    }
+
     if let Some(v) = opt_bool(map, "preferCssPageSize")? {
         opts.prefer_css_page_size = v;
     }
@@ -1075,5 +1088,36 @@ mod tests {
         let html = render_markdown("| a | b |\n|---|---|\n| 1 | 2 |\n");
         assert!(html.contains("<table>"));
         assert!(html.contains("<td>1</td>"));
+    }
+
+    #[test]
+    fn omit_background_requires_print_background() {
+        let map: HashMap<String, String> = [
+            ("omitBackground".to_string(), "true".to_string()),
+            ("printBackground".to_string(), "false".to_string()),
+        ]
+        .into_iter()
+        .collect();
+        let err = parse_pdf_options(&map).unwrap_err();
+        assert!(matches!(err, ApiError::InvalidField { field: "omitBackground", .. }));
+    }
+
+    #[test]
+    fn omit_background_with_print_background_ok() {
+        let map: HashMap<String, String> = [
+            ("omitBackground".to_string(), "true".to_string()),
+            ("printBackground".to_string(), "true".to_string()),
+        ]
+        .into_iter()
+        .collect();
+        let opts = parse_pdf_options(&map).unwrap();
+        assert!(opts.omit_background);
+        assert!(opts.print_background);
+    }
+
+    #[test]
+    fn omit_background_defaults_false() {
+        let opts = parse_pdf_options(&HashMap::new()).unwrap();
+        assert!(!opts.omit_background);
     }
 }

@@ -84,6 +84,7 @@ mod tests {
             landscape: true,
             scale: 0.75,
             print_background: false,
+            omit_background: false,
             prefer_css_page_size: true,
             emulate_media: Some(MediaType::Screen),
             page_ranges: Some(PageRanges::parse("1-3,5").unwrap()),
