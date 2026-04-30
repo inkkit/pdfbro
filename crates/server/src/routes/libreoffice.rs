@@ -27,7 +27,8 @@ pub async fn libreoffice_convert(
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let lo = state
         .libreoffice
         .as_ref()

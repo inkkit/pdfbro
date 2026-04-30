@@ -31,7 +31,8 @@ pub async fn chromium_html(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let index = form
         .find_named("files", INDEX_HTML)
         .ok_or_else(|| ApiError::MissingFile(INDEX_HTML.to_string()))?;
@@ -101,7 +102,8 @@ pub async fn chromium_url(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let url = form
         .map
         .get("url")
@@ -184,7 +186,8 @@ pub async fn chromium_markdown(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let opts = parse_pdf_options(&form.map)?;
     opts.validate()?;
     let ctx = parse_request_context(&form.map)?;
@@ -648,7 +651,8 @@ pub async fn chromium_screenshot_html(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let index = form
         .find_named("files", INDEX_HTML)
         .ok_or_else(|| ApiError::MissingFile(INDEX_HTML.to_string()))?;
@@ -713,7 +717,8 @@ pub async fn chromium_screenshot_url(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let url = form.map.get("url").ok_or(ApiError::MissingField("url"))?;
 
     let opts = parse_screenshot_options(&form.map)?;
@@ -773,7 +778,8 @@ pub async fn chromium_screenshot_markdown(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let index = form
         .find_named("files", "index.md")
         .ok_or_else(|| ApiError::MissingFile("index.md".to_string()))?;

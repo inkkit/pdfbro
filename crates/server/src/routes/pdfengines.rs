@@ -32,7 +32,8 @@ pub async fn pdfengines_merge(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
     if files.len() < 2 {
         return Err(ApiError::InvalidField {
@@ -121,7 +122,8 @@ pub async fn pdfengines_split(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
     if files.len() != 1 {
         return Err(ApiError::InvalidField {
@@ -264,7 +266,8 @@ pub async fn pdfengines_flatten(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
     if files.is_empty() {
         return Err(ApiError::MissingFile("files".to_string()));
@@ -326,7 +329,8 @@ pub async fn pdfengines_metadata_read(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
     if files.is_empty() {
         return Err(ApiError::MissingFile("files".to_string()));
@@ -379,7 +383,8 @@ pub async fn pdfengines_metadata_write(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
     if files.is_empty() {
         return Err(ApiError::MissingFile("files".to_string()));
@@ -448,7 +453,8 @@ pub async fn pdfengines_rotate(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
     if files.len() != 1 {
         return Err(ApiError::InvalidField {
@@ -558,7 +564,8 @@ pub async fn pdfengines_convert(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
     if files.len() != 1 {
         return Err(ApiError::InvalidField {
@@ -607,7 +614,8 @@ pub async fn pdfengines_bookmarks_read(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
     if files.len() != 1 {
         return Err(ApiError::InvalidField {
@@ -655,7 +663,8 @@ pub async fn pdfengines_bookmarks_write(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
     if files.len() != 1 {
         return Err(ApiError::InvalidField {
@@ -705,7 +714,8 @@ pub async fn pdfengines_watermark(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
     if files.len() != 1 {
         return Err(ApiError::InvalidField {
@@ -760,7 +770,8 @@ pub async fn pdfengines_stamp(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
     if files.len() != 1 {
         return Err(ApiError::InvalidField {
@@ -860,7 +871,8 @@ pub async fn pdfengines_encrypt(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
     if files.len() != 1 {
         return Err(ApiError::InvalidField {
@@ -915,7 +927,8 @@ pub async fn pdfengines_decrypt(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
     if files.len() != 1 {
         return Err(ApiError::InvalidField {

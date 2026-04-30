@@ -299,6 +299,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn inject_downloads_disabled_is_noop() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let mut form = FormFields {
+            files: vec![],
+            map: {
+                let mut m = HashMap::new();
+                m.insert("downloadFrom".to_string(), r#"[{"url":"http://127.0.0.1:1/never.pdf"}]"#.to_string());
+                m
+            },
+            tmp,
+        };
+
+        let mut env = HashMap::new();
+        env.insert("API_DISABLE_DOWNLOAD_FROM".to_string(), "true".to_string());
+        let config = crate::config::ServerConfig::resolve(
+            &crate::config::ServerArgs::default(),
+            &env,
+        )
+        .unwrap();
+
+        // Even though the URL is unreachable, disabled config should be a no-op.
+        inject_downloads(&mut form, &config).await.unwrap();
+        assert!(form.files.is_empty());
+    }
+
+    #[tokio::test]
     async fn inject_downloads_fetches_and_appends_file() {
         use axum::Router;
         use axum::routing::get;
