@@ -76,6 +76,18 @@ pub struct ResourceError {
     pub error: String,
 }
 
+/// A single field validation error.
+#[derive(Debug, Clone, Serialize)]
+pub struct FieldError {
+    /// Name of the field that failed validation.
+    pub field: String,
+    /// Error message explaining what's wrong.
+    pub message: String,
+    /// The invalid value that was provided (if available).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+}
+
 /// All error shapes the server can emit.
 #[derive(Debug)]
 pub enum ApiError {
@@ -110,6 +122,8 @@ pub enum ApiError {
     Gone,
     /// Sub-resource(s) failed to load (images, CSS, fonts, etc.).
     ResourceErrors(Vec<ResourceError>),
+    /// Multiple field validation errors (collects all validation failures).
+    MultipleValidationErrors(Vec<FieldError>),
 }
 
 impl ApiError {
@@ -131,6 +145,7 @@ impl ApiError {
             ApiError::NotFound => (StatusCode::NOT_FOUND, "NOT_FOUND"),
             ApiError::Gone => (StatusCode::GONE, "GONE"),
             ApiError::ResourceErrors(_) => (StatusCode::BAD_GATEWAY, "RESOURCE_ERROR"),
+            ApiError::MultipleValidationErrors(_) => (StatusCode::BAD_REQUEST, "VALIDATION_ERRORS"),
         }
     }
 
@@ -435,6 +450,22 @@ impl ApiError {
                 documentation: Some(documentation_link("UNSUPPORTED_MEDIA_TYPE")),
             },
 
+            // Multiple validation errors - collect all field errors
+            ApiError::MultipleValidationErrors(errors) => ApiErrorResponse {
+                error: format!("{} validation errors", errors.len()),
+                code: code.to_string(),
+                details: Some(ErrorDetails {
+                    field: Some(errors.iter().map(|e| e.field.clone()).collect::<Vec<_>>().join(", ")),
+                    ..Default::default()
+                }),
+                suggestion: Some(format!(
+                    "Fix the {} field(s): {}",
+                    errors.len(),
+                    errors.iter().map(|e| format!("{}: {}", e.field, e.message)).collect::<Vec<_>>().join("; ")
+                )),
+                documentation: Some(documentation_link("VALIDATION_ERRORS")),
+            },
+
             // Webhook errors
             ApiError::Webhook(msg) => ApiErrorResponse {
                 error: msg.clone(),
@@ -627,6 +658,7 @@ fn documentation_link(error_code: &str) -> String {
         "IDLE_TIMEOUT" => "/troubleshooting#idle-timeout",
         "RESOURCE_TIMEOUT" => "/troubleshooting#resource-timeout",
         "LIBREOFFICE_TIMEOUT" => "/troubleshooting#libreoffice-timeout",
+        "VALIDATION_ERRORS" => "/api#validation-errors",
         "INVALID_OPTION" | "INVALID_FIELD" => "/api#form-fields",
         "INVALID_PAGE_RANGE" => "/api#page-ranges",
         "MISSING_FIELD" | "MISSING_FILE" => "/api#required-fields",

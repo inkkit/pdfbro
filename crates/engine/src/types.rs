@@ -109,6 +109,58 @@ impl From<lopdf::Error> for EngineError {
 pub type EngineResult<T> = Result<T, EngineError>;
 
 // ---------------------------------------------------------------------------
+// Partial Success & Warnings
+// ---------------------------------------------------------------------------
+
+/// Severity level for conversion warnings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WarningSeverity {
+    /// Informational - resource failed but not critical (e.g., tracking pixel).
+    Info,
+    /// Warning - resource failed, quality may be degraded.
+    Warning,
+    /// Critical - resource failed, consider retry.
+    Critical,
+}
+
+/// A warning about a non-fatal issue during conversion.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConversionWarning {
+    /// URL or resource that caused the warning.
+    pub resource: String,
+    /// HTTP status code if applicable.
+    pub status_code: Option<u16>,
+    /// Warning message.
+    pub message: String,
+    /// Severity level.
+    pub severity: WarningSeverity,
+}
+
+/// Result of a conversion with potential warnings.
+///
+/// This allows returning a successful PDF along with warnings about
+/// non-critical issues (e.g., missing images that don't prevent PDF generation).
+#[derive(Debug, Clone)]
+pub struct ConversionResult {
+    /// The generated PDF bytes.
+    pub pdf_bytes: Vec<u8>,
+    /// Warnings about non-critical issues during conversion.
+    pub warnings: Vec<ConversionWarning>,
+    /// Number of pages in the generated PDF.
+    pub page_count: u32,
+}
+
+/// Extension trait for PdfOptions to support partial success mode.
+pub trait PartialSuccessOptions {
+    /// Whether to fail conversion if any resource fails (default: true).
+    ///
+    /// When `false`, the conversion continues and returns warnings
+    /// for failed resources instead of failing entirely.
+    fn fail_on_resource_error(&self) -> bool;
+}
+
+// ---------------------------------------------------------------------------
 // Paper size
 // ---------------------------------------------------------------------------
 
