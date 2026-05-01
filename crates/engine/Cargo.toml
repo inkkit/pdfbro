@@ -9,7 +9,7 @@ description = "Folio core engine: ChromiumEngine, LibreOfficeEngine, PdfOperatio
 default = ["chromium", "libreoffice"]
 chromium = ["dep:chromiumoxide", "dep:futures-util", "dep:pulldown-cmark", "dep:urlencoding"]
 libreoffice = []
-chrome-fetch = ["chromium", "dep:reqwest", "dep:sha2", "dep:zip", "dep:flate2", "dep:tar", "dep:dirs"]
+chrome-fetch = ["chromium", "dep:reqwest", "dep:sha2", "dep:zip", "dep:flate2", "dep:tar", "dep:dirs", "dep:walkdir"]
 
 [dependencies]
 chromiumoxide = { workspace = true, optional = true }
@@ -38,6 +38,7 @@ zip = { workspace = true, optional = true }
 flate2 = { workspace = true, optional = true }
 tar = { workspace = true, optional = true }
 dirs = { workspace = true, optional = true }
+walkdir = { workspace = true, optional = true }
 
 [dev-dependencies]
 axum = { workspace = true }
