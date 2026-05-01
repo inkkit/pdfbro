@@ -107,7 +107,7 @@ async fn test_validate_fonts_returns_200_with_html() {
     let html_content = r#"<style>body { font-family: 'Arial', sans-serif; }</style><body>Test</body>"#;
 
     let body = format!(
-        "------{}\r\nContent-Disposition: form-data; name=\"html\"\r\n\r\n{}\r\n------{}--\r\n",
+        "--{}\r\nContent-Disposition: form-data; name=\"html\"\r\n\r\n{}\r\n--{}--\r\n",
         boundary, html_content, boundary
     );
 
@@ -128,7 +128,7 @@ async fn test_validate_fonts_returns_400_without_input() {
 
     let boundary = "----test-boundary";
     let body = format!(
-        "------{}\r\nContent-Disposition: form-data; name=\"other\"\r\n\r\nvalue\r\n------{}--\r\n",
+        "--{}\r\nContent-Disposition: form-data; name=\"other\"\r\n\r\nvalue\r\n--{}--\r\n",
         boundary, boundary
     );
 
@@ -151,7 +151,7 @@ async fn test_diagnose_html_returns_200() {
     let html_content = r#"<!DOCTYPE html><html><head><style>body { font-family: 'Arial'; }</style></head><body><h1>Test</h1></body></html>"#;
 
     let body = format!(
-        "------{}\r\nContent-Disposition: form-data; name=\"html\"\r\n\r\n{}\r\n------{}--\r\n",
+        "--{}\r\nContent-Disposition: form-data; name=\"html\"\r\n\r\n{}\r\n--{}--\r\n",
         boundary, html_content, boundary
     );
 
@@ -172,7 +172,7 @@ async fn test_diagnose_html_returns_400_without_html() {
 
     let boundary = "----test-boundary";
     let body = format!(
-        "------{}\r\nContent-Disposition: form-data; name=\"other\"\r\n\r\nvalue\r\n------{}--\r\n",
+        "--{}\r\nContent-Disposition: form-data; name=\"other\"\r\n\r\nvalue\r\n--{}--\r\n",
         boundary, boundary
     );
 

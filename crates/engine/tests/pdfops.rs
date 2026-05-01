@@ -199,3 +199,50 @@ proptest! {
         prop_assert_eq!(page_count(&left), (sa + sb + sc) as usize);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Merge + Metadata round-trip
+// ---------------------------------------------------------------------------
+
+#[test]
+fn merge_then_write_metadata_round_trips_author() {
+    let pdf1 = make_multipage_pdf(1);
+    let pdf2 = make_multipage_pdf(1);
+    let merged = merge(&[&pdf1, &pdf2]).unwrap();
+
+    let mut meta = Metadata::default();
+    meta.author = Some("Julien Neuhart".into());
+    meta.title = Some("Sample".into());
+
+    let with_meta = write_metadata(&merged, &meta).unwrap();
+    let read_back = read_metadata(&with_meta).unwrap();
+
+    assert_eq!(read_back.author.as_deref(), Some("Julien Neuhart"));
+    assert_eq!(read_back.title.as_deref(), Some("Sample"));
+}
+
+// ---------------------------------------------------------------------------
+// Merge + Bookmarks round-trip
+// ---------------------------------------------------------------------------
+
+#[test]
+fn merge_then_write_bookmarks_round_trips() {
+    use engine::bookmarks::{read_bookmarks, write_bookmarks, Bookmark};
+
+    let pdf1 = make_multipage_pdf(1);
+    let pdf2 = make_multipage_pdf(1);
+    let merged = merge(&[&pdf1, &pdf2]).unwrap();
+
+    let bookmarks = vec![Bookmark {
+        title: "Merged Index".into(),
+        page: 1,
+        children: vec![],
+    }];
+
+    let with_bm = write_bookmarks(&merged, &bookmarks).unwrap();
+    let read_back = read_bookmarks(&with_bm).unwrap();
+
+    assert_eq!(read_back.len(), 1);
+    assert_eq!(read_back[0].title, "Merged Index");
+    assert_eq!(read_back[0].page, 1);
+}
