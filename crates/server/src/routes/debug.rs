@@ -232,9 +232,9 @@ static FONT_FACE_RE: OnceLock<Regex> = OnceLock::new();
 fn extract_font_families_from_html(html: &str) -> Vec<String> {
     let mut families = HashSet::new();
 
-    // Match font-family in style attributes
+    // Match font-family in style attributes - capture everything up to ; or }
     let font_family_re = FONT_FAMILY_RE.get_or_init(|| {
-        Regex::new(r#"font-family\s*:\s*['"]?([^'";,}]+)['"]?"#).unwrap()
+        Regex::new(r#"font-family\s*:\s*([^;}]+)"#).unwrap()
     });
 
     for cap in font_family_re.captures_iter(html) {
