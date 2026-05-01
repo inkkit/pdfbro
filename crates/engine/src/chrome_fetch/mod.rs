@@ -27,8 +27,11 @@ pub const CHROME_VERSION: &str = include_str!("../../../../bindings/CHROME_VERSI
 /// Options controlling [`ensure_chrome`].
 #[derive(Debug, Clone)]
 pub struct EnsureOptions {
+    /// Explicit path to a Chrome executable; skips all detection if set.
     pub explicit: Option<PathBuf>,
+    /// Override the platform cache directory used for downloaded binaries.
     pub cache_dir: Option<PathBuf>,
+    /// When `true`, download Chrome automatically if no system Chrome is found.
     pub auto_download: bool,
 }
 
