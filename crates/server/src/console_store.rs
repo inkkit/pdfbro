@@ -1,6 +1,6 @@
 // crates/server/src/console_store.rs
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex, broadcast};
 
@@ -61,7 +61,7 @@ pub struct ConsoleStore {
     pub chromium_was_running: AtomicBool,
     pub libreoffice_restarts: AtomicU32,
     pub libreoffice_was_running: AtomicBool,
-    // Rolling p95 approximation updated by request log middleware
+    // Rolling-max p95 approximation; updated by request log middleware, reset to 0 by sampler each tick
     pub last_p95_ms: Mutex<f64>,
     // RPS delta tracking
     pub prev_http_total: Mutex<f64>,
@@ -120,6 +120,8 @@ impl ConsoleStore {
     }
 }
 
-// Suppress dead_code warnings — fields are used by future tasks
-#[allow(dead_code)]
-const _ATOMIC_ORDERING_USED: Ordering = Ordering::SeqCst;
+impl Default for ConsoleStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
