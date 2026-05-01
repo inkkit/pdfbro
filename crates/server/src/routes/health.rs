@@ -1,5 +1,7 @@
 //! `/health`, `/version`, and `/prometheus/metrics` routes.
 
+use std::time::SystemTime;
+
 use axum::Json;
 use axum::extract::State;
 use axum::http::header;
@@ -28,19 +30,37 @@ pub async fn health(State(state): State<AppState>) -> impl IntoResponse {
     // Update engine health metrics
     state.metrics.update_engine_health(chromium_up, lo_up);
 
-    let uptime_secs = state.started_at.elapsed().as_secs();
-    Json(json!({
+    let _uptime_secs = state.started_at.elapsed().as_secs();
+    let ts = {
+        let secs = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        format!("{secs}")
+    };
+    let body = json!({
         "status": "up",
-        "uptime_secs": uptime_secs,
-        "chromium": if chromium_up { "up" } else { "down" },
-        "libreoffice": if lo_up { "up" } else { "down" },
-    }))
+        "details": {
+            "chromium": {
+                "status": if chromium_up { "up" } else { "down" },
+                "timestamp": ts
+            },
+            "libreoffice": {
+                "status": if lo_up { "up" } else { "down" },
+                "timestamp": ts
+            }
+        }
+    });
+    (
+        [(header::CONTENT_TYPE, "application/json; charset=utf-8")],
+        Json(body),
+    )
 }
 
 /// Crate version, plain text.
 pub async fn version() -> impl IntoResponse {
     (
-        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        [(header::CONTENT_TYPE, "text/plain; charset=UTF-8")],
         env!("CARGO_PKG_VERSION"),
     )
 }
@@ -52,10 +72,58 @@ pub async fn metrics_handler() -> impl IntoResponse {
         .status(axum::http::StatusCode::OK)
         .header(
             header::CONTENT_TYPE,
-            "text/plain; version=0.0.4; charset=utf-8",
+            "text/plain; version=0.0.4; charset=utf-8; escaping=underscores",
         )
         .body(metrics)
         .unwrap()
+}
+
+/// `GET /` — lists all registered routes, matching Gotenberg's convention.
+pub async fn root() -> impl IntoResponse {
+    const ROUTES: &str = "\
+GET /
+GET /health
+GET /version
+GET /prometheus/metrics
+POST /forms/chromium/convert/html
+POST /forms/chromium/convert/url
+POST /forms/chromium/convert/markdown
+POST /forms/chromium/screenshot/html
+POST /forms/chromium/screenshot/url
+POST /forms/chromium/screenshot/markdown
+POST /forms/libreoffice/convert
+POST /forms/pdfengines/merge
+POST /forms/pdfengines/split
+POST /forms/pdfengines/flatten
+POST /forms/pdfengines/convert
+POST /forms/pdfengines/metadata/read
+POST /forms/pdfengines/metadata/write
+POST /forms/pdfengines/bookmarks/read
+POST /forms/pdfengines/bookmarks/write
+POST /forms/pdfengines/watermark
+POST /forms/pdfengines/stamp
+POST /forms/pdfengines/encrypt
+POST /forms/pdfengines/decrypt
+POST /forms/pdfengines/rotate
+POST /forms/pdfengines/embed
+POST /forms/batch/submit
+GET /forms/batch/{id}/status
+GET /forms/batch/{id}/download
+";
+    (
+        [(header::CONTENT_TYPE, "text/html; charset=UTF-8")],
+        ROUTES,
+    )
+}
+
+/// `GET /favicon.ico` — returns 204 No Content (matching Gotenberg's convention).
+pub async fn favicon() -> impl IntoResponse {
+    axum::http::StatusCode::NO_CONTENT
+}
+
+/// `HEAD /health` — same as GET but with no body.
+pub async fn health_head() -> impl IntoResponse {
+    axum::http::StatusCode::OK
 }
 
 /// Debug endpoint - exposes server configuration and state.
@@ -82,4 +150,23 @@ pub async fn debug(State(state): State<AppState>) -> impl IntoResponse {
             "libreoffice": cfg!(feature = "libreoffice"),
         }
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::body::to_bytes;
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
+
+    #[tokio::test]
+    async fn root_returns_200_with_route_list() {
+        let resp = super::root().await.into_response();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = to_bytes(resp.into_body(), 64 * 1024).await.unwrap();
+        let text = std::str::from_utf8(&body).unwrap();
+        assert!(text.contains("/health"), "missing /health in root listing");
+        assert!(text.contains("/forms/chromium/convert/html"), "missing html route");
+        assert!(text.contains("/forms/pdfengines/merge"), "missing merge route");
+        assert!(text.contains("/forms/pdfengines/embed"), "missing embed route");
+    }
 }

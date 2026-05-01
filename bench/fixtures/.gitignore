@@ -1,0 +1,2 @@
+# Allow fixture PDF files in this directory
+!*.pdf

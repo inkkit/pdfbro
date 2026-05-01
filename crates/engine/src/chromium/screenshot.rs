@@ -57,7 +57,7 @@ impl ScreenshotFormat {
     pub fn extension(&self) -> &'static str {
         match self {
             ScreenshotFormat::Png => "png",
-            ScreenshotFormat::Jpeg { .. } => "jpg",
+            ScreenshotFormat::Jpeg { .. } => "jpeg",
             ScreenshotFormat::Webp { .. } => "webp",
         }
     }
@@ -406,7 +406,7 @@ mod tests {
     #[test]
     fn screenshot_format_extension() {
         assert_eq!(ScreenshotFormat::Png.extension(), "png");
-        assert_eq!(ScreenshotFormat::Jpeg { quality: 80 }.extension(), "jpg");
+        assert_eq!(ScreenshotFormat::Jpeg { quality: 80 }.extension(), "jpeg");
         assert_eq!(ScreenshotFormat::Webp { quality: 80 }.extension(), "webp");
     }
 

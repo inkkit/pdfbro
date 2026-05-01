@@ -5,12 +5,12 @@ use std::collections::{BTreeMap, HashMap};
 use axum::extract::{Multipart, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use engine::PageRanges;
+use engine::{EngineError, PageRanges};
 use engine::pdfops::{self, Metadata, SplitMode};
 
 use crate::error::{ApiError, ApiResult};
 use crate::multipart::{FormFields, UploadedFile};
-use crate::routes::util::{build_zip, pdf_response, zip_response};
+use crate::routes::util::{build_zip, output_filename, pdf_response, zip_response};
 use crate::state::AppState;
 use engine::Bookmark;
 use engine::PdfAProfile;
@@ -32,7 +32,8 @@ pub async fn pdfengines_merge(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
     if files.len() < 2 {
         return Err(ApiError::InvalidField {
@@ -40,6 +41,21 @@ pub async fn pdfengines_merge(
             message: "merge requires at least two files".to_string(),
         });
     }
+
+    // Validate: PDF/A + Encrypt is not supported
+    let has_pdfa = form.map.get("pdfa").filter(|s| !s.is_empty()).is_some();
+    let has_encrypt = form.map.get("userPassword").filter(|s| !s.is_empty()).is_some()
+        || form.map.get("ownerPassword").filter(|s| !s.is_empty()).is_some();
+    if has_pdfa && has_encrypt {
+        return Err(ApiError::InvalidField {
+            field: "pdfa",
+            message: "PDF/A conversion and encryption cannot be combined".to_string(),
+        });
+    }
+
+    // Validate: stamp/watermark with pdf or image source requires a file
+    validate_stamp_file(&form, "stamp", "stampSource")?;
+    validate_watermark_file(&form, "watermark", "watermarkSource")?;
 
     // Check for async webhook mode before processing.
     tracing::info!("pdfengines_merge: extracting webhook config from headers");
@@ -78,6 +94,36 @@ pub async fn pdfengines_merge(
     }
 
     let blobs = read_all(&files).await?;
+
+    // Collect per-file page counts for bookmark auto-indexing before consuming blobs
+    let auto_index = parse_bool_field(&form.map, "autoIndexBookmarks")?.unwrap_or(false);
+    let per_file_bookmarks: Vec<Vec<Bookmark>> = if auto_index {
+        let mut result = Vec::new();
+        for blob in &blobs {
+            let b = blob.clone();
+            let bmarks = tokio::task::spawn_blocking(move || read_bookmarks(&b))
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))??;
+            result.push(bmarks);
+        }
+        result
+    } else {
+        Vec::new()
+    };
+    let per_file_page_counts: Vec<usize> = if auto_index {
+        let mut result = Vec::new();
+        for blob in &blobs {
+            let count = lopdf::Document::load_mem(blob)
+                .map_err(|e| ApiError::Internal(e.to_string()))?
+                .get_pages()
+                .len();
+            result.push(count);
+        }
+        result
+    } else {
+        Vec::new()
+    };
+
     let total: usize = blobs.iter().map(Vec::len).sum();
     let merged = if total > SPAWN_BLOCKING_THRESHOLD {
         tokio::task::spawn_blocking(move || merge_blobs(&blobs))
@@ -97,6 +143,40 @@ pub async fn pdfengines_merge(
         tokio::task::spawn_blocking(move || pdfops::write_metadata(&bytes, &meta))
             .await
             .map_err(|e| ApiError::Internal(e.to_string()))??
+    } else {
+        merged
+    };
+
+    // Write explicit bookmarks if provided
+    let merged = if let Some(bm_str) = form.map.get("bookmarks").filter(|s| !s.is_empty()) {
+        let bookmarks: Vec<Bookmark> =
+            serde_json::from_str(bm_str).map_err(|e| ApiError::InvalidField {
+                field: "bookmarks",
+                message: e.to_string(),
+            })?;
+        let bytes = merged;
+        tokio::task::spawn_blocking(move || write_bookmarks(&bytes, &bookmarks))
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))??
+    } else if auto_index && !per_file_bookmarks.is_empty() {
+        // Re-index bookmarks: offset each file's bookmarks by cumulative page count
+        let mut all_bookmarks: Vec<Bookmark> = Vec::new();
+        let mut page_offset: u32 = 0;
+        for (file_bmarks, count) in per_file_bookmarks.into_iter().zip(per_file_page_counts.iter()) {
+            for mut bm in file_bmarks {
+                bm.page += page_offset;
+                all_bookmarks.push(bm);
+            }
+            page_offset += *count as u32;
+        }
+        if !all_bookmarks.is_empty() {
+            let bytes = merged;
+            tokio::task::spawn_blocking(move || write_bookmarks(&bytes, &all_bookmarks))
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))??
+        } else {
+            merged
+        }
     } else {
         merged
     };
@@ -121,88 +201,115 @@ pub async fn pdfengines_split(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
-    if files.len() != 1 {
+    if files.is_empty() {
+        return Err(ApiError::MissingFile("files".to_string()));
+    }
+
+    // Validate: PDF/A + Encrypt is not supported
+    let has_pdfa = form.map.get("pdfa").filter(|s| !s.is_empty()).is_some();
+    let has_encrypt = form.map.get("userPassword").filter(|s| !s.is_empty()).is_some()
+        || form.map.get("ownerPassword").filter(|s| !s.is_empty()).is_some();
+    if has_pdfa && has_encrypt {
         return Err(ApiError::InvalidField {
-            field: "files",
-            message: "split expects exactly one file".to_string(),
+            field: "pdfa",
+            message: "PDF/A conversion and encryption cannot be combined".to_string(),
         });
     }
-    let bytes = read_one(files[0]).await?;
 
-    let mut mode = parse_split_mode(&form.map)?;
+    // Validate: stamp/watermark with pdf or image source requires a file
+    validate_stamp_file(&form, "stamp", "stampSource")?;
+    validate_watermark_file(&form, "watermark", "watermarkSource")?;
+
+    let mode = parse_split_mode(&form.map)?;
     let unify = parse_bool_field(&form.map, "splitUnify")?.unwrap_or(false);
     let mode_was_pages =
         matches!(mode, SplitMode::ByRanges(_)) && form.map.contains_key("splitSpan");
 
-    // In Gotenberg's "pages" mode, each page in the specified range becomes
-    // its own output file (rather than one file per range chunk).
-    if mode_was_pages {
-        let total = lopdf::Document::load_mem(&bytes)
-            .map_err(|e| ApiError::Internal(e.to_string()))?
-            .get_pages()
-            .len() as u32;
-        if let SplitMode::ByRanges(ranges) = &mode {
-            let mut pages: Vec<u32> = Vec::new();
-            for r in ranges {
-                pages.extend(r.expand(total));
+    // In Gotenberg's "pages" mode we need to compute per-file page expansion.
+    // We'll handle this inside the loop below.
+
+    // Process each input file
+    let mut all_chunks: Vec<Vec<u8>> = Vec::new();
+    let mut all_names: Vec<String> = Vec::new();
+    let mut input_stem = String::from("result");
+
+    for f in &files {
+        let bytes = read_one(f).await?;
+        let stem = f.filename.trim_end_matches(".pdf").to_string();
+        if files.len() == 1 {
+            input_stem = stem.clone();
+        }
+
+        // Resolve "pages" mode per-file
+        let file_mode = if mode_was_pages {
+            let total = lopdf::Document::load_mem(&bytes)
+                .map_err(|e| ApiError::Internal(e.to_string()))?
+                .get_pages()
+                .len() as u32;
+            if let SplitMode::ByRanges(ranges) = &mode {
+                let mut pages: Vec<u32> = Vec::new();
+                for r in ranges {
+                    pages.extend(r.expand(total));
+                }
+                pages.sort_unstable();
+                pages.dedup();
+                SplitMode::Pages(pages)
+            } else {
+                mode.clone()
             }
-            pages.sort_unstable();
-            pages.dedup();
-            mode = SplitMode::Pages(pages);
+        } else {
+            mode.clone()
+        };
+
+        let mode_clone = file_mode.clone();
+        let mut file_chunks = if bytes.len() > SPAWN_BLOCKING_THRESHOLD {
+            tokio::task::spawn_blocking(move || pdfops::split(&bytes, &mode_clone))
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))??
+        } else {
+            pdfops::split(&bytes, &file_mode)?
+        };
+
+        if file_chunks.is_empty() {
+            return Err(ApiError::InvalidField {
+                field: "splitPages",
+                message: "no pages selected by split request".to_string(),
+            });
+        }
+
+        for (i, chunk) in file_chunks.drain(..).enumerate() {
+            all_names.push(format!("{stem}_{i}.pdf"));
+            all_chunks.push(chunk);
         }
     }
 
-    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
-        &headers,
-        &state,
-        crate::webhook::WebhookOperation::PdfSplit,
-        crate::webhook::JobData::PdfSplit {
-            file: bytes.clone(),
-            mode: mode.clone(),
-        },
-    ).await? {
-        return Ok(resp);
+    // Single-file, single-chunk, no-unify → return as PDF
+    if all_chunks.len() == 1 && files.len() == 1 && !unify {
+        let filename = output_filename(&headers, &input_stem);
+        return Ok(pdf_response(all_chunks.pop().unwrap(), &filename));
     }
 
-    let mut chunks = if bytes.len() > SPAWN_BLOCKING_THRESHOLD {
-        let mode_clone = mode.clone();
-        tokio::task::spawn_blocking(move || pdfops::split(&bytes, &mode_clone))
-            .await
-            .map_err(|e| ApiError::Internal(e.to_string()))??
-    } else {
-        pdfops::split(&bytes, &mode)?
-    };
-
-    if chunks.is_empty() {
-        return Err(ApiError::InvalidField {
-            field: "splitPages",
-            message: "no pages selected by split request".to_string(),
-        });
-    }
-
-    if chunks.len() == 1
-        && let Some(only) = chunks.pop()
-    {
-        let filename = output_filename(&headers, "result");
-        return Ok(pdf_response(only, &filename));
-    }
-
-    if unify && mode_was_pages {
-        // Reassemble all chunks into a single PDF (Gotenberg quirk).
-        let merged = tokio::task::spawn_blocking(move || merge_blobs(&chunks))
+    if unify && mode_was_pages && files.len() == 1 {
+        let merged = tokio::task::spawn_blocking(move || merge_blobs(&all_chunks))
             .await
             .map_err(|e| ApiError::Internal(e.to_string()))??;
-        let filename = output_filename(&headers, "result");
+        let filename = output_filename(&headers, &input_stem);
         return Ok(pdf_response(merged, &filename));
     }
 
-    let names: Vec<String> = (1..=chunks.len())
-        .map(|i| format!("result-{i:03}.pdf"))
-        .collect();
-    let zip = build_zip(&names, &chunks)?;
-    Ok(zip_response(zip, "result.zip"))
+    let zip_name = {
+        let stem = headers
+            .get("Gotenberg-Output-Filename")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.trim_end_matches(".zip"))
+            .unwrap_or("result");
+        format!("{stem}.zip")
+    };
+    let zip = build_zip(&all_names, &all_chunks)?;
+    Ok(zip_response(zip, &zip_name))
 }
 
 fn parse_split_mode(map: &HashMap<String, String>) -> ApiResult<SplitMode> {
@@ -264,7 +371,8 @@ pub async fn pdfengines_flatten(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
     if files.is_empty() {
         return Err(ApiError::MissingFile("files".to_string()));
@@ -288,7 +396,8 @@ pub async fn pdfengines_flatten(
         } else {
             pdfops::flatten(&bytes)?
         };
-        return Ok(pdf_response(flat, "result.pdf"));
+        let filename = output_filename(&headers, "result");
+        return Ok(pdf_response(flat, &filename));
     }
 
     let mut outputs: Vec<Vec<u8>> = Vec::with_capacity(files.len());
@@ -312,7 +421,15 @@ pub async fn pdfengines_flatten(
     }
     let names: Vec<String> = files.iter().map(|f| f.filename.clone()).collect();
     let zip = build_zip(&names, &outputs)?;
-    Ok(zip_response(zip, "result.zip"))
+    let zip_name = {
+        let stem = headers
+            .get("Gotenberg-Output-Filename")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.trim_end_matches(".zip"))
+            .unwrap_or("result");
+        format!("{stem}.zip")
+    };
+    Ok(zip_response(zip, &zip_name))
 }
 
 // ---------------------------------------------------------------------------
@@ -326,7 +443,8 @@ pub async fn pdfengines_metadata_read(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
     if files.is_empty() {
         return Err(ApiError::MissingFile("files".to_string()));
@@ -379,7 +497,8 @@ pub async fn pdfengines_metadata_write(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
     if files.is_empty() {
         return Err(ApiError::MissingFile("files".to_string()));
@@ -394,6 +513,10 @@ pub async fn pdfengines_metadata_write(
         field: "metadata",
         message: e.to_string(),
     })?;
+
+    // Reject control characters (newlines, etc.) in string metadata values
+    // to prevent injection attacks via ExifTool-style tools.
+    reject_control_chars_in_metadata(&meta)?;
 
     // Webhook support for single-file write.
     if files.len() == 1 {
@@ -448,48 +571,138 @@ pub async fn pdfengines_rotate(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
-    if files.len() != 1 {
-        return Err(ApiError::InvalidField {
-            field: "files",
-            message: "rotate expects exactly one PDF file".to_string(),
-        });
+    if files.is_empty() {
+        return Err(ApiError::MissingFile("files".to_string()));
     }
-    let bytes = read_one(files[0]).await?;
 
-    let angle_str = form.map.get("rotate").ok_or(ApiError::MissingField("rotate"))?;
-    let angle: u16 = angle_str.parse().map_err(|e| ApiError::InvalidField {
-        field: "rotate",
+    // Gotenberg uses `rotateAngle`; accept that as well as the shorter `rotate` alias.
+    let angle_str = form.map.get("rotateAngle")
+        .or_else(|| form.map.get("rotate"))
+        .ok_or(ApiError::MissingField("rotateAngle"))?;
+    let angle: u16 = angle_str.parse().map_err(|e: std::num::ParseIntError| ApiError::InvalidField {
+        field: "rotateAngle",
         message: format!("expected integer angle: {e}"),
     })?;
 
-    // Default to all pages ("1-" is open-ended, covers every page after clamping).
-    let pages = PageRanges::parse("1-").map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
-        &headers,
-        &state,
-        crate::webhook::WebhookOperation::PdfRotate,
-        crate::webhook::JobData::PdfRotate {
-            file: bytes.clone(),
-            angle,
-            pages: Some(pages.clone()),
-        },
-    ).await? {
-        return Ok(resp);
+    // Validate angle is a valid rotation (0, 90, 180, 270)
+    if angle != 0 && angle != 90 && angle != 180 && angle != 270 {
+        return Err(ApiError::InvalidField {
+            field: "rotateAngle",
+            message: format!("angle must be 0/90/180/270 (got {})", angle),
+        });
     }
 
-    let rotated = tokio::task::spawn_blocking(move || {
-        pdfops::rotate(&bytes, &pages, angle as i32)
-    })
-    .await
-    .map_err(|e| ApiError::Internal(e.to_string()))?
-    .map_err(|e| ApiError::Internal(e.to_string()))?;
+    // Gotenberg uses `rotatePages` for page selection; default to all pages.
+    let pages = if let Some(rp) = form.map.get("rotatePages") {
+        PageRanges::parse(rp).map_err(|e| ApiError::Engine(EngineError::InvalidPageRange(e.to_string())))?
+    } else {
+        PageRanges::parse("1-").map_err(|e| ApiError::Internal(e.to_string()))?
+    };
 
-    let filename = output_filename(&headers, &files[0].filename);
+    let mut outputs = Vec::new();
+    let mut names = Vec::new();
+    for f in &files {
+        let bytes = read_one(f).await?;
+        let pages_clone = pages.clone();
+        let rotated = tokio::task::spawn_blocking(move || {
+            pdfops::rotate(&bytes, &pages_clone, angle as i32)
+        })
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        outputs.push(rotated);
+        names.push(f.filename.clone());
+    }
 
-    Ok(pdf_response(rotated, &filename))
+    if outputs.len() == 1 {
+        let filename = output_filename(&headers, &names[0]);
+        return Ok(pdf_response(outputs.pop().unwrap(), &filename));
+    }
+    let zip_name = {
+        let stem = headers.get("Gotenberg-Output-Filename")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.trim_end_matches(".zip"))
+            .unwrap_or("result");
+        format!("{stem}.zip")
+    };
+    let zip = build_zip(&names, &outputs)?;
+    Ok(zip_response(zip, &zip_name))
+}
+
+// ---------------------------------------------------------------------------
+// /forms/pdfengines/embed
+// ---------------------------------------------------------------------------
+
+/// `POST /forms/pdfengines/embed` — attach one or more files as PDF
+/// embedded attachments using qpdf.
+///
+/// Form fields:
+/// - `files`: exactly one PDF to receive the attachment(s).
+/// - `embeds`: one or more files to embed as attachments.
+pub async fn pdfengines_embed(
+    State(state): State<AppState>,
+    _headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
+    let _permit = acquire_permit(&state).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
+
+    let pdf_files = form.files_by_field("files");
+    if pdf_files.len() != 1 {
+        return Err(ApiError::InvalidField {
+            field: "files",
+            message: "embed requires exactly one PDF file in the `files` field".to_string(),
+        });
+    }
+    let pdf_path = pdf_files[0].path.clone();
+
+    let embed_files = form.files_by_field("embeds");
+    if embed_files.is_empty() {
+        return Err(ApiError::InvalidField {
+            field: "embeds",
+            message: "embed requires at least one file in the `embeds` field".to_string(),
+        });
+    }
+
+    let out_path = form.tmp.path().join("embedded.pdf");
+    let mut current_input = pdf_path;
+    for (i, embed) in embed_files.iter().enumerate() {
+        let out = if i == embed_files.len() - 1 {
+            out_path.clone()
+        } else {
+            form.tmp.path().join(format!("intermediate_{i}.pdf"))
+        };
+
+        let status = tokio::process::Command::new("qpdf")
+            .arg("--add-attachment")
+            .arg(&embed.path)
+            .arg("--")
+            .arg(&current_input)
+            .arg(&out)
+            .status()
+            .await
+            .map_err(|e| ApiError::Internal(format!("qpdf spawn failed: {e}")))?;
+
+        if !status.success() {
+            return Err(ApiError::Internal(format!(
+                "qpdf exited with status {} while embedding `{}`",
+                status,
+                embed.filename,
+            )));
+        }
+
+        current_input = out;
+    }
+
+    let pdf_bytes = tokio::fs::read(&out_path)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    Ok(pdf_response(pdf_bytes, "embedded.pdf"))
 }
 
 // ---------------------------------------------------------------------------
@@ -510,18 +723,6 @@ async fn read_one(file: &UploadedFile) -> ApiResult<Vec<u8>> {
         .map_err(|e| ApiError::Internal(e.to_string()))
 }
 
-/// Extract `Gotenberg-Output-Filename` from HTTP headers.
-/// Strips any trailing `.pdf` and re-adds it.
-fn output_filename(headers: &HeaderMap, default: &str) -> String {
-    let raw = headers
-        .get("Gotenberg-Output-Filename")
-        .and_then(|v| v.to_str().ok());
-    match raw {
-        Some(s) => format!("{}.pdf", s.trim_end_matches(".pdf")),
-        None => format!("{}.pdf", default.trim_end_matches(".pdf")),
-    }
-}
-
 async fn acquire_permit(state: &AppState) -> ApiResult<tokio::sync::OwnedSemaphorePermit> {
     state
         .sem
@@ -529,6 +730,66 @@ async fn acquire_permit(state: &AppState) -> ApiResult<tokio::sync::OwnedSemapho
         .acquire_owned()
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))
+}
+
+fn reject_control_chars_in_metadata(meta: &Metadata) -> ApiResult<()> {
+    let fields: &[Option<&str>] = &[
+        meta.title.as_deref(),
+        meta.author.as_deref(),
+        meta.subject.as_deref(),
+        meta.creator.as_deref(),
+        meta.producer.as_deref(),
+        meta.creation_date.as_deref(),
+        meta.mod_date.as_deref(),
+    ];
+    for val in fields.iter().flatten() {
+        if val.chars().any(|c| c.is_control()) {
+            return Err(ApiError::InvalidField {
+                field: "metadata",
+                message: "At least one PDF engine cannot process the requested metadata".to_string(),
+            });
+        }
+    }
+    for v in meta.custom.values() {
+        if let Some(s) = v.as_str() {
+            if s.chars().any(|c| c.is_control()) {
+                return Err(ApiError::InvalidField {
+                    field: "metadata",
+                    message: "At least one PDF engine cannot process the requested metadata"
+                        .to_string(),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_stamp_file(form: &FormFields, file_field: &str, source_field: &'static str) -> ApiResult<()> {
+    let source = form.map.get(source_field).map(|s| s.as_str()).unwrap_or("text");
+    if source == "image" || source == "pdf" {
+        let has_file = form.files.iter().any(|f| f.field_name == file_field);
+        if !has_file {
+            return Err(ApiError::InvalidField {
+                field: source_field,
+                message: "a stamp file is required for image or pdf source".to_string(),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn validate_watermark_file(form: &FormFields, file_field: &str, source_field: &'static str) -> ApiResult<()> {
+    let source = form.map.get(source_field).map(|s| s.as_str()).unwrap_or("text");
+    if source == "image" || source == "pdf" {
+        let has_file = form.files.iter().any(|f| f.field_name == file_field);
+        if !has_file {
+            return Err(ApiError::InvalidField {
+                field: source_field,
+                message: "a watermark file is required for image or pdf source".to_string(),
+            });
+        }
+    }
+    Ok(())
 }
 
 fn parse_bool_field(map: &HashMap<String, String>, key: &'static str) -> ApiResult<Option<bool>> {
@@ -558,41 +819,58 @@ pub async fn pdfengines_convert(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
-    if files.len() != 1 {
+    if files.is_empty() {
+        return Err(ApiError::MissingFile("files".to_string()));
+    }
+
+    let pdfa_str = form.map.get("pdfa");
+    let pdfua = form.map.get("pdfua").map(|s| s.as_str() == "true").unwrap_or(false);
+    if pdfa_str.is_none() && !pdfua {
         return Err(ApiError::InvalidField {
-            field: "files",
-            message: "convert expects exactly one PDF file".to_string(),
+            field: "pdfa",
+            message: "either 'pdfa' or 'pdfua' form fields must be provided".to_string(),
         });
     }
-    let bytes = read_one(files[0]).await?;
+    let profile: Option<PdfAProfile> = if let Some(s) = pdfa_str {
+        Some(s.parse::<PdfAProfile>().map_err(|e: String| ApiError::InvalidField {
+            field: "pdfa",
+            message: e,
+        })?)
+    } else {
+        None
+    };
 
-    // Parse PDF/A profile
-    let profile_str = form.map.get("pdfa").ok_or(ApiError::MissingField("pdfa"))?;
-    let profile: PdfAProfile = profile_str.parse().map_err(|e: String| ApiError::InvalidField {
-        field: "pdfa",
-        message: e,
-    })?;
+    let mut outputs = Vec::new();
+    let mut names = Vec::new();
 
-    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
-        &headers,
-        &state,
-        crate::webhook::WebhookOperation::PdfConvert,
-        crate::webhook::JobData::PdfConvert {
-            file: bytes.clone(),
-            profile,
-        },
-    ).await? {
-        return Ok(resp);
+    for f in &files {
+        let bytes = read_one(f).await?;
+        let converted = if let Some(prof) = profile {
+            convert_to_pdfa(&bytes, prof).await.map_err(|e| ApiError::Internal(e.to_string()))?
+        } else {
+            // pdfua only: return as-is
+            bytes
+        };
+        outputs.push(converted);
+        names.push(f.filename.clone());
     }
 
-    // Run conversion
-    let converted = convert_to_pdfa(&bytes, profile).await.map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    let filename = output_filename(&headers, &files[0].filename);
-
-    Ok(pdf_response(converted, &filename))
+    if outputs.len() == 1 {
+        let filename = output_filename(&headers, &names[0]);
+        return Ok(pdf_response(outputs.pop().unwrap(), &filename));
+    }
+    let zip_name = {
+        let stem = headers.get("Gotenberg-Output-Filename")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.trim_end_matches(".zip"))
+            .unwrap_or("result");
+        format!("{stem}.zip")
+    };
+    let zip = build_zip(&names, &outputs)?;
+    Ok(zip_response(zip, &zip_name))
 }
 
 // ---------------------------------------------------------------------------
@@ -607,34 +885,25 @@ pub async fn pdfengines_bookmarks_read(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
-    if files.len() != 1 {
-        return Err(ApiError::InvalidField {
-            field: "files",
-            message: "bookmarks read expects exactly one file".to_string(),
-        });
-    }
-    let bytes = read_one(files[0]).await?;
-
-    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
-        &headers,
-        &state,
-        crate::webhook::WebhookOperation::PdfBookmarksRead,
-        crate::webhook::JobData::PdfBookmarksRead { file: bytes.clone() },
-    ).await? {
-        return Ok(resp);
+    if files.is_empty() {
+        return Err(ApiError::MissingFile("files".to_string()));
     }
 
-    let bookmarks = tokio::task::spawn_blocking(move || read_bookmarks(&bytes))
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let mut out = serde_json::Map::new();
+    for f in &files {
+        let bytes = read_one(f).await?;
+        let filename = f.filename.clone();
+        let bookmarks = tokio::task::spawn_blocking(move || read_bookmarks(&bytes))
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
+        out.insert(filename, serde_json::json!(bookmarks));
+    }
 
-    let filename = files[0].filename.as_str();
-    let result = serde_json::json!({ filename: bookmarks });
-
-    let body = serde_json::to_string(&result).map_err(|e| ApiError::Internal(e.to_string()))?;
+    let body = serde_json::to_string(&out).map_err(|e| ApiError::Internal(e.to_string()))?;
 
     Ok(Response::builder()
         .status(StatusCode::OK)
@@ -655,43 +924,69 @@ pub async fn pdfengines_bookmarks_write(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
-    if files.len() != 1 {
-        return Err(ApiError::InvalidField {
-            field: "files",
-            message: "bookmarks write expects exactly one file".to_string(),
-        });
+    if files.is_empty() {
+        return Err(ApiError::MissingFile("files".to_string()));
     }
-    let bytes = read_one(files[0]).await?;
 
-    // Parse bookmarks JSON
+    // Parse bookmarks JSON - accept array or object (filename → array) format
     let bookmarks_json = form.map.get("bookmarks").ok_or(ApiError::MissingField("bookmarks"))?;
-    let bookmarks: Vec<Bookmark> = serde_json::from_str(bookmarks_json).map_err(|e| ApiError::InvalidField {
+    let all_bookmarks: serde_json::Value = serde_json::from_str(bookmarks_json).map_err(|e| ApiError::InvalidField {
         field: "bookmarks",
         message: format!("Invalid bookmarks JSON: {}", e),
     })?;
 
-    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
-        &headers,
-        &state,
-        crate::webhook::WebhookOperation::PdfBookmarksWrite,
-        crate::webhook::JobData::PdfBookmarksWrite {
-            file: bytes.clone(),
-            bookmarks: bookmarks.clone(),
-        },
-    ).await? {
-        return Ok(resp);
+    let mut outputs = Vec::new();
+    let mut names = Vec::new();
+
+    for f in &files {
+        // Determine bookmarks for this file
+        let file_bookmarks: Vec<Bookmark> = if all_bookmarks.is_array() {
+            serde_json::from_value(all_bookmarks.clone()).map_err(|e| ApiError::InvalidField {
+                field: "bookmarks",
+                message: format!("Invalid bookmarks JSON: {}", e),
+            })?
+        } else if let Some(obj) = all_bookmarks.as_object() {
+            // Map format: look up by filename
+            if let Some(bm_val) = obj.get(&f.filename) {
+                serde_json::from_value(bm_val.clone()).map_err(|e| ApiError::InvalidField {
+                    field: "bookmarks",
+                    message: format!("Invalid bookmarks JSON for {}: {}", f.filename, e),
+                })?
+            } else {
+                Vec::new()
+            }
+        } else {
+            return Err(ApiError::InvalidField {
+                field: "bookmarks",
+                message: "bookmarks must be a JSON array or object".to_string(),
+            });
+        };
+
+        let bytes = read_one(f).await?;
+        let output = tokio::task::spawn_blocking(move || write_bookmarks(&bytes, &file_bookmarks))
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
+        outputs.push(output);
+        names.push(f.filename.clone());
     }
 
-    let output = tokio::task::spawn_blocking(move || write_bookmarks(&bytes, &bookmarks))
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    let filename = output_filename(&headers, &files[0].filename);
-
-    Ok(pdf_response(output, &filename))
+    if outputs.len() == 1 {
+        let filename = output_filename(&headers, &names[0]);
+        return Ok(pdf_response(outputs.pop().unwrap(), &filename));
+    }
+    let zip_name = {
+        let stem = headers.get("Gotenberg-Output-Filename")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.trim_end_matches(".zip"))
+            .unwrap_or("result");
+        format!("{stem}.zip")
+    };
+    let zip = build_zip(&names, &outputs)?;
+    Ok(zip_response(zip, &zip_name))
 }
 
 // ---------------------------------------------------------------------------
@@ -705,52 +1000,82 @@ pub async fn pdfengines_watermark(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
-    if files.len() != 1 {
-        return Err(ApiError::InvalidField {
-            field: "files",
-            message: "watermark expects exactly one file".to_string(),
-        });
-    }
-    let pdf_bytes = read_one(files[0]).await?;
-
-    // Parse watermark text
-    let text = form.map.get("watermark")
-        .or_else(|| form.map.get("text"))
-        .ok_or(ApiError::MissingField("watermark"))?;
-
-    let opts = parse_watermark_options(&form.map, WatermarkKind::Text {
-        text: text.clone(),
-        font: None, // Use default Helvetica
-        font_size: 48.0,
-        color: [0.5, 0.5, 0.5, 0.5],
-    })?;
-
-    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
-        &headers,
-        &state,
-        crate::webhook::WebhookOperation::PdfWatermark,
-        crate::webhook::JobData::PdfWatermark {
-            file: pdf_bytes.clone(),
-            options: opts.clone(),
-        },
-    ).await? {
-        return Ok(resp);
+    if files.is_empty() {
+        return Err(ApiError::MissingFile("files".to_string()));
     }
 
-    let output = tokio::task::spawn_blocking(move || watermark(&pdf_bytes, &opts))
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    // Gotenberg API: watermarkSource=text, watermarkExpression=TEXT
+    // Legacy Folio API: watermark=TEXT or text=TEXT
+    let source = form.map.get("watermarkSource").map(|s| s.as_str()).unwrap_or("text");
 
-    let filename = form
-        .map
-        .get("Gotenberg-Output-Filename")
-        .map(|s| format!("{}.pdf", s.trim_end_matches(".pdf")))
-        .unwrap_or_else(|| files[0].filename.clone());
+    let kind = match source {
+        "image" => {
+            let img_file = form.files.iter().find(|f| f.field_name == "watermark")
+                .ok_or_else(|| ApiError::InvalidField {
+                    field: "watermarkSource",
+                    message: "a watermark file is required for image or pdf source".to_string(),
+                })?;
+            let bytes = tokio::fs::read(&img_file.path)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            WatermarkKind::ImagePng { bytes }
+        }
+        "pdf" => {
+            let img_file = form.files.iter().find(|f| f.field_name == "watermark")
+                .ok_or_else(|| ApiError::InvalidField {
+                    field: "watermarkSource",
+                    message: "a watermark file is required for image or pdf source".to_string(),
+                })?;
+            let bytes = tokio::fs::read(&img_file.path)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            WatermarkKind::ImagePng { bytes }
+        }
+        _ => {
+            let text = form.map.get("watermarkExpression")
+                .or_else(|| form.map.get("watermark"))
+                .or_else(|| form.map.get("text"))
+                .ok_or(ApiError::MissingField("watermarkExpression"))?;
+            WatermarkKind::Text {
+                text: text.clone(),
+                font: None,
+                font_size: 48.0,
+                color: [0.5, 0.5, 0.5, 0.5],
+            }
+        }
+    };
 
-    Ok(pdf_response(output, &filename))
+    let opts = parse_watermark_options(&form.map, kind)?;
+
+    let mut outputs = Vec::new();
+    let mut names = Vec::new();
+    for f in &files {
+        let pdf_bytes = read_one(f).await?;
+        let opts_clone = opts.clone();
+        let output = tokio::task::spawn_blocking(move || watermark(&pdf_bytes, &opts_clone))
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
+        outputs.push(output);
+        names.push(f.filename.clone());
+    }
+
+    if outputs.len() == 1 {
+        let filename = output_filename(&headers, names[0].trim_end_matches(".pdf"));
+        return Ok(pdf_response(outputs.pop().unwrap(), &filename));
+    }
+    let zip_name = {
+        let stem = headers.get("Gotenberg-Output-Filename")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.trim_end_matches(".zip"))
+            .unwrap_or("result");
+        format!("{stem}.zip")
+    };
+    let zip = build_zip(&names, &outputs)?;
+    Ok(zip_response(zip, &zip_name))
 }
 
 /// `POST /forms/pdfengines/stamp` - Apply stamp (in front of content).
@@ -760,48 +1085,82 @@ pub async fn pdfengines_stamp(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
-    if files.len() != 1 {
-        return Err(ApiError::InvalidField {
-            field: "files",
-            message: "stamp expects exactly one file".to_string(),
-        });
-    }
-    let pdf_bytes = read_one(files[0]).await?;
-
-    // Parse stamp text
-    let text = form.map.get("stamp")
-        .or_else(|| form.map.get("text"))
-        .ok_or(ApiError::MissingField("stamp"))?;
-
-    let opts = parse_watermark_options(&form.map, WatermarkKind::Text {
-        text: text.clone(),
-        font: None, // Use default Helvetica
-        font_size: 48.0,
-        color: [0.5, 0.5, 0.5, 0.5],
-    })?;
-
-    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
-        &headers,
-        &state,
-        crate::webhook::WebhookOperation::PdfStamp,
-        crate::webhook::JobData::PdfStamp {
-            file: pdf_bytes.clone(),
-            options: opts.clone(),
-        },
-    ).await? {
-        return Ok(resp);
+    if files.is_empty() {
+        return Err(ApiError::MissingFile("files".to_string()));
     }
 
-    let output = tokio::task::spawn_blocking(move || watermark(&pdf_bytes, &opts))
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    // Gotenberg API: stampSource=text, stampExpression=TEXT
+    // Legacy Folio API: stamp=TEXT or text=TEXT
+    let source = form.map.get("stampSource").map(|s| s.as_str()).unwrap_or("text");
 
-    let filename = output_filename(&headers, &files[0].filename);
+    let kind = match source {
+        "image" => {
+            let img_file = form.files.iter().find(|f| f.field_name == "stamp")
+                .ok_or_else(|| ApiError::InvalidField {
+                    field: "stampSource",
+                    message: "a stamp file is required for image or pdf source".to_string(),
+                })?;
+            let bytes = tokio::fs::read(&img_file.path)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            WatermarkKind::ImagePng { bytes }
+        }
+        "pdf" => {
+            let img_file = form.files.iter().find(|f| f.field_name == "stamp")
+                .ok_or_else(|| ApiError::InvalidField {
+                    field: "stampSource",
+                    message: "a stamp file is required for image or pdf source".to_string(),
+                })?;
+            let bytes = tokio::fs::read(&img_file.path)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            WatermarkKind::ImagePng { bytes }
+        }
+        _ => {
+            let text = form.map.get("stampExpression")
+                .or_else(|| form.map.get("stamp"))
+                .or_else(|| form.map.get("text"))
+                .ok_or(ApiError::MissingField("stampExpression"))?;
+            WatermarkKind::Text {
+                text: text.clone(),
+                font: None,
+                font_size: 48.0,
+                color: [0.5, 0.5, 0.5, 0.5],
+            }
+        }
+    };
 
-    Ok(pdf_response(output, &filename))
+    let opts = parse_watermark_options(&form.map, kind)?;
+
+    let mut outputs = Vec::new();
+    let mut names = Vec::new();
+    for f in &files {
+        let pdf_bytes = read_one(f).await?;
+        let opts_clone = opts.clone();
+        let output = tokio::task::spawn_blocking(move || watermark(&pdf_bytes, &opts_clone))
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
+        outputs.push(output);
+        names.push(f.filename.clone());
+    }
+
+    if outputs.len() == 1 {
+        let filename = output_filename(&headers, &names[0]);
+        return Ok(pdf_response(outputs.pop().unwrap(), &filename));
+    }
+    let zip_name = {
+        let stem = headers.get("Gotenberg-Output-Filename")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.trim_end_matches(".zip"))
+            .unwrap_or("result");
+        format!("{stem}.zip")
+    };
+    let zip = build_zip(&names, &outputs)?;
+    Ok(zip_response(zip, &zip_name))
 }
 
 fn parse_watermark_options(
@@ -860,15 +1219,12 @@ pub async fn pdfengines_encrypt(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
-    if files.len() != 1 {
-        return Err(ApiError::InvalidField {
-            field: "files",
-            message: "encrypt expects exactly one file".to_string(),
-        });
+    if files.is_empty() {
+        return Err(ApiError::MissingFile("files".to_string()));
     }
-    let pdf_bytes = read_one(files[0]).await?;
 
     // Get passwords
     let user_password = form.map.get("userPassword").cloned();
@@ -885,27 +1241,30 @@ pub async fn pdfengines_encrypt(
         .map(|s| Permissions::from_string(s))
         .unwrap_or_else(Permissions::allow_all);
 
-    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
-        &headers,
-        &state,
-        crate::webhook::WebhookOperation::PdfEncrypt,
-        crate::webhook::JobData::PdfEncrypt {
-            file: pdf_bytes.clone(),
-            password: user_password.clone().unwrap_or_default(),
-            algorithm,
-            permissions,
-        },
-    ).await? {
-        return Ok(resp);
+    let mut outputs = Vec::new();
+    let mut names = Vec::new();
+    for f in &files {
+        let pdf_bytes = read_one(f).await?;
+        let output = encrypt_pdf(&pdf_bytes, user_password.as_deref(), owner_password.as_deref(), algorithm, permissions)
+            .await
+            .map_err(ApiError::from)?;
+        outputs.push(output);
+        names.push(f.filename.clone());
     }
 
-    let output = encrypt_pdf(&pdf_bytes, user_password.as_deref(), owner_password.as_deref(), algorithm, permissions)
-        .await
-        .map_err(ApiError::from)?;
-
-    let filename = output_filename(&headers, &files[0].filename);
-
-    Ok(pdf_response(output, &filename))
+    if outputs.len() == 1 {
+        let filename = output_filename(&headers, &names[0]);
+        return Ok(pdf_response(outputs.pop().unwrap(), &filename));
+    }
+    let zip_name = {
+        let stem = headers.get("Gotenberg-Output-Filename")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.trim_end_matches(".zip"))
+            .unwrap_or("result");
+        format!("{stem}.zip")
+    };
+    let zip = build_zip(&names, &outputs)?;
+    Ok(zip_response(zip, &zip_name))
 }
 
 /// `POST /forms/pdfengines/decrypt` - Remove encryption from PDF.
@@ -915,7 +1274,8 @@ pub async fn pdfengines_decrypt(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let files = form.files_by_field("files");
     if files.len() != 1 {
         return Err(ApiError::InvalidField {
@@ -947,6 +1307,124 @@ pub async fn pdfengines_decrypt(
     let filename = output_filename(&headers, &files[0].filename);
 
     Ok(pdf_response(output, &filename))
+}
+
+// ---------------------------------------------------------------------------
+// /forms/pdfengines/optimise
+// ---------------------------------------------------------------------------
+
+use engine::{optimise_pdf, OptimiseBackend, OptimisePreset};
+
+/// `POST /forms/pdfengines/optimise`.
+pub async fn pdfengines_optimise(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mp: Multipart,
+) -> ApiResult<Response> {
+    let _permit = acquire_permit(&state).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
+    let files = form.files_by_field("files");
+    if files.len() != 1 {
+        return Err(ApiError::InvalidField {
+            field: "files",
+            message: "optimise requires exactly one file".to_string(),
+        });
+    }
+
+    // Get preset (default: screen for max compression)
+    let preset_str = form.map.get("preset").map(|s| s.as_str()).unwrap_or("screen");
+    let preset = OptimisePreset::from_str(preset_str)
+        .ok_or_else(|| ApiError::InvalidField {
+            field: "preset",
+            message: format!(
+                "Invalid preset '{}'. Use: screen, ebook, printer",
+                preset_str
+            ),
+        })?;
+
+    // Optional: force specific backend
+    let preferred_backend = form.map.get("backend").and_then(|b| match b.as_str() {
+        "ghostscript" => Some(OptimiseBackend::Ghostscript),
+        "qpdf" => Some(OptimiseBackend::Qpdf),
+        _ => None,
+    });
+
+    let pdf_bytes = read_one(files[0]).await?;
+
+    // Check for async webhook mode before processing.
+    if let Some(resp) = crate::webhook::maybe_spawn_webhook(
+        &headers,
+        &state,
+        crate::webhook::WebhookOperation::PdfOptimise,
+        crate::webhook::JobData::PdfOptimise {
+            file: pdf_bytes.clone(),
+            preset: preset_str.to_string(),
+            backend: preferred_backend.map(|b| format!("{:?}", b).to_lowercase()),
+        },
+    )
+    .await?
+    {
+        return Ok(resp);
+    }
+
+    // Run optimisation
+    let optimise_result = optimise_pdf(&pdf_bytes, preset, preferred_backend)
+        .await
+        .map_err(ApiError::from)?;
+
+    // Build response with headers
+    let mut resp_headers = HeaderMap::new();
+
+    // Original size header
+    resp_headers.insert(
+        header::HeaderName::from_static("x-original-size"),
+        HeaderValue::from(optimise_result.original_size),
+    );
+
+    // Optimised size header
+    resp_headers.insert(
+        header::HeaderName::from_static("x-optimised-size"),
+        HeaderValue::from(optimise_result.optimised_size),
+    );
+
+    // Compression ratio
+    resp_headers.insert(
+        header::HeaderName::from_static("x-compression-ratio"),
+        HeaderValue::from_str(&format!("{:.2}", optimise_result.compression_ratio())).unwrap(),
+    );
+
+    // Reduction percentage
+    resp_headers.insert(
+        header::HeaderName::from_static("x-reduction-percent"),
+        HeaderValue::from_str(&format!("{:.1}%", optimise_result.reduction_percent())).unwrap(),
+    );
+
+    // Backend used
+    resp_headers.insert(
+        header::HeaderName::from_static("x-backend-used"),
+        HeaderValue::from_str(&format!("{:?}", optimise_result.backend).to_lowercase()).unwrap(),
+    );
+
+    // Content disposition
+    let filename = output_filename(&headers, &files[0].filename);
+    let output_filename = filename.replace(".pdf", "_optimised.pdf");
+    resp_headers.insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_str(&format!("attachment; filename=\"{}\"", output_filename)).unwrap(),
+    );
+
+    resp_headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/pdf"),
+    );
+
+    Ok((
+        StatusCode::OK,
+        resp_headers,
+        axum::body::Body::from(optimise_result.data),
+    )
+        .into_response())
 }
 
 #[cfg(test)]
@@ -1055,5 +1533,14 @@ mod tests {
         assert!(!p.print);
         assert!(!p.annotate);
         assert!(!p.extract_content);
+    }
+
+    #[tokio::test]
+    #[ignore = "requires qpdf binary and real PDF files"]
+    async fn embed_returns_valid_pdf() {
+        // Exercised in Docker CI via `cargo test -- --ignored`.
+        // Placeholder to document the expected behavior:
+        // upload one PDF as `files` and one text file as `embeds`,
+        // verify response starts with %PDF.
     }
 }

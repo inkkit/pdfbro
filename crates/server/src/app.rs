@@ -38,8 +38,6 @@ use crate::routes::chromium;
 use crate::routes::libreoffice;
 use crate::state::AppState;
 
-const REQUEST_ID_HEADER: &str = "x-request-id";
-
 /// Generates a UUIDv4 for every incoming request that did not already
 /// carry an `X-Request-Id` header.
 #[derive(Clone, Default)]
@@ -65,6 +63,8 @@ struct RequestIdMakeSpan {
     disable_debug: bool,
     /// Whether to disable telemetry for version route.
     disable_version: bool,
+    /// Header name to read the request ID from.
+    header_name: String,
 }
 
 impl RequestIdMakeSpan {
@@ -74,6 +74,7 @@ impl RequestIdMakeSpan {
             disable_root: config.api_disable_root_route_telemetry,
             disable_debug: config.api_disable_debug_route_telemetry,
             disable_version: config.api_disable_version_route_telemetry,
+            header_name: config.api_correlation_id_header.clone(),
         }
     }
 
@@ -99,7 +100,7 @@ impl<B> MakeSpan<B> for RequestIdMakeSpan {
 
         let request_id = request
             .headers()
-            .get(REQUEST_ID_HEADER)
+            .get(self.header_name.as_str())
             .and_then(|v| v.to_str().ok())
             .unwrap_or("unknown")
             .to_string();
@@ -209,8 +210,16 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
             post(pdfengines::pdfengines_decrypt),
         )
         .route(
+            "/forms/pdfengines/optimise",
+            post(pdfengines::pdfengines_optimise),
+        )
+        .route(
             "/forms/pdfengines/rotate",
             post(pdfengines::pdfengines_rotate),
+        )
+        .route(
+            "/forms/pdfengines/embed",
+            post(pdfengines::pdfengines_embed),
         )
         // Batch API routes
         .route("/forms/batch/submit", post(batch::batch_submit))
@@ -224,16 +233,76 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
         .layer(DefaultBodyLimit::max(max_body));
 
     let mut untimed = Router::new()
+        .route("/", get(health::root))
         .route("/health", get(health::health))
+        .route("/health", axum::routing::head(health::health_head))
         .route("/version", get(health::version))
-        .route("/prometheus/metrics", get(health::metrics_handler));
+        .route("/prometheus/metrics", get(health::metrics_handler))
+        .route("/favicon.ico", get(health::favicon));
 
     // Conditionally add debug route
     if config.api_enable_debug_route {
         untimed = untimed.route("/debug", get(health::debug));
     }
 
-    let header_name = HeaderName::from_static(REQUEST_ID_HEADER);
+    // Font Doctor diagnostic routes (always enabled)
+    use crate::routes::debug;
+    untimed = untimed
+        .route("/debug/fonts", get(debug::debug_list_fonts))
+        .route("/debug/validate-fonts", post(debug::debug_validate_fonts))
+        .route("/debug/diagnose-html", post(debug::debug_diagnose_html));
+
+    // Live Preview Mode routes (Spec 45)
+    use crate::routes::preview;
+    untimed = untimed
+        .route("/preview/url", get(preview::preview_url))
+        .route("/preview/html", post(preview::preview_html))
+        .route("/preview/markdown", post(preview::preview_markdown))
+        .route("/preview/compare", post(preview::preview_compare));
+
+    // PDF Size Estimator routes (Spec 46)
+    use crate::routes::estimate;
+    untimed = untimed
+        .route("/estimate", post(estimate::estimate))
+        .route("/estimate/form", post(estimate::estimate_form))
+        .route("/estimate/batch", post(estimate::estimate_batch));
+
+    // OpenAPI spec for Scalar documentation
+    use crate::routes::openapi;
+    untimed = untimed.route("/openapi.json", get(openapi::openapi_spec));
+
+    // Scalar interactive API documentation
+    use axum::response::Html;
+    use scalar_api_reference::scalar_html_default;
+    use serde_json::json;
+
+    let scalar_config = json!({
+        "url": "/openapi.json",
+        "metaData": {
+            "title": "Folio API",
+            "description": "PDF generation API (Gotenberg-compatible)",
+            "favicon": "https://gotenberg.dev/favicon.ico"
+        },
+        "theme": "purple",
+        "darkMode": true,
+        "layout": "modern",
+        "searchHotKey": "k",
+        "defaultHttpClient": {
+            "targetKey": "curl",
+            "clientKey": "curl"
+        }
+    });
+
+    // Create Scalar HTML handler
+    let scalar_html = scalar_html_default(&scalar_config);
+    untimed = untimed.route("/docs", get(|| async move {
+        Html(scalar_html)
+    }));
+
+    let header_name = HeaderName::from_bytes(
+        config.api_correlation_id_header.as_bytes(),
+    )
+    .expect("api_correlation_id_header was validated in ServerConfig::resolve");
 
     let mut router = Router::new()
         .merge(timed)

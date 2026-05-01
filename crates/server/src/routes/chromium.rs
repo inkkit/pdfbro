@@ -15,7 +15,7 @@ use engine::{Cookie, MediaType, PageRanges, PdfOptions, RequestContext, WaitCond
 
 use crate::error::{ApiError, ApiResult};
 use crate::multipart::FormFields;
-use crate::routes::util::pdf_response;
+use crate::routes::util::{output_filename, pdf_response};
 use crate::state::AppState;
 
 const INDEX_HTML: &str = "index.html";
@@ -31,14 +31,16 @@ pub async fn chromium_html(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let index = form
         .find_named("files", INDEX_HTML)
         .ok_or_else(|| ApiError::MissingFile(INDEX_HTML.to_string()))?;
     let html = tokio::fs::read_to_string(&index.path)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    let opts = parse_pdf_options(&form.map)?;
+    let mut opts = parse_pdf_options(&form.map)?;
+    apply_header_footer_files(&mut opts, &form).await?;
     opts.validate()?;
     let ctx = parse_request_context(&form.map)?;
 
@@ -91,7 +93,8 @@ pub async fn chromium_html(
     }
 
     let pdf = result?;
-    Ok(pdf_response(pdf, "result.pdf"))
+    let pdf = apply_metadata_field(pdf, &form.map).await?;
+    Ok(pdf_response(pdf, &output_filename(&headers, "result")))
 }
 
 /// `POST /forms/chromium/convert/url`.
@@ -101,7 +104,8 @@ pub async fn chromium_url(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let url = form
         .map
         .get("url")
@@ -165,7 +169,7 @@ pub async fn chromium_url(
     }
 
     let pdf = result?;
-    Ok(pdf_response(pdf, "result.pdf"))
+    Ok(pdf_response(pdf, &output_filename(&headers, "result")))
 }
 
 /// `POST /forms/chromium/convert/markdown`.
@@ -184,8 +188,10 @@ pub async fn chromium_markdown(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
-    let opts = parse_pdf_options(&form.map)?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
+    let mut opts = parse_pdf_options(&form.map)?;
+    apply_header_footer_files(&mut opts, &form).await?;
     opts.validate()?;
     let ctx = parse_request_context(&form.map)?;
 
@@ -244,7 +250,8 @@ pub async fn chromium_markdown(
         }
 
         let pdf = result?;
-        return Ok(pdf_response(pdf, "result.pdf"));
+        let pdf = apply_metadata_field(pdf, &form.map).await?;
+        return Ok(pdf_response(pdf, &output_filename(&headers, "result")));
     }
 
     // Simple form: render the first .md file directly.
@@ -308,7 +315,57 @@ pub async fn chromium_markdown(
     }
 
     let pdf = result?;
-    Ok(pdf_response(pdf, "result.pdf"))
+    let pdf = apply_metadata_field(pdf, &form.map).await?;
+    Ok(pdf_response(pdf, &output_filename(&headers, "result")))
+}
+
+// ---------------------------------------------------------------------------
+// Post-processing helpers (header/footer files, metadata)
+// ---------------------------------------------------------------------------
+
+/// If `header.html` or `footer.html` are present as uploaded files and no
+/// template was already set via a form field, read their contents and apply
+/// them as the header/footer template strings.
+async fn apply_header_footer_files(
+    opts: &mut PdfOptions,
+    form: &FormFields,
+) -> ApiResult<()> {
+    if opts.header_template.is_none() {
+        if let Some(f) = form.find_named("files", "header.html") {
+            let content = tokio::fs::read_to_string(&f.path)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            opts.header_template = Some(content);
+        }
+    }
+    if opts.footer_template.is_none() {
+        if let Some(f) = form.find_named("files", "footer.html") {
+            let content = tokio::fs::read_to_string(&f.path)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            opts.footer_template = Some(content);
+        }
+    }
+    Ok(())
+}
+
+/// Apply the `metadata` form field (if present) to an already-generated PDF.
+async fn apply_metadata_field(
+    pdf: Vec<u8>,
+    map: &HashMap<String, String>,
+) -> ApiResult<Vec<u8>> {
+    let Some(meta_str) = map.get("metadata").filter(|s| !s.is_empty()) else {
+        return Ok(pdf);
+    };
+    let meta: engine::Metadata =
+        serde_json::from_str(meta_str).map_err(|e| ApiError::InvalidField {
+            field: "metadata",
+            message: e.to_string(),
+        })?;
+    tokio::task::spawn_blocking(move || engine::write_metadata(&pdf, &meta))
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .map_err(ApiError::Engine)
 }
 
 // ---------------------------------------------------------------------------
@@ -316,19 +373,29 @@ pub async fn chromium_markdown(
 // ---------------------------------------------------------------------------
 
 async fn inline_markdown_links(wrapper: &str, form: &FormFields) -> ApiResult<String> {
-    // Find every <link rel="markdown" href="..."> (case-insensitive on
-    // attribute names) and replace it with the rendered HTML for the
-    // referenced markdown file. We deliberately keep the regex out of the
-    // dependency tree and use a tiny hand-written scanner.
+    // Handles two markdown-embedding patterns:
+    // 1. <link rel="markdown" href="file.md">  (HTML link tag)
+    // 2. {{ toHTML "file.md" }}                 (Gotenberg Go-template syntax)
+    // Both are replaced in-place with the rendered HTML.
     let mut out = String::with_capacity(wrapper.len());
     let mut cursor = 0usize;
     while cursor < wrapper.len() {
-        match find_markdown_link(&wrapper[cursor..]) {
-            Some(MarkdownLink { start, end, href }) => {
-                out.push_str(&wrapper[cursor..cursor + start]);
+        let rest = &wrapper[cursor..];
+        // Find which pattern appears first.
+        let link_pos = find_markdown_link(rest).map(|l| (l.start, l.end, l.href.clone()));
+        let tohtml_pos = find_tohtml_call(rest).map(|t| (t.start, t.end, t.filename.clone()));
+        let chosen = match (link_pos, tohtml_pos) {
+            (Some(a), Some(b)) => Some(if a.0 <= b.0 { a } else { b }),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        };
+        match chosen {
+            Some((start, end, filename)) => {
+                out.push_str(&rest[..start]);
                 let f = form
-                    .find_named("files", &href)
-                    .ok_or_else(|| ApiError::MissingFile(href.clone()))?;
+                    .find_named("files", &filename)
+                    .ok_or_else(|| ApiError::MissingFile(filename.clone()))?;
                 let md = tokio::fs::read_to_string(&f.path)
                     .await
                     .map_err(|e| ApiError::Internal(e.to_string()))?;
@@ -337,7 +404,7 @@ async fn inline_markdown_links(wrapper: &str, form: &FormFields) -> ApiResult<St
                 cursor += end;
             }
             None => {
-                out.push_str(&wrapper[cursor..]);
+                out.push_str(rest);
                 break;
             }
         }
@@ -412,6 +479,42 @@ fn extract_href(tag: &str) -> Option<String> {
     Some(rest[1..1 + end_rel].to_string())
 }
 
+struct ToHtmlCall {
+    start: usize,
+    end: usize,
+    filename: String,
+}
+
+/// Find the first `{{ toHTML "filename" }}` or `{{ toHTML 'filename' }}` call.
+fn find_tohtml_call(haystack: &str) -> Option<ToHtmlCall> {
+    let mut pos = 0;
+    while pos < haystack.len() {
+        let open = haystack[pos..].find("{{")? + pos;
+        let close = haystack[open..].find("}}")? + open + 2;
+        let inner = haystack[open + 2..close - 2].trim();
+        // Match: toHTML "<filename>" or toHTML '<filename>'
+        if let Some(rest) = inner.strip_prefix("toHTML") {
+            let rest = rest.trim_start();
+            if let Some(filename) = extract_quoted(rest) {
+                return Some(ToHtmlCall { start: open, end: close, filename });
+            }
+        }
+        pos = close;
+    }
+    None
+}
+
+fn extract_quoted(s: &str) -> Option<String> {
+    let s = s.trim();
+    let quote = s.chars().next()?;
+    if quote != '"' && quote != '\'' {
+        return None;
+    }
+    let inner = &s[1..];
+    let end = inner.find(quote)?;
+    Some(inner[..end].to_string())
+}
+
 // ---------------------------------------------------------------------------
 // Form-map → engine option parsing
 // ---------------------------------------------------------------------------
@@ -449,6 +552,19 @@ pub fn parse_pdf_options(map: &HashMap<String, String>) -> ApiResult<PdfOptions>
     if let Some(v) = opt_bool(map, "printBackground")? {
         opts.print_background = v;
     }
+
+    if let Some(v) = opt_bool(map, "omitBackground")? {
+        opts.omit_background = v;
+    }
+
+    // Gotenberg parity: omitBackground requires printBackground=true.
+    if opts.omit_background && !opts.print_background {
+        return Err(ApiError::InvalidField {
+            field: "omitBackground",
+            message: "omitBackground=true requires printBackground=true".to_string(),
+        });
+    }
+
     if let Some(v) = opt_bool(map, "preferCssPageSize")? {
         opts.prefer_css_page_size = v;
     }
@@ -468,13 +584,13 @@ pub fn parse_pdf_options(map: &HashMap<String, String>) -> ApiResult<PdfOptions>
     {
         opts.footer_template = Some(s.clone());
     }
-    if let Some(s) = map.get("emulateMediaType").map(String::as_str) {
+    if let Some(s) = map.get("emulatedMediaType").map(String::as_str) {
         opts.emulate_media = match s.trim().to_ascii_lowercase().as_str() {
             "print" => Some(MediaType::Print),
             "screen" => Some(MediaType::Screen),
             other => {
                 return Err(ApiError::InvalidField {
-                    field: "emulateMediaType",
+                    field: "emulatedMediaType",
                     message: format!("expected `print` or `screen`, got `{other}`"),
                 });
             }
@@ -503,6 +619,19 @@ pub fn parse_pdf_options(map: &HashMap<String, String>) -> ApiResult<PdfOptions>
             message: e.to_string(),
         })?;
         opts.wait = WaitCondition::Delay { duration: d };
+    }
+
+    if let Some(v) = opt_bool(map, "singlePage")? {
+        opts.single_page = v;
+    }
+
+    if let Some(s) = nonempty(map, "emulatedMediaFeatures") {
+        let map: std::collections::HashMap<String, String> =
+            serde_json::from_str(&s).map_err(|e| ApiError::InvalidField {
+                field: "emulatedMediaFeatures",
+                message: e.to_string(),
+            })?;
+        opts.emulated_media_features = map.into_iter().collect();
     }
 
     Ok(opts)
@@ -648,7 +777,8 @@ pub async fn chromium_screenshot_html(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let index = form
         .find_named("files", INDEX_HTML)
         .ok_or_else(|| ApiError::MissingFile(INDEX_HTML.to_string()))?;
@@ -701,7 +831,7 @@ pub async fn chromium_screenshot_html(
 
     let image = result?;
     let ext = opts.format.extension();
-    let filename = format!("screenshot.{}", ext);
+    let filename = screenshot_filename(&headers, "screenshot", ext);
 
     Ok(image_response(image, &filename, opts.format.content_type()))
 }
@@ -713,7 +843,8 @@ pub async fn chromium_screenshot_url(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let url = form.map.get("url").ok_or(ApiError::MissingField("url"))?;
 
     let opts = parse_screenshot_options(&form.map)?;
@@ -761,7 +892,7 @@ pub async fn chromium_screenshot_url(
 
     let image = result?;
     let ext = opts.format.extension();
-    let filename = format!("screenshot.{}", ext);
+    let filename = screenshot_filename(&headers, "screenshot", ext);
 
     Ok(image_response(image, &filename, opts.format.content_type()))
 }
@@ -773,16 +904,15 @@ pub async fn chromium_screenshot_markdown(
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
-    let form = FormFields::from_multipart(mp).await?;
+    let mut form = FormFields::from_multipart(mp).await?;
+    crate::download::inject_downloads(&mut form, &state.config).await?;
     let index = form
-        .find_named("files", "index.md")
-        .ok_or_else(|| ApiError::MissingFile("index.md".to_string()))?;
-    let md = tokio::fs::read_to_string(&index.path)
+        .find_named("files", "index.html")
+        .ok_or_else(|| ApiError::MissingFile("index.html".to_string()))?;
+    let wrapper = tokio::fs::read_to_string(&index.path)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    // Convert markdown to HTML
-    let html = render_markdown_to_html(&md);
+    let html = inline_markdown_links(&wrapper, &form).await?;
 
     let opts = parse_screenshot_options(&form.map)?;
 
@@ -801,9 +931,18 @@ pub async fn chromium_screenshot_markdown(
     let image = state.chromium.as_ref().unwrap().html_to_screenshot(&html, &opts).await?;
 
     let ext = opts.format.extension();
-    let filename = format!("screenshot.{}", ext);
+    let filename = screenshot_filename(&headers, "screenshot", ext);
 
     Ok(image_response(image, &filename, opts.format.content_type()))
+}
+
+fn screenshot_filename(headers: &HeaderMap, default_stem: &str, ext: &str) -> String {
+    let stem = headers
+        .get("Gotenberg-Output-Filename")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.trim_end_matches(&format!(".{ext}")))
+        .unwrap_or(default_stem);
+    format!("{stem}.{ext}")
 }
 
 fn parse_screenshot_options(map: &HashMap<String, String>) -> ApiResult<ScreenshotOptions> {
@@ -911,7 +1050,7 @@ mod tests {
             ("printBackground", "false"),
             ("preferCssPageSize", "true"),
             ("pageRanges", "1-3,7-"),
-            ("emulateMediaType", "screen"),
+            ("emulatedMediaType", "screen"),
             ("waitDelay", "1500ms"),
         ]);
         let opts = parse_pdf_options(&map).unwrap();
@@ -954,10 +1093,10 @@ mod tests {
 
     #[test]
     fn pdf_options_invalid_emulate_media_rejected() {
-        let map = fm(&[("emulateMediaType", "carrier-pigeon")]);
+        let map = fm(&[("emulatedMediaType", "carrier-pigeon")]);
         let err = parse_pdf_options(&map).unwrap_err();
         match err {
-            ApiError::InvalidField { field, .. } => assert_eq!(field, "emulateMediaType"),
+            ApiError::InvalidField { field, .. } => assert_eq!(field, "emulatedMediaType"),
             other => panic!("expected InvalidField, got {other:?}"),
         }
     }
@@ -1069,5 +1208,36 @@ mod tests {
         let html = render_markdown("| a | b |\n|---|---|\n| 1 | 2 |\n");
         assert!(html.contains("<table>"));
         assert!(html.contains("<td>1</td>"));
+    }
+
+    #[test]
+    fn omit_background_requires_print_background() {
+        let map: HashMap<String, String> = [
+            ("omitBackground".to_string(), "true".to_string()),
+            ("printBackground".to_string(), "false".to_string()),
+        ]
+        .into_iter()
+        .collect();
+        let err = parse_pdf_options(&map).unwrap_err();
+        assert!(matches!(err, ApiError::InvalidField { field: "omitBackground", .. }));
+    }
+
+    #[test]
+    fn omit_background_with_print_background_ok() {
+        let map: HashMap<String, String> = [
+            ("omitBackground".to_string(), "true".to_string()),
+            ("printBackground".to_string(), "true".to_string()),
+        ]
+        .into_iter()
+        .collect();
+        let opts = parse_pdf_options(&map).unwrap();
+        assert!(opts.omit_background);
+        assert!(opts.print_background);
+    }
+
+    #[test]
+    fn omit_background_defaults_false() {
+        let opts = parse_pdf_options(&HashMap::new()).unwrap();
+        assert!(!opts.omit_background);
     }
 }

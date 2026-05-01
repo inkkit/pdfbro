@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use axum::http::{HeaderMap, HeaderValue, header};
+use engine::{OptimiseBackend, OptimisePreset};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
@@ -106,6 +107,8 @@ pub enum WebhookOperation {
     PdfEncrypt,
     /// PDF decrypt.
     PdfDecrypt,
+    /// PDF optimise.
+    PdfOptimise,
     /// PDF bookmarks read.
     PdfBookmarksRead,
     /// PDF bookmarks write.
@@ -133,6 +136,7 @@ impl WebhookOperation {
             WebhookOperation::PdfStamp => "pdf_stamp",
             WebhookOperation::PdfEncrypt => "pdf_encrypt",
             WebhookOperation::PdfDecrypt => "pdf_decrypt",
+            WebhookOperation::PdfOptimise => "pdf_optimise",
             WebhookOperation::PdfBookmarksRead => "pdf_bookmarks_read",
             WebhookOperation::PdfBookmarksWrite => "pdf_bookmarks_write",
         }
@@ -300,6 +304,15 @@ pub enum JobData {
         file: Vec<u8>,
         /// Password.
         password: String,
+    },
+    /// PDF optimise job.
+    PdfOptimise {
+        /// Source file bytes.
+        file: Vec<u8>,
+        /// Compression preset.
+        preset: String,
+        /// Optional forced backend.
+        backend: Option<String>,
     },
     /// PDF bookmarks read job.
     PdfBookmarksRead {
@@ -828,6 +841,24 @@ async fn execute_job(job: &WebhookJob, ctx: &WebhookEngineContext) -> Result<Web
             let out = engine::encrypt::decrypt_pdf(&file, &password).await
                 .map_err(|e| e.to_string())?;
             Ok(WebhookPayload::Pdf { data: out, filename: "result.pdf".into() })
+        }
+        // ── PDF optimise ──
+        WebhookOperation::PdfOptimise => {
+            let (file, preset_str, backend_str) = match &job.data {
+                JobData::PdfOptimise { file, preset, backend } => (file, preset, backend),
+                _ => return Err("Invalid job data for PdfOptimise".into()),
+            };
+            let file = file.clone();
+            let preset = OptimisePreset::from_str(preset_str)
+                .ok_or_else(|| format!("Invalid preset: {}", preset_str))?;
+            let preferred_backend = backend_str.as_ref().and_then(|b| match b.as_str() {
+                "ghostscript" => Some(OptimiseBackend::Ghostscript),
+                "qpdf" => Some(OptimiseBackend::Qpdf),
+                _ => None,
+            });
+            let out = engine::optimise_pdf(&file, preset, preferred_backend).await
+                .map_err(|e| e.to_string())?;
+            Ok(WebhookPayload::Pdf { data: out.data, filename: "optimised.pdf".into() })
         }
         // ── PDF bookmarks read ──
         WebhookOperation::PdfBookmarksRead => {

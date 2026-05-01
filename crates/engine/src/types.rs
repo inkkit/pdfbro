@@ -502,6 +502,10 @@ pub struct PdfOptions {
     pub scale: f32,
     /// Print background graphics.
     pub print_background: bool,
+    /// When `true`, the page background is made transparent before capturing.
+    /// Requires `print_background = true` to take effect (the server layer
+    /// enforces this; the engine itself does not re-validate).
+    pub omit_background: bool,
     /// Honor `@page { size: ... }` CSS rules; overrides [`PdfOptions::paper`]
     /// when present.
     pub prefer_css_page_size: bool,
@@ -517,6 +521,13 @@ pub struct PdfOptions {
     pub footer_template: Option<String>,
     /// What to wait for before printing.
     pub wait: WaitCondition,
+    /// When `true`, render entire content on a single page: measure scroll
+    /// height via JS and set paper height to match, with zero margins.
+    pub single_page: bool,
+    /// CSS media features to emulate (`prefers-reduced-motion`, etc.).
+    /// Each element is a `(name, value)` pair passed to
+    /// `Emulation.setEmulatedMedia` alongside [`Self::emulate_media`].
+    pub emulated_media_features: Vec<(String, String)>,
 }
 
 impl Default for PdfOptions {
@@ -527,12 +538,15 @@ impl Default for PdfOptions {
             landscape: false,
             scale: 1.0,
             print_background: false,
+            omit_background: false,
             prefer_css_page_size: false,
             emulate_media: None,
             page_ranges: None,
             header_template: None,
             footer_template: None,
             wait: WaitCondition::Load,
+            single_page: false,
+            emulated_media_features: Vec::new(),
         }
     }
 }
@@ -612,6 +626,12 @@ mod tests {
     use super::*;
 
     // --- PaperSize ---------------------------------------------------------
+
+    #[test]
+    fn pdf_options_omit_background_default_false() {
+        let d = PdfOptions::default();
+        assert!(!d.omit_background);
+    }
 
     #[test]
     fn paper_size_constants_match_spec() {
@@ -868,12 +888,15 @@ mod tests {
             landscape: true,
             scale: 1.5,
             print_background: false,
+            omit_background: false,
             prefer_css_page_size: true,
             emulate_media: Some(MediaType::Screen),
             page_ranges: Some(PageRanges::parse("1-3").unwrap()),
             header_template: None,
             footer_template: None,
             wait: WaitCondition::NetworkIdle,
+            single_page: false,
+            emulated_media_features: Vec::new(),
         };
         let json = serde_json::to_value(&opts).unwrap();
         // Spot-check camelCase field naming on the public surface

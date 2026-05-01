@@ -1,5 +1,6 @@
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
+#![recursion_limit = "256"]
 //! Folio HTTP server — Gotenberg-compatible facade over the [`engine`] crate.
 //!
 //! See `docs/specs/30-server.md` for the wire contract. Public entry points
@@ -12,6 +13,7 @@ pub mod backend;
 pub mod banner;
 pub mod batch_worker;
 pub mod config;
+pub mod download;
 pub mod error;
 pub mod logging;
 pub mod metrics;

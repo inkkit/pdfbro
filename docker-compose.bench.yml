@@ -1,0 +1,39 @@
+services:
+  folio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bench-folio
+    ports:
+      - "3001:3000"
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2g
+    environment:
+      RUST_LOG: error
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: bench-gotenberg
+    ports:
+      - "3002:3000"
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2g
+
+  fixture-server:
+    image: nginx:alpine
+    container_name: bench-fixture
+    ports:
+      - "18080:80"
+    volumes:
+      - ./bench/fixtures:/usr/share/nginx/html:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256m
