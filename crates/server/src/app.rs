@@ -380,8 +380,11 @@ async fn console_log_middleware(
         return next.run(req).await;
     }
 
+    use std::sync::atomic::Ordering;
+    state.console.active_requests.fetch_add(1, Ordering::SeqCst);
     let start = Instant::now();
     let response = next.run(req).await;
+    state.console.active_requests.fetch_sub(1, Ordering::SeqCst);
     let elapsed = start.elapsed();
     let duration_ms = elapsed.as_millis() as u64;
     let status = response.status().as_u16();

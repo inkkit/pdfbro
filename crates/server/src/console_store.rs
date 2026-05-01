@@ -65,6 +65,10 @@ pub struct ConsoleStore {
     pub prev_http_total: Mutex<f64>,
     // Error rate delta tracking
     pub prev_error_total: Mutex<f64>,
+    // Live count of all HTTP requests currently in flight (incremented before
+    // next.run(), decremented after) — gives real-time concurrency even for
+    // fast requests that complete between 5s sampler ticks.
+    pub active_requests: AtomicU32,
 }
 
 impl ConsoleStore {
@@ -81,6 +85,7 @@ impl ConsoleStore {
             libreoffice_was_running: AtomicBool::new(false),
             prev_http_total: Mutex::new(0.0),
             prev_error_total: Mutex::new(0.0),
+            active_requests: AtomicU32::new(0),
         }
     }
 
@@ -213,8 +218,9 @@ pub async fn build_console_payload(
 ) -> ConsolePayload {
     let uptime_seconds = started_at.elapsed().as_secs();
     let concurrency_max = state.config.concurrency as u32;
-    let concurrency_active = (concurrency_max as usize)
-        .saturating_sub(state.sem.available_permits()) as u32;
+    // Use the live atomic counter (incremented/decremented in middleware) so
+    // fast requests that finish between sampler ticks still appear in the UI.
+    let concurrency_active = state.console.active_requests.load(Ordering::SeqCst);
 
     let (rps_series, p95_series, cpu_series, memory_series, last_rps, last_p95_ms, last_error_pct) = {
         let history = state.console.history.lock().await;
@@ -565,8 +571,7 @@ pub fn spawn_console_sampler(state: crate::state::AppState, started_at: Instant)
 
             // ── Concurrency ────────────────────────────────────────────────
             let concurrency_max = state.config.concurrency as u32;
-            let concurrency_active = (concurrency_max as usize)
-                .saturating_sub(state.sem.available_permits()) as u32;
+            let concurrency_active = state.console.active_requests.load(Ordering::SeqCst);
 
             // ── Push sample + broadcast ────────────────────────────────────
             let sample = MetricsSample {
