@@ -73,27 +73,27 @@ fn build_optimise_request(pdf_data: Vec<u8>, preset: Option<&str>, backend: Opti
     let boundary = "----test-boundary";
     let mut body = Vec::new();
 
-    body.extend_from_slice(format!("------{}\r\n", boundary).as_bytes());
+    body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
     body.extend_from_slice(b"Content-Disposition: form-data; name=\"files\"; filename=\"test.pdf\"\r\n");
     body.extend_from_slice(b"Content-Type: application/pdf\r\n\r\n");
     body.extend_from_slice(&pdf_data);
     body.extend_from_slice(b"\r\n");
 
     if let Some(p) = preset {
-        body.extend_from_slice(format!("------{}\r\n", boundary).as_bytes());
+        body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
         body.extend_from_slice(b"Content-Disposition: form-data; name=\"preset\"\r\n\r\n");
         body.extend_from_slice(p.as_bytes());
         body.extend_from_slice(b"\r\n");
     }
 
     if let Some(b) = backend {
-        body.extend_from_slice(format!("------{}\r\n", boundary).as_bytes());
+        body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
         body.extend_from_slice(b"Content-Disposition: form-data; name=\"backend\"\r\n\r\n");
         body.extend_from_slice(b.as_bytes());
         body.extend_from_slice(b"\r\n");
     }
 
-    body.extend_from_slice(format!("------{}--\r\n", boundary).as_bytes());
+    body.extend_from_slice(format!("--{}--\r\n", boundary).as_bytes());
 
     Request::builder()
         .method("POST")
@@ -185,7 +185,7 @@ async fn test_optimise_pdf_returns_400_for_missing_file() {
     
     let boundary = "----test-boundary";
     let body = format!(
-        "------{}\r\nContent-Disposition: form-data; name=\"preset\"\r\n\r\nscreen\r\n------{}--\r\n",
+        "--{}\r\nContent-Disposition: form-data; name=\"preset\"\r\n\r\nscreen\r\n--{}--\r\n",
         boundary, boundary
     );
 

@@ -201,6 +201,47 @@ proptest! {
 }
 
 // ---------------------------------------------------------------------------
+// Merge + Metadata round-trip using real testdata fixtures
+// ---------------------------------------------------------------------------
+
+#[test]
+#[ignore = "requires testdata fixture files"]
+fn read_metadata_from_current_teststore_foo_pdf() {
+    // Read the current teststore/foo.pdf and dump its metadata to see what's in it.
+    let pdf = std::fs::read("../server/tests/bdd/testdata/teststore/foo.pdf")
+        .expect("teststore/foo.pdf must exist");
+    let meta = engine::read_metadata(&pdf).unwrap();
+    println!("Metadata from teststore/foo.pdf:");
+    println!("  author: {:?}", meta.author);
+    println!("  title: {:?}", meta.title);
+    println!("  creator: {:?}", meta.creator);
+    println!("  producer: {:?}", meta.producer);
+    println!("  custom: {:?}", meta.custom);
+    // This test just dumps info; it always passes.
+}
+
+#[test]
+#[ignore = "requires testdata fixture files"]
+fn merge_then_write_metadata_round_trips_author_with_real_pdfs() {
+    // Uses the actual page_1.pdf / page_2.pdf from the BDD testdata folder
+    // to reproduce the exact scenario that fails in the BDD tests.
+    let pdf1 = std::fs::read("../server/tests/bdd/testdata/page_1.pdf")
+        .expect("page_1.pdf must exist at crates/server/tests/bdd/testdata/page_1.pdf");
+    let pdf2 = std::fs::read("../server/tests/bdd/testdata/page_2.pdf")
+        .expect("page_2.pdf must exist");
+    let merged = merge(&[&pdf1, &pdf2]).unwrap();
+
+    let mut meta = Metadata::default();
+    meta.author = Some("Julien Neuhart".into());
+
+    let with_meta = write_metadata(&merged, &meta).unwrap();
+    let read_back = read_metadata(&with_meta).unwrap();
+
+    assert_eq!(read_back.author.as_deref(), Some("Julien Neuhart"),
+        "Author should round-trip when merging real page_1/page_2 PDFs");
+}
+
+// ---------------------------------------------------------------------------
 // Merge + Metadata round-trip
 // ---------------------------------------------------------------------------
 
@@ -245,4 +286,32 @@ fn merge_then_write_bookmarks_round_trips() {
     assert_eq!(read_back.len(), 1);
     assert_eq!(read_back[0].title, "Merged Index");
     assert_eq!(read_back[0].page, 1);
+}
+
+// ---------------------------------------------------------------------------
+// Test: exact BDD metadata JSON round-trip
+// ---------------------------------------------------------------------------
+
+#[test]
+fn bdd_metadata_json_deserializes_and_round_trips_author() {
+    // Uses the EXACT metadata JSON from the BDD test
+    let meta_json = r#"{"Author":"Julien Neuhart","Copyright":"Julien Neuhart","CreateDate":"2006-09-18T16:27:50-04:00","Creator":"Gotenberg","Keywords":["first","second"],"Marked":true,"ModDate":"2006-09-18T16:27:50-04:00","PDFVersion":1.7,"Producer":"Gotenberg","Subject":"Sample","Title":"Sample","Trapped":"Unknown"}"#;
+    let meta: Metadata = serde_json::from_str(meta_json).expect("JSON should parse");
+    
+    // Verify deserialization
+    assert_eq!(meta.author.as_deref(), Some("Julien Neuhart"), "Author should deserialize");
+    assert_eq!(meta.title.as_deref(), Some("Sample"), "Title should deserialize");
+    assert_eq!(meta.creator.as_deref(), Some("Gotenberg"), "Creator should deserialize");
+    
+    // Now do the full round-trip with real PDFs
+    let pdf1 = make_multipage_pdf(1);
+    let pdf2 = make_multipage_pdf(1);
+    let merged = merge(&[&pdf1, &pdf2]).unwrap();
+    let with_meta = write_metadata(&merged, &meta).unwrap();
+    let read_back = read_metadata(&with_meta).unwrap();
+    
+    assert_eq!(read_back.author.as_deref(), Some("Julien Neuhart"),
+        "Author should survive merge+write_metadata+read_metadata with BDD metadata JSON");
+    assert_eq!(read_back.title.as_deref(), Some("Sample"),
+        "Title should survive");
 }

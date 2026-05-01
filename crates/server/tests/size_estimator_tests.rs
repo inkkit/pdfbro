@@ -112,7 +112,7 @@ async fn test_estimate_form_returns_200_with_html_field() {
     let html_content = "<html><body>Test</body></html>";
 
     let body = format!(
-        "------{}\r\nContent-Disposition: form-data; name=\"html\"\r\n\r\n{}\r\n------{}--\r\n",
+        "--{}\r\nContent-Disposition: form-data; name=\"html\"\r\n\r\n{}\r\n--{}--\r\n",
         boundary, html_content, boundary
     );
 
