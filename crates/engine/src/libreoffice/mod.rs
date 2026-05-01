@@ -316,6 +316,7 @@ pub struct OfficeOptions {
     /// Export bookmarks as Named Destinations.
     pub export_bookmarks_to_pdf_destination: bool,
     /// Update document indexes before conversion.
+    /// Note: not currently passed to unoserver (unoserver has no direct API for this).
     pub update_indexes: bool,
 
     // --- Form Fields & Placeholders ---

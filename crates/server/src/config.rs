@@ -475,10 +475,13 @@ impl ServerConfig {
 
         let libreoffice_unoserver_port = match args.libreoffice_unoserver_port {
             Some(p) => p,
-            None => env
-                .get("LIBREOFFICE_UNOSERVER_PORT")
-                .and_then(|v| v.parse::<u16>().ok())
-                .unwrap_or(2003),
+            None => match env.get("LIBREOFFICE_UNOSERVER_PORT") {
+                Some(v) => v.parse::<u16>().map_err(|e| ConfigError::Parse {
+                    field: "libreoffice_unoserver_port",
+                    message: e.to_string(),
+                })?,
+                None => 2003,
+            },
         };
 
         let libreoffice_unoserver_ready_timeout = args
