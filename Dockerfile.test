@@ -62,10 +62,11 @@ ENV RUST_LOG=info
 # Cache dependencies
 COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --recipe-path recipe.json
+RUN cargo chef cook --recipe-path recipe.json --tests
 
-# Build everything including folio-server (BDD runner spawns it as a subprocess)
+# Build everything: folio-server binary + all test binaries
 COPY . .
-RUN cargo build
+RUN cargo test --no-run
 
-# Run the full test suite: unit tests + BDD integration tests
-CMD ["cargo", "test"]
+# Run pre-compiled test binaries — no recompilation at container start
+CMD ["cargo", "test", "--no-fail-fast"]
