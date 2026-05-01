@@ -574,7 +574,7 @@ pub fn spawn_console_sampler(state: crate::state::AppState, started_at: Instant)
                 .unwrap_or(0.0);
 
             // ── Concurrency ────────────────────────────────────────────────
-            let concurrency_max = state.config.concurrency as u32;
+            let _concurrency_max = state.config.concurrency as u32;
             let concurrency_active = state.console.active_requests.load(Ordering::SeqCst);
 
             // ── Push sample + broadcast ────────────────────────────────────

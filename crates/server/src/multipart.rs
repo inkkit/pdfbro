@@ -94,7 +94,7 @@ impl FormFields {
     /// Files are streamed out to disk to keep memory usage bounded; the
     /// scratch directory is auto-deleted when [`FormFields`] (and hence
     /// [`Self::tmp`]) is dropped.
-    pub async fn from_multipart(mut mp: Multipart) -> Result<Self, ApiError> {
+    pub async fn from_multipart(mp: Multipart) -> Result<Self, ApiError> {
         Self::from_multipart_with_config(mp, MultipartSecurityConfig::default()).await
     }
 

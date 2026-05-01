@@ -881,7 +881,7 @@ pub async fn pdfengines_convert(
 /// Reads bookmarks from a PDF and returns them as JSON.
 pub async fn pdfengines_bookmarks_read(
     State(state): State<AppState>,
-    headers: HeaderMap,
+    _headers: HeaderMap,
     mp: Multipart,
 ) -> ApiResult<Response> {
     let _permit = acquire_permit(&state).await?;
