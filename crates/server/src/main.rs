@@ -143,8 +143,7 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
 
     {
         use server::console_store::spawn_console_sampler;
-        let console_started_at = std::time::Instant::now();
-        spawn_console_sampler(state.clone(), console_started_at);
+        spawn_console_sampler(state.clone(), state.started_at);
     }
 
     let router = build_router(state, &config);

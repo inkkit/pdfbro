@@ -65,6 +65,8 @@ pub struct ConsoleStore {
     pub last_p95_ms: Mutex<f64>,
     // RPS delta tracking
     pub prev_http_total: Mutex<f64>,
+    // Error rate delta tracking
+    pub prev_error_total: Mutex<f64>,
 }
 
 impl ConsoleStore {
@@ -81,6 +83,7 @@ impl ConsoleStore {
             libreoffice_was_running: AtomicBool::new(false),
             last_p95_ms: Mutex::new(0.0),
             prev_http_total: Mutex::new(0.0),
+            prev_error_total: Mutex::new(0.0),
         }
     }
 
@@ -238,19 +241,25 @@ pub async fn build_console_payload(state: &crate::state::AppState, started_at: I
     // Queue size from metrics gauge
     let queue_size = state.metrics.queue_size.get();
 
-    // Engine status from health gauges
-    let chromium_status = if state.metrics.chromium_healthy.get() >= 1.0 {
+    // Engine status from health gauges (with feature guards so absent engines show "n/a")
+    #[cfg(feature = "chromium")]
+    let chromium_status = if state.chromium.is_some() && state.metrics.chromium_healthy.get() >= 1.0 {
         "up".to_string()
     } else {
         "down".to_string()
     };
+    #[cfg(not(feature = "chromium"))]
+    let chromium_status = "n/a".to_string();
     let chromium_restarts = state.console.chromium_restarts.load(Ordering::SeqCst);
 
+    #[cfg(feature = "libreoffice")]
     let libreoffice_status = if state.metrics.libreoffice_healthy.get() >= 1.0 {
         "up".to_string()
     } else {
         "down".to_string()
     };
+    #[cfg(not(feature = "libreoffice"))]
+    let libreoffice_status = "n/a".to_string();
     let libreoffice_restarts = state.console.libreoffice_restarts.load(Ordering::SeqCst);
 
     // Engine mini_series (last 20 concurrency samples as proxy for load)
@@ -292,22 +301,26 @@ pub async fn build_console_payload(state: &crate::state::AppState, started_at: I
             uptime_seconds,
         },
         routes,
-        engines: vec![
-            EnginePayload {
+        engines: {
+            let mut engines = Vec::new();
+            #[cfg(feature = "chromium")]
+            engines.push(EnginePayload {
                 name: "Chromium".to_string(),
-                status: chromium_status,
+                status: chromium_status.clone(),
                 restarts: chromium_restarts,
                 mode: if state.config.chromium_lazy_start { "lazy".to_string() } else { "eager".to_string() },
                 mini_series: mini.clone(),
-            },
-            EnginePayload {
+            });
+            #[cfg(feature = "libreoffice")]
+            engines.push(EnginePayload {
                 name: "LibreOffice".to_string(),
-                status: libreoffice_status,
+                status: libreoffice_status.clone(),
                 restarts: libreoffice_restarts,
                 mode: if state.config.libreoffice_lazy_start { "lazy".to_string() } else { "eager".to_string() },
                 mini_series: mini,
-            },
-        ],
+            });
+            engines
+        },
         concurrency: ConcurrencyPayload {
             active: concurrency_active,
             max: concurrency_max,
@@ -400,31 +413,36 @@ pub fn spawn_console_sampler(state: crate::state::AppState, started_at: Instant)
         loop {
             interval.tick().await;
 
-            // Read current http total for RPS delta
-            let http_total: f64 = {
-                let families = prometheus::gather();
-                families.iter()
-                    .find(|f| f.get_name() == "folio_http_requests_total")
-                    .map(|f| f.get_metric().iter().map(|m| m.get_counter().get_value()).sum())
-                    .unwrap_or(0.0)
-            };
-            let mut prev = state.console.prev_http_total.lock().await;
-            let rps = (http_total - *prev) / 5.0;
-            *prev = http_total;
-            drop(prev);
+            // Gather metrics once per tick to avoid data race between http_total and error_total
+            let families = prometheus::gather();
 
-            // Error rate
-            let error_total: f64 = {
-                let families = prometheus::gather();
-                families.iter()
-                    .find(|f| f.get_name() == "folio_http_requests_total")
-                    .map(|f| f.get_metric().iter()
-                        .filter(|m| m.get_label().iter()
-                            .any(|l| l.get_name() == "status" && (l.get_value().starts_with('5') || l.get_value().starts_with('4'))))
-                        .map(|m| m.get_counter().get_value()).sum())
-                    .unwrap_or(0.0)
-            };
-            let error_pct = if http_total > 0.0 { (error_total / http_total) * 100.0 } else { 0.0 };
+            // Read current http total for RPS delta
+            let http_total: f64 = families.iter()
+                .find(|f| f.get_name() == "folio_http_requests_total")
+                .map(|f| f.get_metric().iter().map(|m| m.get_counter().get_value()).sum())
+                .unwrap_or(0.0);
+
+            // Error rate (interval-relative delta, not lifetime cumulative)
+            let error_total: f64 = families.iter()
+                .find(|f| f.get_name() == "folio_http_requests_total")
+                .map(|f| f.get_metric().iter()
+                    .filter(|m| m.get_label().iter()
+                        .any(|l| l.get_name() == "status" && (l.get_value().starts_with('5') || l.get_value().starts_with('4'))))
+                    .map(|m| m.get_counter().get_value()).sum())
+                .unwrap_or(0.0);
+
+            let rps;
+            let error_pct;
+            {
+                let mut prev_http = state.console.prev_http_total.lock().await;
+                let mut prev_err = state.console.prev_error_total.lock().await;
+                let http_delta = http_total - *prev_http;
+                let error_delta = error_total - *prev_err;
+                rps = http_delta / 5.0;
+                error_pct = if http_delta > 0.0 { (error_delta / http_delta) * 100.0 } else { 0.0 };
+                *prev_http = http_total;
+                *prev_err = error_total;
+            }
 
             // Concurrency
             let concurrency_max = state.config.concurrency as u32;
@@ -457,12 +475,15 @@ pub fn spawn_console_sampler(state: crate::state::AppState, started_at: Instant)
 
             // Detect engine restarts via health gauge transitions
             // chromium: health gauge 1.0 = up, 0.0 = down
-            let chromium_now_running = state.metrics.chromium_healthy.get() >= 1.0;
-            let chromium_was = state.console.chromium_was_running.load(Ordering::SeqCst);
-            if !chromium_was && chromium_now_running {
-                state.console.chromium_restarts.fetch_add(1, Ordering::SeqCst);
+            #[cfg(feature = "chromium")]
+            {
+                let chromium_now_running = state.chromium.is_some() && state.metrics.chromium_healthy.get() >= 1.0;
+                let chromium_was = state.console.chromium_was_running.load(Ordering::SeqCst);
+                if chromium_now_running && !chromium_was {
+                    state.console.chromium_restarts.fetch_add(1, Ordering::SeqCst);
+                }
+                state.console.chromium_was_running.store(chromium_now_running, Ordering::SeqCst);
             }
-            state.console.chromium_was_running.store(chromium_now_running, Ordering::SeqCst);
 
             #[cfg(feature = "libreoffice")]
             {
