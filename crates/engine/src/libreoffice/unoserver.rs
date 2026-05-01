@@ -27,10 +27,8 @@ impl UnoserverProcess {
     ) -> EngineResult<Self> {
         info!(port, "Starting unoserver");
 
-        let mut cmd = tokio::process::Command::new("python3");
+        let mut cmd = tokio::process::Command::new("unoserver");
         cmd.args([
-            "-m",
-            "unoserver",
             "--interface",
             "127.0.0.1",
             "--port",
