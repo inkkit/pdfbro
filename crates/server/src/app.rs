@@ -271,6 +271,12 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
     use crate::routes::openapi;
     untimed = untimed.route("/openapi.json", get(openapi::openapi_spec));
 
+    // Operator console SSE stream and one-shot metrics JSON (long-lived, no timeout)
+    use crate::routes::console;
+    untimed = untimed
+        .route("/_/api/stream",  get(console::console_stream))
+        .route("/_/api/metrics", get(console::console_metrics_json));
+
     // Scalar interactive API documentation
     use axum::response::Html;
     use scalar_api_reference::scalar_html_default;
