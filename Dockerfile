@@ -5,6 +5,9 @@ ARG FOLIO_USER_GID=1001
 # Pinned for reproducible builds — bump deliberately when upgrading.
 # See: https://snapshot.debian.org/package/chromium/
 ARG CHROMIUM_VERSION=142.0.7444.175-1
+# TDF (The Document Foundation) pinned LibreOffice release.
+# Format: MAJOR.MINOR (e.g. 26.2). Maps to apt repo libreoffice-MAJOR-MINOR.
+ARG LIBREOFFICE_VERSION=26.2
 
 # =============================================================================
 # Stage: ui-builder — builds the operator console SPA
@@ -171,6 +174,7 @@ FROM common-chromium AS folio
 ARG FOLIO_VERSION
 ARG FOLIO_USER_UID
 ARG FOLIO_USER_GID
+ARG LIBREOFFICE_VERSION
 
 LABEL org.opencontainers.image.title="Folio" \
       org.opencontainers.image.description="A Docker-based API for converting documents to PDF." \
@@ -178,13 +182,24 @@ LABEL org.opencontainers.image.title="Folio" \
       org.opencontainers.image.authors="Folio Team" \
       org.opencontainers.image.source="https://github.com/been-there-done-that/folio"
 
-RUN apt-get update -qq && apt-get upgrade -yqq && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+RUN LO_REPO="libreoffice-$(echo "${LIBREOFFICE_VERSION}" | tr '.' '-')" && \
+    curl -fsSL "https://deb.libreoffice.org/libreoffice/${LO_REPO}/Release.key" \
+      | gpg --dearmor -o /usr/share/keyrings/libreoffice.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/libreoffice.gpg] https://deb.libreoffice.org/libreoffice/${LO_REPO}/ bookworm main" \
+      > /etc/apt/sources.list.d/libreoffice.list && \
+    apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         libreoffice-writer \
         libreoffice-calc \
         libreoffice-impress \
         libreoffice-draw \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+        python3-minimal \
+        python3-pip && \
+    pip3 install --no-cache-dir --break-system-packages unoserver==2.2.1 && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Force headless SVP rendering backend — skips virtual display probe (~50–100ms).
+ENV SAL_USE_VCLPLUGIN=svp
 
 COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" \
     --from=builder-full /app/target/release/folio-server /usr/bin/
@@ -241,6 +256,7 @@ FROM common AS folio-libreoffice
 ARG FOLIO_VERSION
 ARG FOLIO_USER_UID
 ARG FOLIO_USER_GID
+ARG LIBREOFFICE_VERSION
 
 LABEL org.opencontainers.image.title="Folio (LibreOffice)" \
       org.opencontainers.image.description="A Docker-based API for converting documents to PDF — LibreOffice variant." \
@@ -248,13 +264,24 @@ LABEL org.opencontainers.image.title="Folio (LibreOffice)" \
       org.opencontainers.image.authors="Folio Team" \
       org.opencontainers.image.source="https://github.com/been-there-done-that/folio"
 
-RUN apt-get update -qq && apt-get upgrade -yqq && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+RUN LO_REPO="libreoffice-$(echo "${LIBREOFFICE_VERSION}" | tr '.' '-')" && \
+    curl -fsSL "https://deb.libreoffice.org/libreoffice/${LO_REPO}/Release.key" \
+      | gpg --dearmor -o /usr/share/keyrings/libreoffice.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/libreoffice.gpg] https://deb.libreoffice.org/libreoffice/${LO_REPO}/ bookworm main" \
+      > /etc/apt/sources.list.d/libreoffice.list && \
+    apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         libreoffice-writer \
         libreoffice-calc \
         libreoffice-impress \
         libreoffice-draw \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+        python3-minimal \
+        python3-pip && \
+    pip3 install --no-cache-dir --break-system-packages unoserver==2.2.1 && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Force headless SVP rendering backend — skips virtual display probe (~50–100ms).
+ENV SAL_USE_VCLPLUGIN=svp
 
 COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" \
     --from=builder-libreoffice /app/target/release/folio-server /usr/bin/
