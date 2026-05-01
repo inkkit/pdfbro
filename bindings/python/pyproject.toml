@@ -1,0 +1,27 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "folio"
+version = "0.1.0"
+description = "Folio: Rust-native PDF conversion, embeddable in Python."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Rust",
+  "License :: OSI Approved :: MIT License",
+]
+
+[project.urls]
+Homepage = "https://github.com/__deesh_reddy__/folio"
+Repository = "https://github.com/__deesh_reddy__/folio"
+
+[tool.maturin]
+manifest-path = "../../crates/py/Cargo.toml"
+module-name = "folio._native"
+features = ["pyo3/extension-module"]
+python-source = "."
+strip = true
