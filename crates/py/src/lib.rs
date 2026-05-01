@@ -1,14 +1,18 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! Folio Python bindings — see `bindings/python/README.md`.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+mod errors;
+mod folio_async;
+mod folio_sync;
+mod launch;
+mod runtime;
+mod types;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+use pyo3::prelude::*;
+
+#[pymodule]
+fn _native(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    errors::register(py, m)?;
+    m.add_class::<folio_sync::Folio>()?;
+    m.add_class::<folio_async::AsyncFolio>()?;
+    Ok(())
 }
