@@ -11,7 +11,7 @@ ARG CHROMIUM_VERSION=142.0.7444.175-1
 # =============================================================================
 FROM node:22-slim AS ui-builder
 WORKDIR /ui
-COPY ui/package*.json ./
+COPY ui/package*.json ui/bun.lock* ./
 RUN npm install
 COPY ui/ ./
 RUN npm run build
