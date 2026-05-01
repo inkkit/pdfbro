@@ -168,6 +168,79 @@ impl ApiError {
                 documentation: Some(documentation_link("TIMEOUT")),
             },
 
+            // Navigation timeout - specific to page load
+            ApiError::Engine(EngineError::NavigationTimeout { url, duration }) => ApiErrorResponse {
+                error: format!("Navigation timed out after {:?}", duration),
+                code: code.to_string(),
+                details: Some(ErrorDetails {
+                    url: Some(url.clone()),
+                    timeout_ms: Some(duration.as_millis() as u64),
+                    ..Default::default()
+                }),
+                suggestion: Some(format!(
+                    "The URL {} failed to load within {:?}. Check if the site is accessible, or increase --request-timeout.",
+                    url, duration
+                )),
+                documentation: Some(documentation_link("NAVIGATION_TIMEOUT")),
+            },
+
+            // Render timeout - PDF generation hung
+            ApiError::Engine(EngineError::RenderTimeout(duration)) => ApiErrorResponse {
+                error: format!("PDF render timed out after {:?}", duration),
+                code: code.to_string(),
+                details: Some(ErrorDetails {
+                    timeout_ms: Some(duration.as_millis() as u64),
+                    ..Default::default()
+                }),
+                suggestion: Some(
+                    "PDF generation took too long. Try simplifying the page or increase --request-timeout.".to_string()
+                ),
+                documentation: Some(documentation_link("RENDER_TIMEOUT")),
+            },
+
+            // Idle timeout - network didn't become idle
+            ApiError::Engine(EngineError::IdleTimeout(duration)) => ApiErrorResponse {
+                error: format!("Network idle detection timed out after {:?}", duration),
+                code: code.to_string(),
+                details: Some(ErrorDetails {
+                    timeout_ms: Some(duration.as_millis() as u64),
+                    ..Default::default()
+                }),
+                suggestion: Some(
+                    "The page has continuous network activity. Try --skip-network-idle or wait for a specific selector instead.".to_string()
+                ),
+                documentation: Some(documentation_link("IDLE_TIMEOUT")),
+            },
+
+            // Resource timeout - specific sub-resource failed
+            ApiError::Engine(EngineError::ResourceTimeout { url, duration }) => ApiErrorResponse {
+                error: format!("Resource timed out: {}", url),
+                code: code.to_string(),
+                details: Some(ErrorDetails {
+                    url: Some(url.clone()),
+                    timeout_ms: Some(duration.as_millis() as u64),
+                    ..Default::default()
+                }),
+                suggestion: Some(
+                    "A resource (image, CSS, or font) failed to load. Check the URL or increase resource timeout.".to_string()
+                ),
+                documentation: Some(documentation_link("RESOURCE_TIMEOUT")),
+            },
+
+            // LibreOffice timeout
+            ApiError::Engine(EngineError::LibreOfficeTimeout(duration)) => ApiErrorResponse {
+                error: format!("LibreOffice conversion timed out after {:?}", duration),
+                code: code.to_string(),
+                details: Some(ErrorDetails {
+                    timeout_ms: Some(duration.as_millis() as u64),
+                    ..Default::default()
+                }),
+                suggestion: Some(
+                    "Document conversion took too long. Try a smaller document or increase --request-timeout.".to_string()
+                ),
+                documentation: Some(documentation_link("LIBREOFFICE_TIMEOUT")),
+            },
+
             // Invalid option with field context
             ApiError::Engine(EngineError::InvalidOption(msg)) => ApiErrorResponse {
                 error: msg.clone(),
@@ -527,7 +600,13 @@ fn engine_status_and_code(e: &EngineError) -> (StatusCode, &'static str) {
         EngineError::InvalidOption(_) => (StatusCode::BAD_REQUEST, "INVALID_OPTION"),
         EngineError::InvalidPageRange(_) => (StatusCode::BAD_REQUEST, "INVALID_PAGE_RANGE"),
         EngineError::Navigation { .. } => (StatusCode::BAD_GATEWAY, "NAVIGATION"),
+        // Timeout classifications
         EngineError::Timeout(_) => (StatusCode::GATEWAY_TIMEOUT, "TIMEOUT"),
+        EngineError::NavigationTimeout { .. } => (StatusCode::GATEWAY_TIMEOUT, "NAVIGATION_TIMEOUT"),
+        EngineError::RenderTimeout(_) => (StatusCode::GATEWAY_TIMEOUT, "RENDER_TIMEOUT"),
+        EngineError::IdleTimeout(_) => (StatusCode::GATEWAY_TIMEOUT, "IDLE_TIMEOUT"),
+        EngineError::ResourceTimeout { .. } => (StatusCode::GATEWAY_TIMEOUT, "RESOURCE_TIMEOUT"),
+        EngineError::LibreOfficeTimeout(_) => (StatusCode::GATEWAY_TIMEOUT, "LIBREOFFICE_TIMEOUT"),
         EngineError::ChromeNotFound { .. } | EngineError::ChromeLaunch(_) => {
             (StatusCode::INTERNAL_SERVER_ERROR, "ENGINE_UNAVAILABLE")
         }
@@ -543,6 +622,11 @@ fn documentation_link(error_code: &str) -> String {
     let path = match error_code {
         "NAVIGATION" => "/troubleshooting#navigation-failed",
         "TIMEOUT" => "/troubleshooting#timeout",
+        "NAVIGATION_TIMEOUT" => "/troubleshooting#navigation-timeout",
+        "RENDER_TIMEOUT" => "/troubleshooting#render-timeout",
+        "IDLE_TIMEOUT" => "/troubleshooting#idle-timeout",
+        "RESOURCE_TIMEOUT" => "/troubleshooting#resource-timeout",
+        "LIBREOFFICE_TIMEOUT" => "/troubleshooting#libreoffice-timeout",
         "INVALID_OPTION" | "INVALID_FIELD" => "/api#form-fields",
         "INVALID_PAGE_RANGE" => "/api#page-ranges",
         "MISSING_FIELD" | "MISSING_FILE" => "/api#required-fields",

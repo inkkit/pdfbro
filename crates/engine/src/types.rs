@@ -56,6 +56,36 @@ pub enum EngineError {
     #[error("operation timed out after {0:?}")]
     Timeout(Duration),
 
+    /// Page navigation exceeded timeout.
+    #[error("navigation timed out after {duration:?} for {url}")]
+    NavigationTimeout {
+        /// URL that failed to load in time.
+        url: String,
+        /// Duration of the timeout.
+        duration: Duration,
+    },
+
+    /// PDF render operation exceeded timeout.
+    #[error("PDF render timed out after {0:?}")]
+    RenderTimeout(Duration),
+
+    /// Network idle detection exceeded timeout.
+    #[error("network idle detection timed out after {0:?}")]
+    IdleTimeout(Duration),
+
+    /// A resource (image, CSS, font) failed to load within timeout.
+    #[error("resource timed out after {duration:?}: {url}")]
+    ResourceTimeout {
+        /// URL of the resource that timed out.
+        url: String,
+        /// Duration of the timeout.
+        duration: Duration,
+    },
+
+    /// LibreOffice conversion exceeded timeout.
+    #[error("LibreOffice conversion timed out after {0:?}")]
+    LibreOfficeTimeout(Duration),
+
     /// An I/O error occurred (filesystem, sockets, etc.).
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
