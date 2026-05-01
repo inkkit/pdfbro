@@ -32,6 +32,7 @@ export function startSSE() {
 
     es.onerror = () => {
         connected = false;
+        loading = false;
         error = 'Connection lost — reconnecting…';
     };
 }

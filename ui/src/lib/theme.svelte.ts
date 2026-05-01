@@ -7,6 +7,7 @@ export type ThemeTokens = {
     bg: string; surface: string; ink: string; muted: string;
     faint: string; rule: string; ok: string; warn: string; err: string; accent: string;
 };
+export type Theme = ThemeTokens;
 
 export let theme = $derived<ThemeTokens>({
     bg:      dark ? '#0e0f12' : '#f7f7f5',
