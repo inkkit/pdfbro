@@ -8,7 +8,7 @@ description = "Folio core engine: ChromiumEngine, LibreOfficeEngine, PdfOperatio
 [features]
 default = ["chromium", "libreoffice"]
 chromium = ["dep:chromiumoxide", "dep:futures-util", "dep:pulldown-cmark", "dep:urlencoding"]
-libreoffice = []
+libreoffice = ["dep:reqwest"]
 
 [dependencies]
 chromiumoxide = { workspace = true, optional = true }
@@ -16,6 +16,7 @@ futures-util = { workspace = true, optional = true }
 humantime-serde = { workspace = true }
 lopdf = { workspace = true }
 pulldown-cmark = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
