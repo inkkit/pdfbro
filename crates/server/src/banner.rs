@@ -205,6 +205,7 @@ mod tests {
             api_download_from_max_retry: 3,
             api_disable_download_from: false,
             api_correlation_id_header: "x-request-id".to_string(),
+            api_root_path: String::new(),
         }
     }
 

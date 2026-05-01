@@ -187,6 +187,13 @@ pub struct ServerArgs {
     /// incoming requests and propagates it to responses and trace spans.
     #[arg(long, value_name = "HEADER", env = "API_CORRELATION_ID_HEADER")]
     pub api_correlation_id_header: Option<String>,
+
+    /// Mount the entire API under this path prefix (default: empty / no prefix).
+    /// Useful when running behind a reverse proxy that strips no path. Must
+    /// start with `/` and have no trailing slash. Example: `--root-path /pdf`
+    /// makes `/forms/chromium/convert/url` reachable at `/pdf/forms/chromium/convert/url`.
+    #[arg(long, value_name = "PATH", env = "API_ROOT_PATH")]
+    pub api_root_path: Option<String>,
 }
 
 /// Log output formats supported by the server.
@@ -293,6 +300,9 @@ pub struct ServerConfig {
     pub api_disable_download_from: bool,
     /// Request-correlation header name.
     pub api_correlation_id_header: String,
+    /// Path prefix to mount the API under. Empty string means no prefix.
+    /// Always starts with `/` and never ends with `/` (validated at resolve).
+    pub api_root_path: String,
 }
 
 /// Errors produced by [`ServerConfig::resolve`].
@@ -521,6 +531,19 @@ impl ServerConfig {
                 message: format!("`{}` is not a valid HTTP header name", api_correlation_id_header),
             })?;
 
+        let api_root_path = args
+            .api_root_path
+            .clone()
+            .or_else(|| env.get("API_ROOT_PATH").cloned())
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default();
+        let api_root_path = normalize_root_path(&api_root_path).map_err(|message| {
+            ConfigError::Parse {
+                field: "api_root_path",
+                message,
+            }
+        })?;
+
         Ok(Self {
             host,
             port,
@@ -557,6 +580,7 @@ impl ServerConfig {
             api_download_from_max_retry,
             api_disable_download_from,
             api_correlation_id_header,
+            api_root_path,
         })
     }
 
@@ -586,6 +610,29 @@ fn pick_string(
         return v.clone();
     }
     default.to_string()
+}
+
+/// Normalise a user-supplied root-path. Returns `Ok("")` for empty input.
+/// For non-empty input, ensures it starts with `/` and has no trailing slash.
+fn normalize_root_path(s: &str) -> Result<String, String> {
+    let s = s.trim();
+    if s.is_empty() {
+        return Ok(String::new());
+    }
+    if !s.starts_with('/') {
+        return Err(format!("must start with `/`, got `{s}`"));
+    }
+    let trimmed = s.trim_end_matches('/');
+    if trimmed.is_empty() {
+        // Input was just "/" — equivalent to no prefix.
+        return Ok(String::new());
+    }
+    if trimmed.contains("//") {
+        return Err(format!(
+            "must not contain consecutive slashes, got `{s}`"
+        ));
+    }
+    Ok(trimmed.to_string())
 }
 
 fn is_truthy(s: &str) -> bool {
@@ -618,6 +665,53 @@ mod tests {
             .iter()
             .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
             .collect()
+    }
+
+    #[test]
+    fn root_path_defaults_empty() {
+        let args = ServerArgs::default();
+        let cfg = ServerConfig::resolve(&args, &env(&[])).unwrap();
+        assert_eq!(cfg.api_root_path, "");
+    }
+
+    #[test]
+    fn root_path_from_env() {
+        let args = ServerArgs::default();
+        let cfg =
+            ServerConfig::resolve(&args, &env(&[("API_ROOT_PATH", "/pdf")])).unwrap();
+        assert_eq!(cfg.api_root_path, "/pdf");
+    }
+
+    #[test]
+    fn root_path_strips_trailing_slash() {
+        let args = ServerArgs::default();
+        let cfg =
+            ServerConfig::resolve(&args, &env(&[("API_ROOT_PATH", "/pdf/")])).unwrap();
+        assert_eq!(cfg.api_root_path, "/pdf");
+    }
+
+    #[test]
+    fn root_path_just_slash_normalised_to_empty() {
+        let args = ServerArgs::default();
+        let cfg = ServerConfig::resolve(&args, &env(&[("API_ROOT_PATH", "/")])).unwrap();
+        assert_eq!(cfg.api_root_path, "");
+    }
+
+    #[test]
+    fn root_path_missing_leading_slash_rejected() {
+        let args = ServerArgs::default();
+        let err = ServerConfig::resolve(&args, &env(&[("API_ROOT_PATH", "pdf")])).unwrap_err();
+        let ConfigError::Parse { field, .. } = err;
+        assert_eq!(field, "api_root_path");
+    }
+
+    #[test]
+    fn root_path_double_slash_rejected() {
+        let args = ServerArgs::default();
+        let err = ServerConfig::resolve(&args, &env(&[("API_ROOT_PATH", "/a//b")]))
+            .unwrap_err();
+        let ConfigError::Parse { field, .. } = err;
+        assert_eq!(field, "api_root_path");
     }
 
     #[test]

@@ -598,15 +598,21 @@ pub fn parse_pdf_options(map: &HashMap<String, String>) -> ApiResult<PdfOptions>
     }
 
     // Wait conditions. At most one of waitForExpression / waitForSelector /
-    // waitDelay may be set; if multiple are present, that's an error.
-    let wait_count = ["waitForExpression", "waitForSelector", "waitDelay"]
-        .iter()
-        .filter(|k| map.get(**k).map(|s| !s.is_empty()).unwrap_or(false))
-        .count();
+    // waitDelay / waitWindowStatus may be set; if multiple are present, that's an error.
+    let wait_count = [
+        "waitForExpression",
+        "waitForSelector",
+        "waitDelay",
+        "waitWindowStatus",
+    ]
+    .iter()
+    .filter(|k| map.get(**k).map(|s| !s.is_empty()).unwrap_or(false))
+    .count();
     if wait_count > 1 {
         return Err(ApiError::InvalidField {
             field: "wait",
-            message: "set only one of waitForExpression, waitForSelector, waitDelay".to_string(),
+            message: "set only one of waitForExpression, waitForSelector, waitDelay, waitWindowStatus"
+                .to_string(),
         });
     }
     if let Some(s) = nonempty(map, "waitForExpression") {
@@ -619,6 +625,8 @@ pub fn parse_pdf_options(map: &HashMap<String, String>) -> ApiResult<PdfOptions>
             message: e.to_string(),
         })?;
         opts.wait = WaitCondition::Delay { duration: d };
+    } else if let Some(s) = nonempty(map, "waitWindowStatus") {
+        opts.wait = WaitCondition::WindowStatus { status: s };
     }
 
     if let Some(v) = opt_bool(map, "singlePage")? {
@@ -666,7 +674,56 @@ pub fn parse_request_context(map: &HashMap<String, String>) -> ApiResult<Request
         ctx.fail_on_status = parsed;
     }
 
+    if let Some(s) = nonempty(map, "failOnResourceHttpStatusCodes") {
+        let parsed: Vec<u16> = serde_json::from_str(&s).map_err(|e| ApiError::InvalidField {
+            field: "failOnResourceHttpStatusCodes",
+            message: e.to_string(),
+        })?;
+        ctx.fail_on_resource_status = parsed;
+    }
+
+    if let Some(v) = opt_bool(map, "failOnResourceLoadingFailed")? {
+        ctx.fail_on_resource_loading_failed = v;
+    }
+
+    if let Some(v) = opt_bool(map, "failOnConsoleExceptions")? {
+        ctx.fail_on_console_exceptions = v;
+    }
+
+    // skipNetworkIdleEvent / skipNetworkAlmostIdleEvent are merged into a
+    // single engine flag — Chrome does not distinguish the two via CDP.
+    let skip_idle = opt_bool(map, "skipNetworkIdleEvent")?.unwrap_or(false);
+    let skip_almost_idle = opt_bool(map, "skipNetworkAlmostIdleEvent")?.unwrap_or(false);
+    if skip_idle || skip_almost_idle {
+        ctx.skip_network_idle = true;
+    }
+
+    if let Some(s) = nonempty(map, "ignoreResourceHttpStatusDomains") {
+        ctx.ignore_resource_status_domains = parse_string_list(&s);
+    }
+
     Ok(ctx)
+}
+
+/// Parse a list of strings from a form field. Accepts either a JSON array
+/// (`["a","b"]`) or a comma/newline-separated list (`a, b`). Empty
+/// entries are dropped; whitespace is trimmed.
+fn parse_string_list(s: &str) -> Vec<String> {
+    let trimmed = s.trim();
+    if trimmed.starts_with('[') {
+        if let Ok(v) = serde_json::from_str::<Vec<String>>(trimmed) {
+            return v
+                .into_iter()
+                .map(|x| x.trim().to_string())
+                .filter(|x| !x.is_empty())
+                .collect();
+        }
+    }
+    trimmed
+        .split(|c: char| c == ',' || c == '\n')
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty())
+        .collect()
 }
 
 fn parse_cookies_json(s: &str) -> ApiResult<Vec<Cookie>> {
@@ -1177,6 +1234,119 @@ mod tests {
         let map = fm(&[("failOnHttpStatusCodes", "[401, 403, 500]")]);
         let ctx = parse_request_context(&map).unwrap();
         assert_eq!(ctx.fail_on_status, vec![401, 403, 500]);
+    }
+
+    #[test]
+    fn wait_window_status_parses() {
+        let map = fm(&[("waitWindowStatus", "ready")]);
+        let opts = parse_pdf_options(&map).unwrap();
+        assert_eq!(
+            opts.wait,
+            WaitCondition::WindowStatus {
+                status: "ready".into()
+            }
+        );
+    }
+
+    #[test]
+    fn wait_window_status_conflicts_with_other_wait() {
+        let map = fm(&[("waitWindowStatus", "ready"), ("waitDelay", "1s")]);
+        let err = parse_pdf_options(&map).unwrap_err();
+        match err {
+            ApiError::InvalidField { field, .. } => assert_eq!(field, "wait"),
+            other => panic!("expected InvalidField, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn fail_on_resource_status_codes_parse() {
+        let map = fm(&[("failOnResourceHttpStatusCodes", "[404, 502]")]);
+        let ctx = parse_request_context(&map).unwrap();
+        assert_eq!(ctx.fail_on_resource_status, vec![404, 502]);
+    }
+
+    #[test]
+    fn fail_on_resource_status_codes_invalid_json() {
+        let map = fm(&[("failOnResourceHttpStatusCodes", "nope")]);
+        let err = parse_request_context(&map).unwrap_err();
+        match err {
+            ApiError::InvalidField { field, .. } => {
+                assert_eq!(field, "failOnResourceHttpStatusCodes")
+            }
+            other => panic!("expected InvalidField, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn fail_on_resource_loading_failed_parses() {
+        let map = fm(&[("failOnResourceLoadingFailed", "true")]);
+        let ctx = parse_request_context(&map).unwrap();
+        assert!(ctx.fail_on_resource_loading_failed);
+    }
+
+    #[test]
+    fn fail_on_console_exceptions_parses() {
+        let map = fm(&[("failOnConsoleExceptions", "true")]);
+        let ctx = parse_request_context(&map).unwrap();
+        assert!(ctx.fail_on_console_exceptions);
+    }
+
+    #[test]
+    fn skip_network_idle_event_parses() {
+        let map = fm(&[("skipNetworkIdleEvent", "true")]);
+        let ctx = parse_request_context(&map).unwrap();
+        assert!(ctx.skip_network_idle);
+    }
+
+    #[test]
+    fn skip_network_almost_idle_event_also_parses() {
+        let map = fm(&[("skipNetworkAlmostIdleEvent", "true")]);
+        let ctx = parse_request_context(&map).unwrap();
+        assert!(ctx.skip_network_idle);
+    }
+
+    #[test]
+    fn skip_network_idle_off_by_default() {
+        let ctx = parse_request_context(&HashMap::new()).unwrap();
+        assert!(!ctx.skip_network_idle);
+    }
+
+    #[test]
+    fn ignore_resource_domains_json_array() {
+        let map = fm(&[(
+            "ignoreResourceHttpStatusDomains",
+            r#"["googleapis.com", "fonts.gstatic.com"]"#,
+        )]);
+        let ctx = parse_request_context(&map).unwrap();
+        assert_eq!(
+            ctx.ignore_resource_status_domains,
+            vec![
+                "googleapis.com".to_string(),
+                "fonts.gstatic.com".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn ignore_resource_domains_comma_list() {
+        let map = fm(&[(
+            "ignoreResourceHttpStatusDomains",
+            "googleapis.com, fonts.gstatic.com",
+        )]);
+        let ctx = parse_request_context(&map).unwrap();
+        assert_eq!(
+            ctx.ignore_resource_status_domains,
+            vec![
+                "googleapis.com".to_string(),
+                "fonts.gstatic.com".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn ignore_resource_domains_default_empty() {
+        let ctx = parse_request_context(&HashMap::new()).unwrap();
+        assert!(ctx.ignore_resource_status_domains.is_empty());
     }
 
     #[test]

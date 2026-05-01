@@ -101,6 +101,17 @@ pub struct RequestContext {
     pub fail_on_console_exceptions: bool,
     /// If true, fail the render if any resource fails to load (network error).
     pub fail_on_resource_loading_failed: bool,
+    /// If true, skip the engine's `networkIdle` race during navigation —
+    /// proceed once `load` fires. Mirrors Gotenberg's
+    /// `skipNetworkIdleEvent` / `skipNetworkAlmostIdleEvent` flags
+    /// (Chrome does not distinguish the two via CDP, so a single bool
+    /// covers both).
+    pub skip_network_idle: bool,
+    /// Resource URLs whose host contains any of these substrings are
+    /// exempt from [`Self::fail_on_resource_status`] checks. Match is
+    /// case-insensitive substring on the URL host. Empty (the default)
+    /// means no domains are ignored.
+    pub ignore_resource_status_domains: Vec<String>,
 }
 
 /// A single cookie installed on the page before a render.
@@ -453,6 +464,7 @@ mod assertions {
         assert!(ctx.fail_on_resource_status.is_empty());
         assert!(!ctx.fail_on_console_exceptions);
         assert!(!ctx.fail_on_resource_loading_failed);
+        assert!(!ctx.skip_network_idle);
     }
 
     #[test]
