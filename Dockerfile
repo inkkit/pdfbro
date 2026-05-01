@@ -1,196 +1,338 @@
-# Folio - Standard Dockerfile (Full: Chromium + LibreOffice)
-# Tags: latest, 8, v0.1.0
-# Multi-arch support: amd64, arm64
-# Pushes to: docker push deesh2025/no-name:tagname
-
 ARG RUST_VERSION=1.88
 ARG FOLIO_VERSION=0.1.0
 ARG FOLIO_USER_UID=1001
 ARG FOLIO_USER_GID=1001
-# Chromium version - pinned for reproducible builds
-# See: https://snapshot.debian.org/package/chromium/142.0.7444.175-1/
+# Pinned for reproducible builds — bump deliberately when upgrading.
+# See: https://snapshot.debian.org/package/chromium/
 ARG CHROMIUM_VERSION=142.0.7444.175-1
 
 # =============================================================================
-# Stage 1: Chef (prepares dependency recipe)
+# Stage: chef — installs cargo-chef for dependency caching
 # =============================================================================
 FROM rust:${RUST_VERSION} AS chef
 WORKDIR /app
 RUN cargo install cargo-chef --locked
 
 # =============================================================================
-# Stage 2: Planner
+# Stage: planner — produces recipe.json (shared by all builders)
 # =============================================================================
 FROM chef AS planner
 COPY --link . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 # =============================================================================
-# Stage 3: Builder
+# Stage: builder-full — compiles folio with chromium + libreoffice features
 # =============================================================================
-FROM rust:${RUST_VERSION} AS builder
-ARG CHROMIUM_VERSION
-
+FROM chef AS builder-full
 WORKDIR /app
-
-# Install build dependencies (Chromium installed below with version pinning)
-RUN apt-get update -qq && apt-get upgrade -yqq && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-    libgtk-3-0 libx11-xcb1 libxcomposite1 libxcursor1 \
-    libxdamage1 libxi6 libxtst6 libnss3 libcups2 libxss1 \
-    libxrandr2 libasound2 libatk1.0-0 libatk-bridge2.0-0 \
-    libpangocairo-1.0-0 libpango-1.0-0 libcairo2 \
-    libgdk-pixbuf2.0-0 libgconf-2-4 libgdm1 libglib2.0-0 \
-    libgl1-mesa-glx fonts-liberation xdg-utils wget curl unzip ca-certificates \
-    libreoffice \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-# Install Chromium with version pinning
-RUN /bin/bash -c \
-    'set -e &&\
-    if [[ "$CHROMIUM_VERSION" != "latest" && -n "$CHROMIUM_VERSION" ]]; then \
-      apt-get update -qq &&\
-      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends devscripts &&\
-      debsnap chromium-common "$CHROMIUM_VERSION" -v --force --binary --architecture $(dpkg --print-architecture) &&\
-      debsnap chromium "$CHROMIUM_VERSION" -v --force --binary --architecture $(dpkg --print-architecture) &&\
-      dpkg -i --force-depends \
-        "./binary-chromium-common/chromium-common_${CHROMIUM_VERSION}_$(dpkg --print-architecture).deb" \
-        "./binary-chromium/chromium_${CHROMIUM_VERSION}_$(dpkg --print-architecture).deb" &&\
-      apt-get install -f -y -qq --no-install-recommends || true &&\
-      DEBIAN_FRONTEND=noninteractive apt-get purge -y -qq devscripts &&\
-      rm -rf ./binary-chromium-common/* ./binary-chromium/* /var/lib/apt/lists/* /tmp/* /var/tmp/*; \
-    else \
-      apt-get update -qq &&\
-      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends chromium &&\
-      rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*; \
-    fi'
-
-ENV CHROME_PATH=/usr/bin/chromium
-RUN cargo install cargo-chef --locked
-
-# Cache dependencies (cached layer - only rebuilds if deps change)
+# No Chrome or LibreOffice needed at compile time; both are runtime subprocesses.
 COPY --link --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json --features "chromium libreoffice"
-
-# Build with optimizations
 COPY --link . .
 RUN cargo build --release --features "chromium libreoffice" && \
     strip target/release/folio-server && \
     strip target/release/folio
 
 # =============================================================================
-# Stage 4: Runtime - Production
+# Stage: builder-chromium — compiles folio with chromium feature only
 # =============================================================================
-FROM debian:bookworm-slim
+FROM chef AS builder-chromium
+WORKDIR /app
+COPY --link --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json --no-default-features --features chromium
+COPY --link . .
+RUN cargo build --release --no-default-features --features chromium && \
+    strip target/release/folio-server && \
+    strip target/release/folio
+
+# =============================================================================
+# Stage: builder-libreoffice — compiles folio with libreoffice feature only
+# =============================================================================
+FROM chef AS builder-libreoffice
+WORKDIR /app
+COPY --link --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json --no-default-features --features libreoffice
+COPY --link . .
+RUN cargo build --release --no-default-features --features libreoffice && \
+    strip target/release/folio-server && \
+    strip target/release/folio
+
+# =============================================================================
+# Stage: common — non-root user, tini, fonts, PDF tools (no engines yet)
+# =============================================================================
+FROM debian:bookworm-slim AS common
 
 ARG FOLIO_VERSION
 ARG FOLIO_USER_UID
 ARG FOLIO_USER_GID
-ARG CHROMIUM_VERSION
 
-# Metadata
-LABEL org.opencontainers.image.title="Folio" \
-    org.opencontainers.image.description="A Docker-based API for converting documents to PDF" \
-    org.opencontainers.image.version="${FOLIO_VERSION}" \
-    org.opencontainers.image.authors="Folio Team" \
-    org.opencontainers.image.source="https://github.com/been-there-done-that/folio"
-
-# Set UTF-8 locale for consistent behavior
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 ENV TZ=UTC
 
-# Create non-root user for security
-# All processes run with this dedicated user
 RUN groupadd --gid "${FOLIO_USER_GID}" folio && \
     useradd --uid "${FOLIO_USER_UID}" --gid folio --shell /bin/bash \
-    --home /home/folio --no-create-home folio && \
-    mkdir -p /home/folio /app && \
-    chown -R folio:folio /home/folio /app
+        --home /home/folio --no-create-home folio && \
+    mkdir -p /home/folio && \
+    chown folio:folio /home/folio
 
-# Install runtime dependencies with comprehensive font support
-# Note: Chromium is installed below with version pinning
 RUN apt-get update -qq && apt-get upgrade -yqq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-    # Init system for proper zombie process reaping
-    tini \
-    # Health checks
-    curl \
-    ca-certificates \
-    # LibreOffice components
-    libreoffice-writer \
-    libreoffice-calc \
-    libreoffice-impress \
-    libreoffice-draw \
-    # Comprehensive font support (metric-compatible with MS fonts)
-    fonts-crosextra-carlito \
-    fonts-crosextra-caladea \
-    fonts-liberation \
-    fonts-liberation2 \
-    fonts-dejavu \
-    # CJK (Chinese, Japanese, Korean) support
-    fonts-noto-cjk \
-    # Emoji support
-    fonts-noto-color-emoji \
-    # Core fonts (tofu prevention)
-    fonts-noto \
-    fontconfig \
-    # PDF tools
-    qpdf \
-    ghostscript \
-    # Chromium runtime libs (without chromium binary)
-    libgtk-3-0 libx11-xcb1 libxcomposite1 libxcursor1 \
-    libxdamage1 libxi6 libxtst6 libnss3 libcups2 libxss1 \
-    libxrandr2 libasound2 libatk1.0-0 libatk-bridge2.0-0 \
-    libpangocairo-1.0-0 libpango-1.0-0 libcairo2 \
-    libgdk-pixbuf2.0-0 libglib2.0-0 libgl1-mesa-glx \
-    # Cleanup
+        # Signal handling and zombie reaping.
+        tini \
+        # Used by health checks.
+        curl \
+        ca-certificates \
+        # Metric-compatible substitutes for common MS fonts (LibreOffice layout).
+        fonts-crosextra-carlito \
+        fonts-crosextra-caladea \
+        fonts-liberation \
+        fonts-liberation2 \
+        # Reliable general-purpose fallback for Chromium.
+        fonts-dejavu \
+        # CJK (Chinese, Japanese, Korean).
+        fonts-noto-cjk \
+        # Emoji.
+        fonts-noto-color-emoji \
+        # Tofu prevention.
+        fonts-noto \
+        fontconfig \
+        # PDF engines.
+        qpdf \
+        ghostscript \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Install Chromium with version pinning
+ENV FOLIO_VERSION=${FOLIO_VERSION}
+ENV RUST_LOG=info
+ENV GS_BIN=/usr/bin/gs
+
+# =============================================================================
+# Stage: common-chromium — common + Chromium (shared by full and chromium variants)
+# =============================================================================
+FROM common AS common-chromium
+
+ARG CHROMIUM_VERSION
+
+# On most architectures install the latest Chromium from the repo.
+# On amd64/arm64 we pin a specific snapshot version for reproducibility.
 RUN /bin/bash -c \
-    'set -e &&\
-    if [[ "$CHROMIUM_VERSION" != "latest" && -n "$CHROMIUM_VERSION" ]]; then \
-      apt-get update -qq &&\
-      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends devscripts &&\
-      debsnap chromium-common "$CHROMIUM_VERSION" -v --force --binary --architecture $(dpkg --print-architecture) &&\
-      debsnap chromium "$CHROMIUM_VERSION" -v --force --binary --architecture $(dpkg --print-architecture) &&\
+    'set -e; \
+    ARCH="$(dpkg --print-architecture)"; \
+    if [[ -n "$CHROMIUM_VERSION" && "$CHROMIUM_VERSION" != "latest" && \
+          ("$ARCH" == "amd64" || "$ARCH" == "arm64") ]]; then \
+      apt-get update -qq && \
+      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends devscripts && \
+      debsnap chromium-common "$CHROMIUM_VERSION" -v --force --binary --architecture "$ARCH" && \
+      debsnap chromium "$CHROMIUM_VERSION" -v --force --binary --architecture "$ARCH" && \
       dpkg -i --force-depends \
-        "./binary-chromium-common/chromium-common_${CHROMIUM_VERSION}_$(dpkg --print-architecture).deb" \
-        "./binary-chromium/chromium_${CHROMIUM_VERSION}_$(dpkg --print-architecture).deb" &&\
-      apt-get install -f -y -qq --no-install-recommends || true &&\
-      DEBIAN_FRONTEND=noninteractive apt-get purge -y -qq devscripts &&\
-      rm -rf ./binary-chromium-common/* ./binary-chromium/* /var/lib/apt/lists/* /tmp/* /var/tmp/*; \
+        "./binary-chromium-common/chromium-common_${CHROMIUM_VERSION}_${ARCH}.deb" \
+        "./binary-chromium/chromium_${CHROMIUM_VERSION}_${ARCH}.deb" && \
+      apt-get install -f -y -qq --no-install-recommends || true && \
+      DEBIAN_FRONTEND=noninteractive apt-get purge -y -qq devscripts && \
+      rm -rf ./binary-chromium-common ./binary-chromium; \
     else \
-      apt-get update -qq &&\
-      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends chromium &&\
-      rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*; \
-    fi'
+      apt-get update -qq && \
+      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends chromium; \
+    fi' \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Copy binaries with explicit ownership
-COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" --from=builder \
-    /app/target/release/folio-server /usr/bin/
-COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" --from=builder \
-    /app/target/release/folio /usr/bin/
+# Install Chromium runtime libraries (not pulled in automatically by the snap package on some builds).
+RUN apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+        libgtk-3-0 libx11-xcb1 libxcomposite1 libxcursor1 \
+        libxdamage1 libxi6 libxtst6 libnss3 libcups2 libxss1 \
+        libxrandr2 libasound2 libatk1.0-0 libatk-bridge2.0-0 \
+        libpangocairo-1.0-0 libpango-1.0-0 libcairo2 \
+        libgdk-pixbuf2.0-0 libglib2.0-0 libgl1-mesa-glx \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Environment variables
 ENV CHROME_PATH=/usr/bin/chromium
 ENV CHROME_BIN=/usr/bin/chromium
-ENV GS_BIN=/usr/bin/gs
-ENV RUST_LOG=info
-ENV FOLIO_VERSION=${FOLIO_VERSION}
 
-# Use non-root user
+# =============================================================================
+# Final stage: folio — full image (Chromium + LibreOffice)
+# Tags: latest, X.Y.Z
+# =============================================================================
+FROM common-chromium AS folio
+
+ARG FOLIO_VERSION
+ARG FOLIO_USER_UID
+ARG FOLIO_USER_GID
+
+LABEL org.opencontainers.image.title="Folio" \
+      org.opencontainers.image.description="A Docker-based API for converting documents to PDF." \
+      org.opencontainers.image.version="${FOLIO_VERSION}" \
+      org.opencontainers.image.authors="Folio Team" \
+      org.opencontainers.image.source="https://github.com/been-there-done-that/folio"
+
+RUN apt-get update -qq && apt-get upgrade -yqq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+        libreoffice-writer \
+        libreoffice-calc \
+        libreoffice-impress \
+        libreoffice-draw \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" \
+    --from=builder-full /app/target/release/folio-server /usr/bin/
+COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" \
+    --from=builder-full /app/target/release/folio /usr/bin/
+
 USER folio
 WORKDIR /home/folio
-
-# Expose API port
 EXPOSE 3000
 
-# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:3000/health || exit 1
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["/usr/bin/folio-server", "serve"]
+
+# =============================================================================
+# Final stage: folio-chromium — Chromium only (~30% smaller than full)
+# Tags: latest-chromium, X.Y.Z-chromium
+# =============================================================================
+FROM common-chromium AS folio-chromium
+
+ARG FOLIO_VERSION
+ARG FOLIO_USER_UID
+ARG FOLIO_USER_GID
+
+LABEL org.opencontainers.image.title="Folio (Chromium)" \
+      org.opencontainers.image.description="A Docker-based API for converting documents to PDF — Chromium variant." \
+      org.opencontainers.image.version="${FOLIO_VERSION}" \
+      org.opencontainers.image.authors="Folio Team" \
+      org.opencontainers.image.source="https://github.com/been-there-done-that/folio"
+
+COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" \
+    --from=builder-chromium /app/target/release/folio-server /usr/bin/
+COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" \
+    --from=builder-chromium /app/target/release/folio /usr/bin/
+
+USER folio
+WORKDIR /home/folio
+EXPOSE 3000
+
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:3000/health || exit 1
 
-# Use tini for proper signal handling and zombie reaping
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/usr/bin/folio-server", "serve"]
+
+# =============================================================================
+# Final stage: folio-libreoffice — LibreOffice only (~40% smaller than full)
+# Tags: latest-libreoffice, X.Y.Z-libreoffice
+# =============================================================================
+FROM common AS folio-libreoffice
+
+ARG FOLIO_VERSION
+ARG FOLIO_USER_UID
+ARG FOLIO_USER_GID
+
+LABEL org.opencontainers.image.title="Folio (LibreOffice)" \
+      org.opencontainers.image.description="A Docker-based API for converting documents to PDF — LibreOffice variant." \
+      org.opencontainers.image.version="${FOLIO_VERSION}" \
+      org.opencontainers.image.authors="Folio Team" \
+      org.opencontainers.image.source="https://github.com/been-there-done-that/folio"
+
+RUN apt-get update -qq && apt-get upgrade -yqq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+        libreoffice-writer \
+        libreoffice-calc \
+        libreoffice-impress \
+        libreoffice-draw \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" \
+    --from=builder-libreoffice /app/target/release/folio-server /usr/bin/
+COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" \
+    --from=builder-libreoffice /app/target/release/folio /usr/bin/
+
+USER folio
+WORKDIR /home/folio
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:3000/health || exit 1
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["/usr/bin/folio-server", "serve"]
+
+# =============================================================================
+# Cloud Run variants — thin layers that set platform env vars.
+# Cloud Run cannot start a container where the entrypoint is not owned by the
+# running user. See https://github.com/gotenberg/gotenberg/issues/90.
+# =============================================================================
+
+# folio-cloudrun: full (Chromium + LibreOffice)
+# Tags: latest-cloudrun, X.Y.Z-cloudrun
+FROM folio AS folio-cloudrun
+USER root
+RUN chown folio: /usr/bin/tini
+# Cloud Run injects PORT; folio-server reads FOLIO_PORT (or --port flag).
+# Set FOLIO_PORT_FROM_ENV so the server picks up PORT automatically.
+ENV FOLIO_PORT_FROM_ENV=PORT
+ENV CHROMIUM_LAZY_START=false
+ENV LIBREOFFICE_LAZY_START=false
+ENV RUST_LOG=info
+USER folio
+
+# folio-cloudrun-chromium: Chromium only
+# Tags: latest-chromium-cloudrun, X.Y.Z-chromium-cloudrun
+FROM folio-chromium AS folio-cloudrun-chromium
+USER root
+RUN chown folio: /usr/bin/tini
+ENV FOLIO_PORT_FROM_ENV=PORT
+ENV CHROMIUM_LAZY_START=false
+ENV RUST_LOG=info
+USER folio
+
+# folio-cloudrun-libreoffice: LibreOffice only
+# Tags: latest-libreoffice-cloudrun, X.Y.Z-libreoffice-cloudrun
+FROM folio-libreoffice AS folio-cloudrun-libreoffice
+USER root
+RUN chown folio: /usr/bin/tini
+ENV FOLIO_PORT_FROM_ENV=PORT
+ENV LIBREOFFICE_LAZY_START=false
+ENV RUST_LOG=info
+USER folio
+
+# =============================================================================
+# AWS Lambda variants — use the Lambda Web Adapter (LWA) sidecar so folio-server
+# runs as a normal HTTP server without any Lambda-specific code changes.
+# The LWA translates Lambda invoke events into HTTP requests on AWS_LWA_PORT.
+# See: https://github.com/awslabs/aws-lambda-web-adapter
+# =============================================================================
+
+# folio-lambda: full (Chromium + LibreOffice)
+# Tags: latest-lambda, X.Y.Z-lambda
+FROM folio AS folio-lambda
+USER root
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 \
+    /lambda-adapter /opt/extensions/lambda-adapter
+ENV AWS_LWA_PORT=3000
+ENV AWS_LWA_READINESS_CHECK_PATH=/health
+ENV AWS_LWA_INVOKE_MODE=buffered
+USER folio
+
+# folio-lambda-chromium: Chromium only
+# Tags: latest-chromium-lambda, X.Y.Z-chromium-lambda
+FROM folio-chromium AS folio-lambda-chromium
+USER root
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 \
+    /lambda-adapter /opt/extensions/lambda-adapter
+ENV AWS_LWA_PORT=3000
+ENV AWS_LWA_READINESS_CHECK_PATH=/health
+ENV AWS_LWA_INVOKE_MODE=buffered
+USER folio
+
+# folio-lambda-libreoffice: LibreOffice only
+# Tags: latest-libreoffice-lambda, X.Y.Z-libreoffice-lambda
+FROM folio-libreoffice AS folio-lambda-libreoffice
+USER root
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 \
+    /lambda-adapter /opt/extensions/lambda-adapter
+ENV AWS_LWA_PORT=3000
+ENV AWS_LWA_READINESS_CHECK_PATH=/health
+ENV AWS_LWA_INVOKE_MODE=buffered
+USER folio
