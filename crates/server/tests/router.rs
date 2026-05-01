@@ -273,7 +273,7 @@ async fn health_returns_200_when_engines_up() {
     assert_eq!(resp.status(), StatusCode::OK);
     let body: Value = serde_json::from_slice(&read_body(resp).await).unwrap();
     assert_eq!(body["status"], "up");
-    assert_eq!(body["chromium"], "up");
+    assert_eq!(body["details"]["chromium"]["status"], "up");
 }
 
 #[tokio::test]

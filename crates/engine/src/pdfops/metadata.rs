@@ -478,14 +478,19 @@ mod tests {
     }
 
     #[test]
-    fn write_metadata_rejects_invalid_custom_key() {
+    fn write_metadata_silently_drops_invalid_custom_key() {
         let pdf = make_blank_pdf();
         let meta = Metadata {
-            custom: BTreeMap::from([("bad name!".to_string(), "value".to_string())]),
+            custom: BTreeMap::from([(
+                "bad name!".to_string(),
+                Value::String("value".to_string()),
+            )]),
             ..Default::default()
         };
-        let err = write_metadata(&pdf, &meta).unwrap_err();
-        assert!(matches!(err, EngineError::InvalidOption(_)));
+        // Invalid keys are silently dropped, not rejected.
+        let result = write_metadata(&pdf, &meta).unwrap();
+        let back = read_metadata(&result).unwrap();
+        assert!(back.custom.get("bad name!").is_none());
     }
 
     #[test]
@@ -572,15 +577,15 @@ mod tests {
         let pdf = make_blank_pdf();
         let meta = Metadata {
             custom: BTreeMap::from([
-                ("Foo".to_string(), "bar".to_string()),
-                ("My-Key_1".to_string(), "value 2".to_string()),
+                ("Foo".to_string(), Value::String("bar".to_string())),
+                ("My-Key_1".to_string(), Value::String("value 2".to_string())),
             ]),
             ..Default::default()
         };
         let back = round_trip(&pdf, &meta);
-        assert_eq!(back.custom.get("Foo").map(String::as_str), Some("bar"));
+        assert_eq!(back.custom.get("Foo").and_then(Value::as_str), Some("bar"));
         assert_eq!(
-            back.custom.get("My-Key_1").map(String::as_str),
+            back.custom.get("My-Key_1").and_then(Value::as_str),
             Some("value 2")
         );
     }
@@ -593,9 +598,12 @@ mod tests {
             ..Default::default()
         };
         let back = round_trip(&pdf, &meta);
+        // read_metadata converts PDF dates to ExifTool format: "YYYY:MM:DD HH:MM:SS±HH:MM"
         let mod_date = back.mod_date.expect("ModDate should be auto-stamped");
-        assert!(mod_date.starts_with("D:"), "mod_date: {mod_date}");
-        assert!(mod_date.ends_with("'00'"), "mod_date: {mod_date}");
+        assert!(
+            mod_date.len() >= 19 && mod_date.as_bytes()[4] == b':' && mod_date.as_bytes()[7] == b':',
+            "mod_date should be ExifTool format: {mod_date}"
+        );
     }
 
     #[test]
@@ -606,7 +614,8 @@ mod tests {
             ..Default::default()
         };
         let back = round_trip(&pdf, &meta);
-        assert_eq!(back.mod_date.as_deref(), Some("D:20240101000000Z00'00'"));
+        // read_metadata converts PDF dates to ExifTool format.
+        assert_eq!(back.mod_date.as_deref(), Some("2024:01:01 00:00:00+00:00"));
     }
 
     #[test]

@@ -1050,7 +1050,7 @@ mod tests {
             ("printBackground", "false"),
             ("preferCssPageSize", "true"),
             ("pageRanges", "1-3,7-"),
-            ("emulateMediaType", "screen"),
+            ("emulatedMediaType", "screen"),
             ("waitDelay", "1500ms"),
         ]);
         let opts = parse_pdf_options(&map).unwrap();
@@ -1093,10 +1093,10 @@ mod tests {
 
     #[test]
     fn pdf_options_invalid_emulate_media_rejected() {
-        let map = fm(&[("emulateMediaType", "carrier-pigeon")]);
+        let map = fm(&[("emulatedMediaType", "carrier-pigeon")]);
         let err = parse_pdf_options(&map).unwrap_err();
         match err {
-            ApiError::InvalidField { field, .. } => assert_eq!(field, "emulateMediaType"),
+            ApiError::InvalidField { field, .. } => assert_eq!(field, "emulatedMediaType"),
             other => panic!("expected InvalidField, got {other:?}"),
         }
     }

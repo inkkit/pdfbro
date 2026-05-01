@@ -91,6 +91,8 @@ mod tests {
             header_template: Some("<h1>Hi</h1>".into()),
             footer_template: Some("<span></span>".into()),
             wait: WaitCondition::Load,
+            single_page: false,
+            emulated_media_features: Vec::new(),
         };
         let p = build_printtopdf_params(&opts);
 

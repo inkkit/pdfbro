@@ -95,6 +95,6 @@ mod tests {
     fn apply_set_unknown_key_lands_in_custom() {
         let mut m = Metadata::default();
         apply_set(&mut m, "Foo", "bar").unwrap();
-        assert_eq!(m.custom.get("Foo").map(String::as_str), Some("bar"));
+        assert_eq!(m.custom.get("Foo").and_then(|v| v.as_str()), Some("bar"));
     }
 }

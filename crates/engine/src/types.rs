@@ -895,6 +895,8 @@ mod tests {
             header_template: None,
             footer_template: None,
             wait: WaitCondition::NetworkIdle,
+            single_page: false,
+            emulated_media_features: Vec::new(),
         };
         let json = serde_json::to_value(&opts).unwrap();
         // Spot-check camelCase field naming on the public surface
