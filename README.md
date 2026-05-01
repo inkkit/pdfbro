@@ -87,6 +87,18 @@ split, watermark, etc.
 (auto-detected, or set `CHROME_PATH`), and optionally LibreOffice for
 Office conversion.
 
+### Embeddable bindings (v1: conversion)
+
+| Surface | Install |
+|---|---|
+| Python  | `pip install folio` — see `bindings/python/README.md` |
+| Node.js | `npm install @folio/folio` — see `bindings/node/README.md` |
+
+Both bindings auto-download a pinned Chrome on first use if no system
+Chrome is found. v1 supports HTML / URL / Markdown / Office → PDF;
+PDF ops and screenshots ship in v2 (spec:
+`docs/superpowers/specs/2026-05-01-bindings-design.md`).
+
 ---
 
 ## HTTP API at a glance
