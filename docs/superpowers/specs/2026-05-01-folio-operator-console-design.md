@@ -4,7 +4,7 @@
 
 **Goal:** Build a real-time operations dashboard served at `/_/` inside the Folio binary — Variation B · Bars Edition from the approved wireframe.
 
-**Architecture:** Svelte 5 SPA embedded in the Folio binary via `rust-embed`. The Rust server adds a rolling metrics history store, request/error ring buffers, a `GET /_/api/metrics` JSON endpoint, and static file serving for `/_/`. The frontend polls every 5 seconds using Svelte 5 runes.
+**Architecture:** Svelte 5 SPA embedded in the Folio binary via `rust-embed`. The Rust server adds a rolling metrics history store, request/error ring buffers, a `GET /_/api/stream` SSE endpoint that pushes a full snapshot every 5 seconds, a one-shot `GET /_/api/metrics` for initial load, and static file serving for `/_/`. The frontend subscribes via `EventSource` using Svelte 5 runes — no polling.
 
 **Tech Stack:** Rust (Axum, rust-embed, tokio), Svelte 5 (runes forced), Tailwind CSS v4, shadcn-svelte, Lucide icons, Geist font, Vite, TypeScript.
 
@@ -114,9 +114,10 @@ pub struct ErrorLogEntry {
 
 /// Shared console state — Arc-wrapped in AppState.
 pub struct ConsoleStore {
-    pub history: Mutex<MetricsHistory>,       // rolling samples
-    pub request_log: Mutex<VecDeque<RequestLogEntry>>,  // cap 100
-    pub error_log: Mutex<VecDeque<ErrorLogEntry>>,      // cap 100
+    pub history: Mutex<MetricsHistory>,                      // rolling samples
+    pub request_log: Mutex<VecDeque<RequestLogEntry>>,       // cap 100
+    pub error_log: Mutex<VecDeque<ErrorLogEntry>>,           // cap 100
+    pub broadcast: tokio::sync::broadcast::Sender<String>,   // SSE fan-out (JSON payload)
 }
 ```
 
@@ -124,19 +125,50 @@ pub struct ConsoleStore {
 
 ### 3.2 Background sampler task
 
-Spawned in `main.rs` at startup. Every 30 seconds:
-1. Read gauge values from `METRICS` (queue_size, concurrency, RPS from http counters delta, etc.)
-2. Push a `MetricsSample` into `ConsoleStore::history`, evicting the oldest if at cap
+Spawned in `main.rs` at startup. Every **5 seconds**:
+1. Read gauge values from `METRICS` (queue_size, concurrency, RPS delta, etc.)
+2. Push a `MetricsSample` into `ConsoleStore::history`, evicting the oldest if at cap (cap = 360 samples = 30 min at 5s cadence)
+3. Build the full `ConsolePayload` JSON string
+4. Broadcast via `ConsoleStore::broadcast.send(payload)` — all active SSE subscribers receive it immediately
 
-RPS is computed as `(http_requests_total_now - http_requests_total_prev) / 30.0`.
+RPS is computed as `(http_requests_total_now - http_requests_total_prev) / 5.0`.
 
-p95 is not directly available from a Prometheus counter without the histogram. For V1, expose the raw p95 histogram bucket as a derived estimate, or expose the last observed p95 from a tracked moving value. **Simplest V1**: keep a `Mutex<f64>` in AppState that handlers update with each conversion duration, use the rolling 30s max as the p95 approximation. This is documented as "p95 (approx, rolling 30s max)".
+p95 is approximated: keep a `Mutex<f64>` in `ConsoleStore` updated by handlers with each observed duration. The sampler reads the current value as the rolling p95 approximation. This is labelled "p95 (approx)" in the UI.
 
 ### 3.3 Request/error log middleware
 
 The existing `record_http_request` call site in `app.rs` already fires per request. Add a new `record_console_request(state, method, route, status, duration_ms)` call alongside the existing metrics call. This pushes to `ConsoleStore::request_log`. If status >= 500, also push to `error_log`.
 
-### 3.4 `GET /_/api/metrics` — JSON response shape
+### 3.4 `GET /_/api/stream` (SSE) and `GET /_/api/metrics` (one-shot JSON)
+
+**`GET /_/api/stream`** — Server-Sent Events endpoint. Returns `Content-Type: text/event-stream`.
+
+```rust
+async fn console_stream(State(state): State<AppState>) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let mut rx = state.console.broadcast.subscribe();
+    let stream = async_stream::stream! {
+        // Send current snapshot immediately on connect (no waiting for next tick)
+        let snapshot = build_console_payload(&state);
+        yield Ok(Event::default().data(serde_json::to_string(&snapshot).unwrap()));
+        loop {
+            match rx.recv().await {
+                Ok(payload) => yield Ok(Event::default().data(payload)),
+                Err(RecvError::Lagged(_)) => continue, // skip missed ticks, keep going
+                Err(RecvError::Closed) => break,
+            }
+        }
+    };
+    Sse::new(stream).keep_alive(
+        KeepAlive::new().interval(Duration::from_secs(15)).text("ping")
+    )
+}
+```
+
+The broadcast channel is created with capacity 4 (buffer 4 missed ticks before dropping slow subscribers). `EventSource` auto-reconnects on drop; the new connection immediately receives a fresh snapshot.
+
+**`GET /_/api/metrics`** — One-shot JSON snapshot. Same payload as SSE events. Used for debugging and curl inspection.
+
+### 3.5 `ConsolePayload` — shared JSON shape (SSE event `data:` + one-shot JSON response)
 
 ```json
 {
@@ -219,7 +251,7 @@ The existing `record_http_request` call site in `app.rs` already fires per reque
 
 Route-level p50/p95/p99 for V1: derived from the conversion_duration histogram values that are already recorded per endpoint. Expose the `_sum/_count` bucket ratio as a mean (p50 approximation) and the 0.95 quantile from the histogram's bucket data.
 
-### 3.5 Static file serving — `GET /_/` and `GET /_/{*path}`
+### 3.6 Static file serving — `GET /_/` and `GET /_/{*path}`
 
 Use `rust-embed` to embed `ui/build/` at compile time into the binary.
 
@@ -253,8 +285,8 @@ ui/
 │   ├── routes/
 │   │   └── +page.svelte       # full dashboard (single route)
 │   └── lib/
-│       ├── types.ts           # API response TypeScript types
-│       ├── metrics.svelte.ts  # $state store + polling
+│       ├── types.ts           # ConsolePayload TypeScript types (mirrors Rust JSON)
+│       ├── metrics.svelte.ts  # $state store + SSE subscription
 │       ├── theme.svelte.ts    # $state for dark/accent/density
 │       └── components/
 │           ├── Header.svelte
@@ -268,51 +300,65 @@ ui/
 │           ├── ThroughputStrip.svelte
 │           ├── ActivityStrip.svelte
 │           └── shared/
-│               ├── Card.svelte
-│               ├── Pill.svelte
-│               ├── BarChart.svelte    # SVG bar chart, matches wireframe exactly
-│               ├── MiniBars.svelte    # small engine sparkline replacement
-│               └── SlimBar.svelte    # horizontal progress bar
+│               ├── Card.svelte        # thin wrapper — border + radius + optional header
+│               ├── Pill.svelte        # status badge (ok/warn/err/accent tones)
+│               └── SlimBar.svelte     # horizontal load bar (route table + batches)
 ```
 
 ### 4.1 `metrics.svelte.ts`
 
-```typescript
-import { MetricsResponse } from './types';
+SSE-based — no polling. `EventSource` auto-reconnects on drop; on reconnect the server sends a fresh snapshot immediately (see §3.4).
 
-// Svelte 5 runes — exported as module-level reactive state
-export let data = $state<MetricsResponse | null>(null);
+```typescript
+import type { ConsolePayload } from './types';
+
+// Svelte 5 runes — module-level reactive state
+export let data = $state<ConsolePayload | null>(null);
 export let loading = $state(true);
+export let connected = $state(false);
 export let error = $state<string | null>(null);
 export let lastRefreshed = $state<Date | null>(null);
 
-let timer: ReturnType<typeof setInterval>;
+let es: EventSource | null = null;
 
-export function startPolling(intervalMs = 5000) {
-  fetchOnce();
-  timer = setInterval(fetchOnce, intervalMs);
+export function startSSE() {
+  if (es) return;
+  es = new EventSource('/_/api/stream');
+
+  es.onopen = () => {
+    connected = true;
+    error = null;
+  };
+
+  es.onmessage = (event: MessageEvent) => {
+    try {
+      data = JSON.parse(event.data) as ConsolePayload;
+      lastRefreshed = new Date();
+      error = null;
+    } catch {
+      error = 'Failed to parse server data';
+    } finally {
+      loading = false;
+    }
+  };
+
+  es.onerror = () => {
+    connected = false;
+    error = 'Connection lost — reconnecting…';
+    // EventSource reconnects automatically; no manual retry needed
+  };
 }
 
-export function stopPolling() {
-  clearInterval(timer);
+export function stopSSE() {
+  es?.close();
+  es = null;
+  connected = false;
 }
 
 export function manualRefresh() {
-  fetchOnce();
-}
-
-async function fetchOnce() {
-  try {
-    const res = await fetch('/_/api/metrics');
-    if (!res.ok) throw new Error(`${res.status}`);
-    data = await res.json();
-    lastRefreshed = new Date();
-    error = null;
-  } catch (e) {
-    error = String(e);
-  } finally {
-    loading = false;
-  }
+  // Reconnect triggers an immediate snapshot from the server
+  stopSSE();
+  startSSE();
 }
 ```
 
@@ -339,17 +385,40 @@ export let theme = $derived({
 });
 ```
 
-### 4.3 `BarChart.svelte`
+### 4.3 Charts — shadcn-svelte `chart` component
 
-Renders an SVG bar chart matching the wireframe's `BarChart` component exactly:
-- Props: `data: number[]`, `width: number`, `height: number`, `color: string`, `threshold?: number`, `colorFn?: (v: number, i: number) => string`, `label?: string`, `value?: string`, `unit?: string`, `markers?: number[]`
-- Label row sits **above** the SVG (not overlapping bars — this was a bug in an earlier wireframe iteration that was fixed)
-- Dashed threshold line at the correct Y position
-- Bars have `rx = min(1.5, barW/3)`, last bar at full opacity, others at 0.85
+Do **not** build custom SVG bar charts. Use shadcn-svelte's `chart` primitives throughout.
+
+**Setup**: `npx shadcn-svelte@latest add chart` installs `ChartContainer`, `ChartTooltip`, and the layerchart-based bar chart components into `$lib/components/ui/chart/`.
+
+**Chart CSS variable remapping** — update `layout.css` to replace the neutral gray chart vars with semantic colors matching the wireframe:
+
+```css
+:root {
+  --chart-1: #4f8ef7;  /* accent */
+  --chart-2: #2f9967;  /* ok */
+  --chart-3: #b8860b;  /* warn */
+  --chart-4: #c25151;  /* err */
+  --chart-5: rgba(26,28,31,0.4); /* muted */
+}
+.dark {
+  --chart-1: #6aa3f8;
+  --chart-2: #3fb27f;
+  --chart-3: #e0a93c;
+  --chart-4: #e26464;
+  --chart-5: rgba(230,231,234,0.4);
+}
+```
+
+**Usage pattern** in section components:
+- `Resources.svelte` — two stacked `BarChart`s (CPU, Memory), `chartConfig` maps `value` → `--chart-1` with threshold-based color override
+- `ThroughputStrip.svelte` — two side-by-side `BarChart`s (RPS, p95), threshold line via a `ReferenceLine`
+- `Engines.svelte` — `MiniBars` replaced by a compact `BarChart` with `--chart-2` (ok) or `--chart-3` (warn) based on restart count
+- All charts share `ChartTooltip` with `cursor={false}` (no hover cursor line — matches the wireframe's clean look)
 
 ### 4.4 `+page.svelte`
 
-Orchestrates the full layout. Calls `startPolling()` in an `$effect` on mount, `stopPolling()` on destroy. Passes `data` and `theme` as props to every section component. Shows a skeleton loading state on first load.
+Orchestrates the full layout. Calls `startSSE()` in an `$effect` on mount, `stopSSE()` on destroy. Passes `data` and `theme` as props to every section component. Shows a skeleton loading state (`loading === true`) until the first SSE message arrives.
 
 ### 4.5 Tweaks panel
 
@@ -400,14 +469,14 @@ mime_guess = "2"
 | File | Purpose |
 |---|---|
 | `crates/server/src/console_store.rs` | `ConsoleStore`, `MetricsSample`, `MetricsHistory`, `RequestLogEntry`, `ErrorLogEntry` |
-| `crates/server/src/routes/console.rs` | `console_metrics_json` handler + `console_asset` static file handler |
+| `crates/server/src/routes/console.rs` | `console_stream` (SSE), `console_metrics_json` (one-shot), `console_asset` (static files) |
 
 ### Modified files
 
 | File | Change |
 |---|---|
 | `crates/server/src/state.rs` | Add `pub console: Arc<ConsoleStore>` field |
-| `crates/server/src/app.rs` | Mount `/_/api/metrics` and `/_/{*path}` routes; call `record_console_request` from middleware response path |
+| `crates/server/src/app.rs` | Mount `/_/api/stream`, `/_/api/metrics`, and `/_/{*path}` routes; call `record_console_request` alongside `record_http_request` |
 | `crates/server/src/main.rs` | Spawn background sampler task |
 | `crates/server/src/lib.rs` | `pub mod console_store;` |
 
@@ -420,12 +489,13 @@ mime_guess = "2"
 use crate::routes::console;
 
 untimed = untimed
-    .route("/_/api/metrics", get(console::console_metrics_json))
-    .route("/_/", get(console::console_asset))
-    .route("/_/{*path}", get(console::console_asset));
+    .route("/_/api/stream",  get(console::console_stream))       // SSE — long-lived
+    .route("/_/api/metrics", get(console::console_metrics_json)) // one-shot JSON
+    .route("/_/",            get(console::console_asset))
+    .route("/_/{*path}",     get(console::console_asset));
 ```
 
-The `/_/api/metrics` route bypasses the timeout layer (same as `/health`) since it reads in-memory data.
+Both `/_/api/stream` and `/_/api/metrics` live in `untimed` — they bypass the request timeout middleware. The SSE handler must never be cancelled by the timeout layer.
 
 ---
 
@@ -463,7 +533,7 @@ COPY --from=ui-builder /ui/build /app/ui/build
 
 ## 9. Constraints
 
-- The `/_/api/metrics` endpoint is **not** protected by BasicAuth even when the API has auth enabled. If the operator wants auth on the console, they set `FOLIO_DISABLE_CONSOLE=true` and run the UI separately. This matches Gotenberg's pattern of keeping the health/metrics surface always accessible.
+- The `/_/api/stream` and `/_/api/metrics` endpoints are **not** protected by BasicAuth even when the API has auth enabled. `EventSource` in the browser cannot set Authorization headers, so SSE endpoints must be unauthenticated at the HTTP level. If auth is needed, operators should set `FOLIO_DISABLE_CONSOLE=true` and run the UI behind a reverse proxy instead.
 - `mini_series` for engines (the small bar columns) is computed from the rolling history filtered by engine.
 - Route-level p50/p95/p99 are approximated from the Prometheus histogram sum/count/buckets in V1 — not exact quantiles.
 - Memory max (`memory_max_mb`) is read from `/proc/meminfo` on Linux; hardcoded to `0` on macOS (the UI will show "— GB" in that case).
