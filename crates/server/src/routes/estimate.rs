@@ -2,7 +2,6 @@
 //!
 //! Implementation of `docs/specs/46-pdf-size-estimator.md`.
 
-use std::collections::HashSet;
 use std::sync::OnceLock;
 
 use axum::extract::{Json, Multipart, State};
@@ -122,9 +121,10 @@ pub async fn estimate(
         (Some(_url), _) => {
             // For URL-based estimates, we'd need to fetch the content
             // For now, return an estimate based on typical URL characteristics
-            return Err(ApiError::InvalidOption(
-                "URL-based estimation not yet implemented. Use 'html' field.".into(),
-            ));
+            return Err(ApiError::InvalidField {
+                field: "url",
+                message: "URL-based estimation not yet implemented. Use 'html' field.".into(),
+            });
         }
         (None, None) => {
             return Err(ApiError::InvalidField {
@@ -271,7 +271,7 @@ pub async fn estimate_form(
                 message: "Provide 'html' field or 'files' with HTML content".into(),
             });
         }
-        let bytes = crate::routes::util::read_file_to_vec(&files[0].path)
+        let bytes = tokio::fs::read(&files[0].path)
             .await
             .map_err(|e| ApiError::InvalidField {
                 field: "files",
@@ -437,7 +437,6 @@ async fn analyze_html(html: &str) -> HtmlAnalysis {
     // Analyze images
     let mut image_count = 0;
     let mut external_images = 0;
-    let mut data_uri_images = 0;
 
     for cap in img_src_re.captures_iter(html) {
         image_count += 1;
@@ -447,7 +446,6 @@ async fn analyze_html(html: &str) -> HtmlAnalysis {
             external_images += 1;
             result.has_external_resources = true;
         } else if src.starts_with("data:") {
-            data_uri_images += 1;
             // Data URI images are embedded and often large
             if src.len() > 10000 {
                 result.has_large_images = true;

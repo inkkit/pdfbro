@@ -270,8 +270,10 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
     untimed = untimed.route("/openapi.json", get(openapi::openapi_spec));
 
     // Scalar interactive API documentation
-    use scalar_api_reference::axum::router as scalar_router;
+    use axum::response::Html;
+    use scalar_api_reference::scalar_html_default;
     use serde_json::json;
+
     let scalar_config = json!({
         "url": "/openapi.json",
         "metaData": {
@@ -288,7 +290,12 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
             "clientKey": "curl"
         }
     });
-    untimed = untimed.merge(scalar_router("/docs", &scalar_config));
+
+    // Create Scalar HTML handler
+    let scalar_html = scalar_html_default(&scalar_config);
+    untimed = untimed.route("/docs", get(|| async move {
+        Html(scalar_html)
+    }));
 
     let header_name = HeaderName::from_bytes(
         config.api_correlation_id_header.as_bytes(),

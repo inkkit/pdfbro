@@ -162,23 +162,24 @@ pub async fn optimise_pdf(
                 // Read output
                 let data = std::fs::read(&output_path)
                     .map_err(|e| EngineError::Internal(format!("Failed to read output: {e}")))?;
+                let optimised_size = data.len();
 
                 let duration_ms = start.elapsed().as_millis() as u64;
 
                 tracing::info!(
                     original_size,
-                    optimised_size = data.len(),
+                    optimised_size,
                     backend = ?backend,
                     preset = ?preset,
                     duration_ms,
-                    ratio = data.len() as f64 / original_size as f64,
+                    ratio = optimised_size as f64 / original_size as f64,
                     "PDF optimisation complete"
                 );
 
                 return Ok(OptimiseResult {
                     data,
                     original_size,
-                    optimised_size: data.len(),
+                    optimised_size,
                     backend,
                     preset,
                     duration_ms,
@@ -250,7 +251,7 @@ fn optimise_with_ghostscript(
     }
 
     // Input file (must be last)
-    cmd.arg(input_path.display());
+    cmd.arg(input_path.as_os_str());
 
     tracing::info!(
         input = %input_path.display(),
@@ -286,7 +287,7 @@ fn optimise_with_qpdf(
         .arg("--object-streams=generate")
         .arg("--compress-streams=y");
 
-    cmd.arg(input_path.display()).arg(output_path.display());
+    cmd.arg(input_path.as_os_str()).arg(output_path.as_os_str());
 
     tracing::info!(
         input = %input_path.display(),

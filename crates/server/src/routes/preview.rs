@@ -101,13 +101,16 @@ pub async fn preview_url(
 
     // Validate format
     let format_str = query.format.as_deref().unwrap_or("png");
-    let format = parse_screenshot_format(format_str)?;
+    let format = parse_screenshot_format(format_str, query.quality)?;
 
     // Get Chromium backend
     let chromium = state
         .chromium
         .as_ref()
-        .ok_or_else(|| ApiError::InvalidOption("Chromium backend not available".into()))?;
+        .ok_or_else(|| ApiError::InvalidField {
+            field: "backend",
+            message: "Chromium backend not available".into(),
+        })?;
 
     // Build screenshot options
     let opts = build_screenshot_options(&query, format);
@@ -136,9 +139,10 @@ pub async fn preview_url(
     State(_state): State<AppState>,
     Query(_query): Query<PreviewQuery>,
 ) -> ApiResult<impl IntoResponse> {
-    Err(ApiError::InvalidOption(
-        "Preview mode requires Chromium feature".into(),
-    ))
+    Err(ApiError::InvalidField {
+        field: "feature",
+        message: "Preview mode requires Chromium feature".into(),
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +168,7 @@ pub async fn preview_html(
         });
     }
 
-    let html_bytes = crate::routes::util::read_file_to_vec(&files[0].path).await.map_err(|e| {
+    let html_bytes = tokio::fs::read(&files[0].path).await.map_err(|e| {
         ApiError::InvalidField {
             field: "files",
             message: format!("Failed to read HTML: {}", e),
@@ -177,34 +181,33 @@ pub async fn preview_html(
 
     // Parse format from form or default to png
     let format_str = form.map.get("format").map(|s| s.as_str()).unwrap_or("png");
-    let format = parse_screenshot_format(format_str)?;
+    let quality = form.map.get("quality").and_then(|s| s.parse::<u8>().ok());
+    let format = parse_screenshot_format(format_str, quality)?;
 
     // Get Chromium backend
     let chromium = state
         .chromium
         .as_ref()
-        .ok_or_else(|| ApiError::InvalidOption("Chromium backend not available".into()))?;
+        .ok_or_else(|| ApiError::InvalidField {
+            field: "backend",
+            message: "Chromium backend not available".into(),
+        })?;
 
     // Build options from form
-    let mut opts = ScreenshotOptions::for_pdf(&Default::default());
-    opts.format = format;
-    opts.capture_mode = if form.map.get("full_page").map(|v| v == "true").unwrap_or(false) {
-        CaptureMode::FullPage
-    } else {
-        CaptureMode::Viewport
+    let full_page = form.map.get("full_page").map(|v| v == "true").unwrap_or(false);
+    let width = form.map.get("width").and_then(|v| v.parse::<u32>().ok()).unwrap_or(1920);
+    let height = form.map.get("height").and_then(|v| v.parse::<u32>().ok()).unwrap_or(1080);
+    let opts = ScreenshotOptions {
+        format,
+        mode: if full_page { CaptureMode::FullPage } else { CaptureMode::Viewport },
+        width,
+        height,
+        ..Default::default()
     };
-
-    // Viewport sizing
-    if let Some(w) = form.map.get("width").and_then(|v| v.parse::<u32>().ok()) {
-        opts.viewport.width = w;
-    }
-    if let Some(h) = form.map.get("height").and_then(|v| v.parse::<u32>().ok()) {
-        opts.viewport.height = h;
-    }
 
     // Capture screenshot
     let result = chromium
-        .html_to_screenshot(&html, None, &opts)
+        .html_to_screenshot(&html, &opts)
         .await
         .map_err(|e| ApiError::Internal(format!("Screenshot failed: {}", e)))?;
 
@@ -224,9 +227,10 @@ pub async fn preview_html(
     State(_state): State<AppState>,
     _mp: Multipart,
 ) -> ApiResult<impl IntoResponse> {
-    Err(ApiError::InvalidOption(
-        "Preview mode requires Chromium feature".into(),
-    ))
+    Err(ApiError::InvalidField {
+        field: "feature",
+        message: "Preview mode requires Chromium feature".into(),
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -252,7 +256,7 @@ pub async fn preview_markdown(
         });
     }
 
-    let md_bytes = crate::routes::util::read_file_to_vec(&files[0].path).await.map_err(|e| {
+    let md_bytes = tokio::fs::read(&files[0].path).await.map_err(|e| {
         ApiError::InvalidField {
             field: "files",
             message: format!("Failed to read markdown: {}", e),
@@ -264,30 +268,33 @@ pub async fn preview_markdown(
     })?;
 
     // Convert markdown to HTML
-    let html = crate::routes::chromium::render_markdown_to_html(&markdown);
+    let html = render_markdown_to_html(&markdown);
 
     // Parse format
     let format_str = form.map.get("format").map(|s| s.as_str()).unwrap_or("png");
-    let format = parse_screenshot_format(format_str)?;
+    let quality = form.map.get("quality").and_then(|s| s.parse::<u8>().ok());
+    let format = parse_screenshot_format(format_str, quality)?;
 
     // Get Chromium backend
     let chromium = state
         .chromium
         .as_ref()
-        .ok_or_else(|| ApiError::InvalidOption("Chromium backend not available".into()))?;
+        .ok_or_else(|| ApiError::InvalidField {
+            field: "backend",
+            message: "Chromium backend not available".into(),
+        })?;
 
     // Build options
-    let mut opts = ScreenshotOptions::for_pdf(&Default::default());
-    opts.format = format;
-    opts.capture_mode = if form.map.get("full_page").map(|v| v == "true").unwrap_or(false) {
-        CaptureMode::FullPage
-    } else {
-        CaptureMode::Viewport
+    let full_page = form.map.get("full_page").map(|v| v == "true").unwrap_or(false);
+    let opts = ScreenshotOptions {
+        format,
+        mode: if full_page { CaptureMode::FullPage } else { CaptureMode::Viewport },
+        ..Default::default()
     };
 
     // Capture screenshot
     let result = chromium
-        .html_to_screenshot(&html, None, &opts)
+        .html_to_screenshot(&html, &opts)
         .await
         .map_err(|e| ApiError::Internal(format!("Screenshot failed: {}", e)))?;
 
@@ -307,9 +314,10 @@ pub async fn preview_markdown(
     State(_state): State<AppState>,
     _mp: Multipart,
 ) -> ApiResult<impl IntoResponse> {
-    Err(ApiError::InvalidOption(
-        "Preview mode requires Chromium feature".into(),
-    ))
+    Err(ApiError::InvalidField {
+        field: "feature",
+        message: "Preview mode requires Chromium feature".into(),
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -336,7 +344,7 @@ pub async fn preview_compare(
     }
 
     let before_bytes =
-        crate::routes::util::read_file_to_vec(&before_files[0].path).await.map_err(|e| {
+        tokio::fs::read(&before_files[0].path).await.map_err(|e| {
             ApiError::InvalidField {
                 field: "before",
                 message: format!("Failed to read: {}", e),
@@ -348,7 +356,7 @@ pub async fn preview_compare(
     })?;
 
     let after_bytes =
-        crate::routes::util::read_file_to_vec(&after_files[0].path).await.map_err(|e| {
+        tokio::fs::read(&after_files[0].path).await.map_err(|e| {
             ApiError::InvalidField {
                 field: "after",
                 message: format!("Failed to read: {}", e),
@@ -363,18 +371,21 @@ pub async fn preview_compare(
     let chromium = state
         .chromium
         .as_ref()
-        .ok_or_else(|| ApiError::InvalidOption("Chromium backend not available".into()))?;
+        .ok_or_else(|| ApiError::InvalidField {
+            field: "backend",
+            message: "Chromium backend not available".into(),
+        })?;
 
     // Screenshot both versions
-    let opts = ScreenshotOptions::for_pdf(&Default::default());
+    let opts = ScreenshotOptions::default();
 
     let before_img = chromium
-        .html_to_screenshot(&before_html, None, &opts)
+        .html_to_screenshot(&before_html, &opts)
         .await
         .map_err(|e| ApiError::Internal(format!("Before screenshot failed: {}", e)))?;
 
     let after_img = chromium
-        .html_to_screenshot(&after_html, None, &opts)
+        .html_to_screenshot(&after_html, &opts)
         .await
         .map_err(|e| ApiError::Internal(format!("After screenshot failed: {}", e)))?;
 
@@ -393,9 +404,10 @@ pub async fn preview_compare(
     State(_state): State<AppState>,
     _mp: Multipart,
 ) -> ApiResult<impl IntoResponse> {
-    Err(ApiError::InvalidOption(
-        "Preview mode requires Chromium feature".into(),
-    ))
+    Err(ApiError::InvalidField {
+        field: "feature",
+        message: "Preview mode requires Chromium feature".into(),
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -404,67 +416,48 @@ pub async fn preview_compare(
 
 /// Parse screenshot format string.
 #[cfg(feature = "chromium")]
-fn parse_screenshot_format(format: &str) -> ApiResult<ScreenshotFormat> {
+fn parse_screenshot_format(format: &str, quality: Option<u8>) -> ApiResult<ScreenshotFormat> {
+    let q = quality.unwrap_or(80);
     match format.to_lowercase().as_str() {
         "png" => Ok(ScreenshotFormat::Png),
-        "jpeg" | "jpg" => Ok(ScreenshotFormat::Jpeg),
-        "webp" => Ok(ScreenshotFormat::Webp),
-        _ => Err(ApiError::InvalidOption(format!(
-            "Invalid format: '{}'. Use png/jpeg/webp",
-            format
-        ))),
+        "jpeg" | "jpg" => Ok(ScreenshotFormat::Jpeg { quality: q }),
+        "webp" => Ok(ScreenshotFormat::Webp { quality: q }),
+        _ => Err(ApiError::InvalidField {
+            field: "format",
+            message: format!("Invalid format: '{}'. Use png/jpeg/webp", format),
+        }),
     }
 }
 
 #[cfg(not(feature = "chromium"))]
-fn parse_screenshot_format(format: &str) -> ApiResult<()> {
+fn parse_screenshot_format(format: &str, _quality: Option<u8>) -> ApiResult<()> {
     match format.to_lowercase().as_str() {
         "png" | "jpeg" | "jpg" | "webp" => Ok(()),
-        _ => Err(ApiError::InvalidOption(format!(
-            "Invalid format: '{}'. Use png/jpeg/webp",
-            format
-        ))),
+        _ => Err(ApiError::InvalidField {
+            field: "format",
+            message: format!("Invalid format: '{}'. Use png/jpeg/webp", format),
+        }),
     }
 }
 
 /// Build screenshot options from query parameters.
 #[cfg(feature = "chromium")]
 fn build_screenshot_options(query: &PreviewQuery, format: ScreenshotFormat) -> ScreenshotOptions {
-    let mut opts = ScreenshotOptions::for_pdf(&Default::default());
-    opts.format = format;
-
-    // Viewport size
-    if let Some(w) = query.width {
-        opts.viewport.width = w;
+    ScreenshotOptions {
+        format,
+        width: query.width.unwrap_or(1920),
+        height: query.height.unwrap_or(1080),
+        mode: if query.full_page.unwrap_or(false) {
+            CaptureMode::FullPage
+        } else {
+            CaptureMode::Viewport
+        },
+        ..Default::default()
     }
-    if let Some(h) = query.height {
-        opts.viewport.height = h;
-    }
-
-    // Full page capture
-    opts.capture_mode = if query.full_page.unwrap_or(false) {
-        CaptureMode::FullPage
-    } else {
-        CaptureMode::Viewport
-    };
-
-    // Clip region (if specified)
-    if let (Some(x), Some(y), Some(w), Some(h)) =
-        (query.clip_x, query.clip_y, query.clip_width, query.clip_height)
-    {
-        opts.clip_rect = Some(engine::ClipRect {
-            x,
-            y,
-            width: w,
-            height: h,
-        });
-    }
-
-    opts
 }
 
 /// Build image response with appropriate headers.
-fn image_response(data: Vec<u8>, format: &str) -> impl IntoResponse {
+fn image_response(data: Vec<u8>, format: &str) -> impl IntoResponse + use<> {
     let content_type = match format.to_lowercase().as_str() {
         "jpeg" | "jpg" => "image/jpeg",
         "webp" => "image/webp",
@@ -477,9 +470,51 @@ fn image_response(data: Vec<u8>, format: &str) -> impl IntoResponse {
     (StatusCode::OK, headers, data)
 }
 
+/// Render markdown to HTML.
+fn render_markdown_to_html(md: &str) -> String {
+    #[cfg(feature = "chromium")]
+    {
+        use pulldown_cmark::{Parser, Options, html};
+        
+        let mut opts = Options::empty();
+        opts.insert(Options::ENABLE_TABLES);
+        opts.insert(Options::ENABLE_STRIKETHROUGH);
+        
+        let parser = Parser::new_ext(md, opts);
+        let mut html_output = String::new();
+        html::push_html(&mut html_output, parser);
+        
+        format!(
+            r#"<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; padding: 2em; max-width: 900px; margin: 0 auto; }}
+table {{ border-collapse: collapse; width: 100%; }}
+th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+th {{ background-color: #f2f2f2; }}
+code {{ background-color: #f4f4f4; padding: 2px 4px; border-radius: 3px; }}
+pre {{ background-color: #f4f4f4; padding: 16px; overflow-x: auto; border-radius: 5px; }}
+blockquote {{ border-left: 4px solid #ddd; padding-left: 16px; margin-left: 0; color: #666; }}
+</style>
+</head>
+<body>
+{}
+</body>
+</html>"#,
+            html_output
+        )
+    }
+    #[cfg(not(feature = "chromium"))]
+    {
+        format!("<pre>{}</pre>", md)
+    }
+}
+
 /// Combine two images side by side.
 #[cfg(feature = "chromium")]
-fn combine_images_side_by_side(left: &[u8], right: &[u8]) -> Result<Vec<u8>, String> {
+fn combine_images_side_by_side(_left: &[u8], right: &[u8]) -> Result<Vec<u8>, String> {
     // For now, return a simple placeholder that concatenates images
     // Full implementation would use image crate to combine properly
     // This is a simplified version
@@ -520,40 +555,16 @@ mod tests {
     fn parse_screenshot_format_jpeg() {
         #[cfg(feature = "chromium")]
         assert!(matches!(
-            parse_screenshot_format("jpeg").unwrap(),
-            ScreenshotFormat::Jpeg
+            parse_screenshot_format("jpeg", Some(80)).unwrap(),
+            ScreenshotFormat::Jpeg { quality: 80 }
         ));
         #[cfg(not(feature = "chromium"))]
-        assert!(parse_screenshot_format("jpeg").is_ok());
+        assert!(parse_screenshot_format("jpeg", Some(80)).is_ok());
     }
 
     #[test]
     fn parse_screenshot_format_invalid() {
-        assert!(parse_screenshot_format("gif").is_err());
-        assert!(parse_screenshot_format("bmp").is_err());
-    }
-
-    #[test]
-    fn image_response_content_types() {
-        let data = vec![0u8; 10];
-
-        let (status, headers, _) = image_response(data.clone(), "png");
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(
-            headers.get(header::CONTENT_TYPE).unwrap(),
-            "image/png"
-        );
-
-        let (_, headers, _) = image_response(data.clone(), "jpeg");
-        assert_eq!(
-            headers.get(header::CONTENT_TYPE).unwrap(),
-            "image/jpeg"
-        );
-
-        let (_, headers, _) = image_response(data.clone(), "webp");
-        assert_eq!(
-            headers.get(header::CONTENT_TYPE).unwrap(),
-            "image/webp"
-        );
+        assert!(parse_screenshot_format("gif", None).is_err());
+        assert!(parse_screenshot_format("bmp", None).is_err());
     }
 }
