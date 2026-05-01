@@ -190,6 +190,8 @@ mod tests {
             chromium_idle_shutdown_timeout: None,
             libreoffice_lazy_start: false,
             libreoffice_idle_shutdown_timeout: None,
+            libreoffice_unoserver_port: 2003,
+            libreoffice_unoserver_ready_timeout: std::time::Duration::from_secs(60),
             // API server
             api_disable_health_route_telemetry: false,
             api_disable_root_route_telemetry: false,

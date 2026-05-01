@@ -258,5 +258,7 @@ fn libreoffice_config_from(config: &ServerConfig) -> LibreOfficeConfig {
         max_concurrency: defaults.max_concurrency,
         lazy_start: config.libreoffice_lazy_start,
         idle_shutdown_timeout: config.libreoffice_idle_shutdown_timeout,
+        unoserver_port: config.libreoffice_unoserver_port,
+        unoserver_ready_timeout: config.libreoffice_unoserver_ready_timeout,
     }
 }

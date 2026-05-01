@@ -14,6 +14,9 @@ authors = []
 # Internal
 engine = { path = "crates/engine" }
 
+# Encoding
+base64 = "0.22"
+
 # Async / runtime
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"

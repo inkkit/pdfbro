@@ -178,13 +178,25 @@ LABEL org.opencontainers.image.title="Folio" \
       org.opencontainers.image.authors="Folio Team" \
       org.opencontainers.image.source="https://github.com/been-there-done-that/folio"
 
-RUN apt-get update -qq && apt-get upgrade -yqq && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+# Install LibreOffice from Debian bookworm-backports (newer than bookworm's 7.4).
+# python3-uno must match the LO version so it is also pulled from backports.
+RUN echo "deb http://deb.debian.org/debian bookworm-backports main" \
+      > /etc/apt/sources.list.d/backports.list && \
+    apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -t bookworm-backports --no-install-recommends \
         libreoffice-writer \
         libreoffice-calc \
         libreoffice-impress \
         libreoffice-draw \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+        python3-uno && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        python3-minimal \
+        python3-pip && \
+    pip3 install --no-cache-dir --break-system-packages unoserver==2.2.1 && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Force headless SVP rendering backend — skips virtual display probe (~50–100ms).
+ENV SAL_USE_VCLPLUGIN=svp
 
 COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" \
     --from=builder-full /app/target/release/folio-server /usr/bin/
@@ -195,7 +207,7 @@ USER folio
 WORKDIR /home/folio
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:3000/health || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
@@ -248,13 +260,25 @@ LABEL org.opencontainers.image.title="Folio (LibreOffice)" \
       org.opencontainers.image.authors="Folio Team" \
       org.opencontainers.image.source="https://github.com/been-there-done-that/folio"
 
-RUN apt-get update -qq && apt-get upgrade -yqq && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+# Install LibreOffice from Debian bookworm-backports (newer than bookworm's 7.4).
+# python3-uno must match the LO version so it is also pulled from backports.
+RUN echo "deb http://deb.debian.org/debian bookworm-backports main" \
+      > /etc/apt/sources.list.d/backports.list && \
+    apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -t bookworm-backports --no-install-recommends \
         libreoffice-writer \
         libreoffice-calc \
         libreoffice-impress \
         libreoffice-draw \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+        python3-uno && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        python3-minimal \
+        python3-pip && \
+    pip3 install --no-cache-dir --break-system-packages unoserver==2.2.1 && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Force headless SVP rendering backend — skips virtual display probe (~50–100ms).
+ENV SAL_USE_VCLPLUGIN=svp
 
 COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" \
     --from=builder-libreoffice /app/target/release/folio-server /usr/bin/
