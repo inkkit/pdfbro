@@ -1,6 +1,5 @@
 // src/lib/metrics.svelte.ts
 import type { ConsolePayload } from './types';
-import { base } from '$app/paths';
 
 export let data = $state<ConsolePayload | null>(null);
 export let loading = $state(true);
@@ -12,7 +11,7 @@ let es: EventSource | null = null;
 
 export function startSSE() {
     if (es) return;
-    es = new EventSource(`${base}/api/stream`);
+    es = new EventSource('/_/api/stream');
 
     es.onopen = () => {
         connected = true;
