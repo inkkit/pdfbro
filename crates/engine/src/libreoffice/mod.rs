@@ -9,6 +9,7 @@ pub mod filter;
 
 mod convert;
 mod discover;
+mod unoserver;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
