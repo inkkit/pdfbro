@@ -194,6 +194,34 @@ pub struct ServerArgs {
     /// makes `/forms/chromium/convert/url` reachable at `/pdf/forms/chromium/convert/url`.
     #[arg(long, value_name = "PATH", env = "API_ROOT_PATH")]
     pub api_root_path: Option<String>,
+
+    /// Maximum number of webhook delivery attempts (default: 4).
+    #[arg(long, value_name = "N", env = "WEBHOOK_MAX_RETRY")]
+    pub webhook_max_retry: Option<u32>,
+
+    /// Minimum wait between webhook retries — start of exponential
+    /// backoff window (default: 1s).
+    #[arg(long, value_name = "DURATION", env = "WEBHOOK_RETRY_MIN_WAIT")]
+    pub webhook_retry_min_wait: Option<String>,
+
+    /// Maximum wait between webhook retries — cap of exponential
+    /// backoff window (default: 30s).
+    #[arg(long, value_name = "DURATION", env = "WEBHOOK_RETRY_MAX_WAIT")]
+    pub webhook_retry_max_wait: Option<String>,
+
+    /// Per-attempt webhook HTTP client timeout (default: 30s).
+    #[arg(long, value_name = "DURATION", env = "WEBHOOK_CLIENT_TIMEOUT")]
+    pub webhook_client_timeout: Option<String>,
+
+    /// Regex pattern that webhook URLs must match. Repeat for multiple.
+    /// Empty = allow all (subject to SSRF and deny-list).
+    #[arg(long = "webhook-allow-list", value_name = "REGEX")]
+    pub webhook_allow_list: Vec<String>,
+
+    /// Regex pattern that webhook URLs must NOT match. Repeat for
+    /// multiple. Evaluated after allow-list and SSRF checks.
+    #[arg(long = "webhook-deny-list", value_name = "REGEX")]
+    pub webhook_deny_list: Vec<String>,
 }
 
 /// Log output formats supported by the server.
@@ -303,6 +331,20 @@ pub struct ServerConfig {
     /// Path prefix to mount the API under. Empty string means no prefix.
     /// Always starts with `/` and never ends with `/` (validated at resolve).
     pub api_root_path: String,
+
+    /// Maximum webhook delivery attempts (>= 1).
+    pub webhook_max_retry: u32,
+    /// Minimum wait before retry (start of exponential backoff window).
+    pub webhook_retry_min_wait: Duration,
+    /// Maximum wait before retry (cap of exponential backoff window).
+    pub webhook_retry_max_wait: Duration,
+    /// Per-attempt HTTP client timeout for webhook delivery.
+    pub webhook_client_timeout: Duration,
+    /// Webhook URL allow-list (raw regex strings; compiled in main.rs).
+    /// Empty = allow all (subject to SSRF + deny-list).
+    pub webhook_allow_list: Vec<String>,
+    /// Webhook URL deny-list (raw regex strings; compiled in main.rs).
+    pub webhook_deny_list: Vec<String>,
 }
 
 /// Errors produced by [`ServerConfig::resolve`].
@@ -544,6 +586,44 @@ impl ServerConfig {
             }
         })?;
 
+        let webhook_max_retry = args
+            .webhook_max_retry
+            .or_else(|| env.get("WEBHOOK_MAX_RETRY").and_then(|v| v.parse().ok()))
+            .unwrap_or(4);
+        if webhook_max_retry == 0 {
+            return Err(ConfigError::Parse {
+                field: "webhook_max_retry",
+                message: "must be >= 1".to_string(),
+            });
+        }
+        let webhook_retry_min_wait = parse_duration_opt(
+            &args.webhook_retry_min_wait,
+            env.get("WEBHOOK_RETRY_MIN_WAIT").map(String::as_str),
+            Duration::from_secs(1),
+            "webhook_retry_min_wait",
+        )?;
+        let webhook_retry_max_wait = parse_duration_opt(
+            &args.webhook_retry_max_wait,
+            env.get("WEBHOOK_RETRY_MAX_WAIT").map(String::as_str),
+            Duration::from_secs(30),
+            "webhook_retry_max_wait",
+        )?;
+        if webhook_retry_max_wait < webhook_retry_min_wait {
+            return Err(ConfigError::Parse {
+                field: "webhook_retry_max_wait",
+                message: format!(
+                    "must be >= webhook_retry_min_wait ({:?})",
+                    webhook_retry_min_wait
+                ),
+            });
+        }
+        let webhook_client_timeout = parse_duration_opt(
+            &args.webhook_client_timeout,
+            env.get("WEBHOOK_CLIENT_TIMEOUT").map(String::as_str),
+            Duration::from_secs(30),
+            "webhook_client_timeout",
+        )?;
+
         Ok(Self {
             host,
             port,
@@ -581,6 +661,12 @@ impl ServerConfig {
             api_disable_download_from,
             api_correlation_id_header,
             api_root_path,
+            webhook_max_retry,
+            webhook_retry_min_wait,
+            webhook_retry_max_wait,
+            webhook_client_timeout,
+            webhook_allow_list: args.webhook_allow_list.clone(),
+            webhook_deny_list: args.webhook_deny_list.clone(),
         })
     }
 
@@ -633,6 +719,29 @@ fn normalize_root_path(s: &str) -> Result<String, String> {
         ));
     }
     Ok(trimmed.to_string())
+}
+
+/// Parse a humantime duration from CLI arg → env → default, mapping
+/// parse errors to a structured [`ConfigError::Parse`] tagged with the
+/// caller's field name.
+fn parse_duration_opt(
+    arg: &Option<String>,
+    env_val: Option<&str>,
+    default: Duration,
+    field: &'static str,
+) -> Result<Duration, ConfigError> {
+    let raw = arg
+        .as_deref()
+        .or(env_val)
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    match raw {
+        Some(s) => humantime::parse_duration(s).map_err(|e| ConfigError::Parse {
+            field,
+            message: e.to_string(),
+        }),
+        None => Ok(default),
+    }
 }
 
 fn is_truthy(s: &str) -> bool {
