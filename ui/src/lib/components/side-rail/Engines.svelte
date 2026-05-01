@@ -22,7 +22,7 @@
                 <div>
                     <div style="display:flex;align-items:center;gap:6px">
                         <strong style="font-size:{D.fz + 0.5}px">{e.name}</strong>
-                        <Pill tone={engineTone(e)} {t}>{e.status}</Pill>
+                        <Pill tone={engineTone(e)} {t}>{e.status.toUpperCase()}</Pill>
                     </div>
                     <div style="color:{t.muted};font-size:10.5px;margin-top:2px;font-family:ui-monospace,monospace">
                         {e.restarts} restart{e.restarts !== 1 ? 's' : ''} · {e.mode}

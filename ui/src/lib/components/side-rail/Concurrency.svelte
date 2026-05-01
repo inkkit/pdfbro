@@ -27,8 +27,8 @@
             </div>
             <Pill {tone} {t}>{pct}% · {tone}</Pill>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(16,1fr);gap:2px">
-            {#each Array.from({ length: Math.min(conc.max, 64) }, (_, i) => i) as i}
+        <div style="display:grid;grid-template-columns:repeat(32,1fr);gap:2px">
+            {#each Array.from({ length: conc.max }, (_, i) => i) as i}
                 <div style="height:12px;background:{slotColor(i)};border-radius:2px"></div>
             {/each}
         </div>
