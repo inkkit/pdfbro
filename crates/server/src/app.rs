@@ -210,6 +210,10 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
             post(pdfengines::pdfengines_decrypt),
         )
         .route(
+            "/forms/pdfengines/optimise",
+            post(pdfengines::pdfengines_optimise),
+        )
+        .route(
             "/forms/pdfengines/rotate",
             post(pdfengines::pdfengines_rotate),
         )
@@ -240,6 +244,60 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
     if config.api_enable_debug_route {
         untimed = untimed.route("/debug", get(health::debug));
     }
+
+    // Font Doctor diagnostic routes (always enabled)
+    use crate::routes::debug;
+    untimed = untimed
+        .route("/debug/fonts", get(debug::debug_list_fonts))
+        .route("/debug/validate-fonts", post(debug::debug_validate_fonts))
+        .route("/debug/diagnose-html", post(debug::debug_diagnose_html));
+
+    // Live Preview Mode routes (Spec 45)
+    use crate::routes::preview;
+    untimed = untimed
+        .route("/preview/url", get(preview::preview_url))
+        .route("/preview/html", post(preview::preview_html))
+        .route("/preview/markdown", post(preview::preview_markdown))
+        .route("/preview/compare", post(preview::preview_compare));
+
+    // PDF Size Estimator routes (Spec 46)
+    use crate::routes::estimate;
+    untimed = untimed
+        .route("/estimate", post(estimate::estimate))
+        .route("/estimate/form", post(estimate::estimate_form))
+        .route("/estimate/batch", post(estimate::estimate_batch));
+
+    // OpenAPI spec for Scalar documentation
+    use crate::routes::openapi;
+    untimed = untimed.route("/openapi.json", get(openapi::openapi_spec));
+
+    // Scalar interactive API documentation
+    use axum::response::Html;
+    use scalar_api_reference::scalar_html_default;
+    use serde_json::json;
+
+    let scalar_config = json!({
+        "url": "/openapi.json",
+        "metaData": {
+            "title": "Folio API",
+            "description": "PDF generation API (Gotenberg-compatible)",
+            "favicon": "https://gotenberg.dev/favicon.ico"
+        },
+        "theme": "purple",
+        "darkMode": true,
+        "layout": "modern",
+        "searchHotKey": "k",
+        "defaultHttpClient": {
+            "targetKey": "curl",
+            "clientKey": "curl"
+        }
+    });
+
+    // Create Scalar HTML handler
+    let scalar_html = scalar_html_default(&scalar_config);
+    untimed = untimed.route("/docs", get(|| async move {
+        Html(scalar_html)
+    }));
 
     let header_name = HeaderName::from_bytes(
         config.api_correlation_id_header.as_bytes(),

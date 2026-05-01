@@ -59,6 +59,9 @@ tracing-opentelemetry = { workspace = true }
 # Time / duration parsing
 humantime = { workspace = true }
 
+# Regex for font extraction and URL pattern matching
+regex = "1"
+
 # Webhook HTTP client
 reqwest = { workspace = true, features = ["json", "multipart"] }
 url = { workspace = true }
@@ -66,15 +69,15 @@ url = { workspace = true }
 # PDF inspection (page counts for split expansion)
 lopdf = { workspace = true }
 
-# URL pattern matching for downloadFrom allow/deny lists
-regex = "1"
-
 # CLI
 clap = { workspace = true }
 
 # Prometheus metrics
 prometheus = { version = "0.13", default-features = false, features = ["protobuf"] }
 once_cell = "1.21.4"
+
+# Scalar API documentation (interactive docs)
+scalar_api_reference = { version = "0.1", features = ["axum"] }
 
 [dev-dependencies]
 tower = { workspace = true, features = ["util"] }
