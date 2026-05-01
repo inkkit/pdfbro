@@ -99,6 +99,8 @@ RUN apt-get update -qq && apt-get upgrade -yqq && \
         # Used by health checks.
         curl \
         ca-certificates \
+        # Required by LibreOffice TDF apt keyring setup (gpg --dearmor).
+        gnupg \
         # Metric-compatible substitutes for common MS fonts (LibreOffice layout).
         fonts-crosextra-carlito \
         fonts-crosextra-caladea \
@@ -210,7 +212,7 @@ USER folio
 WORKDIR /home/folio
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:3000/health || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
