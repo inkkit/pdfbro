@@ -276,7 +276,9 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
     use crate::routes::console;
     untimed = untimed
         .route("/_/api/stream",  get(console::console_stream))
-        .route("/_/api/metrics", get(console::console_metrics_json));
+        .route("/_/api/metrics", get(console::console_metrics_json))
+        .route("/_/",            get(console::console_asset_root))
+        .route("/_/{*path}",     get(console::console_asset));
 
     // Scalar interactive API documentation
     use axum::response::Html;

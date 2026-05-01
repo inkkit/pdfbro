@@ -3049,6 +3049,7 @@ version = "8.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5bcdef0be6fe7f6fa333b1073c949729274b05f123a0ad7efcb8efd878e5c3b1"
 dependencies = [
+ "mime_guess",
  "sha2",
  "walkdir",
 ]
@@ -3377,10 +3378,12 @@ dependencies = [
  "clap",
  "cucumber",
  "engine",
+ "futures-util",
  "http 1.4.0",
  "humantime",
  "hyper 0.14.32",
  "lopdf",
+ "mime_guess",
  "multer",
  "once_cell",
  "opentelemetry",
@@ -3390,6 +3393,7 @@ dependencies = [
  "pulldown-cmark",
  "regex",
  "reqwest 0.12.28",
+ "rust-embed",
  "scalar_api_reference",
  "serde",
  "serde_json",

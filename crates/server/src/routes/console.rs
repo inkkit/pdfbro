@@ -45,3 +45,42 @@ pub async fn console_metrics_json(
     let started_at = state.started_at;
     Json(build_console_payload(&state, started_at).await)
 }
+
+use axum::body::Body;
+use axum::http::{HeaderValue, StatusCode, header};
+use axum::response::IntoResponse;
+use rust_embed::RustEmbed;
+
+#[derive(RustEmbed)]
+#[folder = "../../ui/build/"]
+struct ConsoleAssets;
+
+/// Serves the embedded Svelte SPA.
+pub async fn console_asset(
+    axum::extract::Path(path): axum::extract::Path<String>,
+) -> axum::response::Response {
+    serve_asset(&path)
+}
+
+pub async fn console_asset_root() -> axum::response::Response {
+    serve_asset("index.html")
+}
+
+fn serve_asset(path: &str) -> axum::response::Response {
+    let path = path.trim_start_matches('/');
+    let asset = ConsoleAssets::get(path)
+        .or_else(|| ConsoleAssets::get("index.html"));
+
+    match asset {
+        Some(content) => {
+            let mime = mime_guess::from_path(path).first_or_octet_stream();
+            let body = Body::from(content.data.into_owned());
+            (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, HeaderValue::from_str(mime.as_ref()).unwrap())],
+                body,
+            ).into_response()
+        }
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
+}
