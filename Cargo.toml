@@ -91,8 +91,9 @@ dirs = "5"
 
 # Bindings
 pyo3 = { version = "0.22", features = ["extension-module"] }
-napi = { version = "2", features = ["napi8"] }
+napi = { version = "2", features = ["napi8", "tokio_rt", "serde-json"] }
 napi-derive = "2"
+napi-build = "2"
 
 [profile.release]
 opt-level = 3
