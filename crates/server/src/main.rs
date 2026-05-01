@@ -141,6 +141,13 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
     #[cfg(feature = "libreoffice")]
     let state = state.with_libreoffice(Some(Arc::new(libreoffice)));
 
+    {
+        use server::console_store::spawn_console_sampler;
+        spawn_console_sampler(state.clone(), state.started_at);
+    }
+
+    // Clone state before moving into the router, so we can signal SSE shutdown.
+    let state_for_shutdown = state.clone();
     let router = build_router(state, &config);
     let addr: SocketAddr = SocketAddr::new(config.host, config.port);
 
@@ -161,8 +168,11 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
         let shutdown_handle = handle.clone();
 
         // Spawn graceful shutdown signal handler
+        let state_for_tls_shutdown = state_for_shutdown.clone();
         tokio::spawn(async move {
             shutdown::shutdown_signal().await;
+            // Signal SSE streams to close so they don't block the drain.
+            let _ = state_for_tls_shutdown.console.shutdown_tx.send(true);
             shutdown_handle.shutdown();
         });
 
@@ -179,7 +189,11 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
             .with_context(|| format!("binding {addr}"))?;
 
         axum::serve(listener, router.into_make_service())
-            .with_graceful_shutdown(shutdown::shutdown_signal())
+            .with_graceful_shutdown(async move {
+                shutdown::shutdown_signal().await;
+                // Signal SSE streams to close so they don't block the drain.
+                let _ = state_for_shutdown.console.shutdown_tx.send(true);
+            })
             .await
             .context("axum serve")?;
     }

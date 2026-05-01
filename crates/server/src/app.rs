@@ -10,9 +10,10 @@ use std::time::Duration;
 
 use axum::Router;
 use axum::error_handling::HandleErrorLayer;
-use axum::extract::DefaultBodyLimit;
+use axum::extract::{DefaultBodyLimit, State};
 use axum::http::{HeaderName, Request};
-use axum::response::IntoResponse;
+use axum::middleware::{self, Next};
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use engine::EngineError;
 use tower::BoxError;
@@ -271,6 +272,15 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
     use crate::routes::openapi;
     untimed = untimed.route("/openapi.json", get(openapi::openapi_spec));
 
+    // Operator console SSE stream and one-shot metrics JSON (long-lived, no timeout)
+    use crate::routes::console;
+    untimed = untimed
+        .route("/_",             get(|| async { axum::response::Redirect::permanent("/_/") }))
+        .route("/_/api/stream",  get(console::console_stream))
+        .route("/_/api/metrics", get(console::console_metrics_json))
+        .route("/_/",            get(console::console_asset_root))
+        .route("/_/{*path}",     get(console::console_asset));
+
     // Scalar interactive API documentation
     use axum::response::Html;
     use scalar_api_reference::scalar_html_default;
@@ -304,6 +314,9 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
     )
     .expect("api_correlation_id_header was validated in ServerConfig::resolve");
 
+    // Keep a clone for the console log middleware (state is moved into with_state below).
+    let state_for_console = state.clone();
+
     let mut router = Router::new()
         .merge(timed)
         .merge(untimed)
@@ -334,6 +347,11 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
         )));
     }
 
+    // Console log middleware — outermost layer so it captures every request
+    // (including auth-rejected ones) and records them into the ConsoleStore
+    // ring buffer. Added last so it wraps the full stack.
+    router = router.layer(middleware::from_fn_with_state(state_for_console, console_log_middleware));
+
     router
 }
 
@@ -341,6 +359,41 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
 #[allow(dead_code)]
 pub fn default_request_timeout() -> Duration {
     Duration::from_secs(120)
+}
+
+/// Middleware that records every non-console HTTP request into the
+/// [`ConsoleStore`] ring buffer for the operator console UI.
+///
+/// Requests to `/_/` (the console API itself) are skipped to avoid noise.
+async fn console_log_middleware(
+    State(state): State<AppState>,
+    req: axum::extract::Request,
+    next: Next,
+) -> Response {
+    use std::time::Instant;
+
+    let method = req.method().to_string();
+    let path = req.uri().path().to_string();
+
+    // Skip the console routes themselves to avoid noise.
+    if path.starts_with("/_/") {
+        return next.run(req).await;
+    }
+
+    use std::sync::atomic::Ordering;
+    state.console.active_requests.fetch_add(1, Ordering::SeqCst);
+    let start = Instant::now();
+    let response = next.run(req).await;
+    state.console.active_requests.fetch_sub(1, Ordering::SeqCst);
+    let elapsed = start.elapsed();
+    let duration_ms = elapsed.as_millis() as u64;
+    let status = response.status().as_u16();
+
+    // Record into ring buffer for the console UI
+    state.console.record_request(method.clone(), path.clone(), status, duration_ms).await;
+    // Record into Prometheus counters + histogram for RPS / routes / error% calculations
+    state.metrics.record_http_request(&method, &path, status, elapsed.as_secs_f64());
+    response
 }
 
 /// Maps `tower::timeout::error::Elapsed` (and any other boxed error

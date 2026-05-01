@@ -12,6 +12,7 @@ pub mod auth;
 pub mod backend;
 pub mod banner;
 pub mod batch_worker;
+pub mod console_store;
 pub mod config;
 pub mod download;
 pub mod error;

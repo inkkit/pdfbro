@@ -7,6 +7,16 @@ ARG FOLIO_USER_GID=1001
 ARG CHROMIUM_VERSION=142.0.7444.175-1
 
 # =============================================================================
+# Stage: ui-builder — builds the operator console SPA
+# =============================================================================
+FROM node:22-slim AS ui-builder
+WORKDIR /ui
+COPY ui/package*.json ui/bun.lock* ./
+RUN npm install
+COPY ui/ ./
+RUN npm run build
+
+# =============================================================================
 # Stage: chef — installs cargo-chef for dependency caching
 # =============================================================================
 FROM rust:${RUST_VERSION} AS chef
@@ -29,6 +39,7 @@ WORKDIR /app
 COPY --link --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json --features "chromium libreoffice"
 COPY --link . .
+COPY --link --from=ui-builder /ui/build /app/ui/build
 RUN cargo build --release --features "chromium libreoffice" && \
     strip target/release/folio-server && \
     strip target/release/folio
@@ -41,6 +52,7 @@ WORKDIR /app
 COPY --link --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json --no-default-features --features chromium
 COPY --link . .
+COPY --link --from=ui-builder /ui/build /app/ui/build
 RUN cargo build --release --no-default-features --features chromium && \
     strip target/release/folio-server && \
     strip target/release/folio
@@ -53,6 +65,7 @@ WORKDIR /app
 COPY --link --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json --no-default-features --features libreoffice
 COPY --link . .
+COPY --link --from=ui-builder /ui/build /app/ui/build
 RUN cargo build --release --no-default-features --features libreoffice && \
     strip target/release/folio-server && \
     strip target/release/folio

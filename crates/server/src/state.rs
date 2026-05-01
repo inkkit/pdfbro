@@ -11,6 +11,7 @@ use tokio::sync::Semaphore;
 
 use crate::ServerConfig;
 use crate::backend::PdfBackend;
+use crate::console_store::ConsoleStore;
 use crate::metrics::FolioMetrics;
 use crate::routes::batch_state::BatchStateManager;
 use crate::supervised_engine::SupervisedLibreOfficeEngine;
@@ -36,6 +37,8 @@ pub struct AppState {
     pub metrics: Arc<FolioMetrics>,
     /// Batch state manager for batch API.
     pub batch_manager: Option<BatchStateManager>,
+    /// Operator console store (ring buffers + SSE broadcast).
+    pub console: Arc<ConsoleStore>,
 }
 
 impl AppState {
@@ -57,6 +60,7 @@ impl AppState {
             webhook_queue: None,
             metrics,
             batch_manager: None,
+            console: Arc::new(ConsoleStore::new()),
         }
     }
 

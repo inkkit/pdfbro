@@ -99,6 +99,17 @@ version: ## Check Folio version
 build-release: ## Build release binaries
 	cargo build --release
 
+.PHONY: ui-build
+ui-build: ## Build the operator console UI (requires Node in ui/)
+	cd ui && npm run build
+
+.PHONY: ui-dev
+ui-dev: ## Start UI dev server with hot reload (run alongside folio-server)
+	cd ui && npm run dev
+
+.PHONY: build-with-ui
+build-with-ui: ui-build build-release ## Build UI then Rust binary (for local testing)
+
 .PHONY: docker-test
 docker-test: ## Run tests inside Docker container (with Chrome + LibreOffice)
 	docker build -t folio-test -f Dockerfile .

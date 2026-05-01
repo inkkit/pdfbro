@@ -215,6 +215,11 @@ impl SupervisedChromiumEngine {
         }
     }
 
+    /// Returns true if the Chromium engine is currently running.
+    pub fn is_running(&self) -> bool {
+        self.inner.is_running.load(Ordering::SeqCst)
+    }
+
     /// Shutdown the engine.
     pub async fn shutdown(&self) {
         let mut guard = self.inner.engine.lock().await;
@@ -346,6 +351,11 @@ impl SupervisedLibreOfficeEngine {
             Some(engine) => engine.convert(input, opts).await,
             None => Err(EngineError::Internal("LibreOffice engine not available".into())),
         }
+    }
+
+    /// Returns true if the LibreOffice engine is currently running.
+    pub fn is_running(&self) -> bool {
+        self.inner.is_running.load(Ordering::SeqCst)
     }
 
     /// Convert many files to PDFs in parallel.
