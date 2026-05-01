@@ -217,7 +217,7 @@ impl SupervisedChromiumEngine {
 
     /// Returns true if the Chromium engine is currently running.
     pub fn is_running(&self) -> bool {
-        self.inner.is_running.load(std::sync::atomic::Ordering::SeqCst)
+        self.inner.is_running.load(Ordering::SeqCst)
     }
 
     /// Shutdown the engine.
@@ -355,7 +355,7 @@ impl SupervisedLibreOfficeEngine {
 
     /// Returns true if the LibreOffice engine is currently running.
     pub fn is_running(&self) -> bool {
-        self.inner.is_running.load(std::sync::atomic::Ordering::SeqCst)
+        self.inner.is_running.load(Ordering::SeqCst)
     }
 
     /// Convert many files to PDFs in parallel.
