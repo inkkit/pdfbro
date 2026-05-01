@@ -2,7 +2,7 @@
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU32};
 use serde::{Deserialize, Serialize};
-use tokio::sync::{Mutex, broadcast};
+use tokio::sync::{Mutex, broadcast, watch};
 
 pub const HISTORY_CAP: usize = 360;  // 30 min at 5s cadence
 pub const LOG_CAP: usize = 100;
@@ -56,6 +56,8 @@ pub struct ConsoleStore {
     pub request_log: Mutex<VecDeque<RequestLogEntry>>,
     pub error_log: Mutex<VecDeque<ErrorLogEntry>>,
     pub broadcast: broadcast::Sender<String>,
+    /// Signals SSE connections to close on graceful shutdown.
+    pub shutdown_tx: watch::Sender<bool>,
     // Activation tracking: counts false→true transitions on engine health
     pub chromium_restarts: AtomicU32,
     pub chromium_was_running: AtomicBool,
@@ -74,11 +76,13 @@ pub struct ConsoleStore {
 impl ConsoleStore {
     pub fn new() -> Self {
         let (tx, _) = broadcast::channel(BROADCAST_CAP);
+        let (shutdown_tx, _) = watch::channel(false);
         Self {
             history: Mutex::new(MetricsHistory::default()),
             request_log: Mutex::new(VecDeque::new()),
             error_log: Mutex::new(VecDeque::new()),
             broadcast: tx,
+            shutdown_tx,
             chromium_restarts: AtomicU32::new(0),
             chromium_was_running: AtomicBool::new(false),
             libreoffice_restarts: AtomicU32::new(0),

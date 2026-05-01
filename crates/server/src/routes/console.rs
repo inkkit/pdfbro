@@ -28,12 +28,20 @@ pub async fn console_stream(
         Ok::<Event, Infallible>(Event::default().data(initial_json))
     });
 
-    let broadcast_stream = stream::unfold(rx, |mut rx| async move {
+    let shutdown_rx = state.console.shutdown_tx.subscribe();
+    let broadcast_stream = stream::unfold((rx, shutdown_rx), |(mut rx, mut shutdown_rx)| async move {
         loop {
-            match rx.recv().await {
-                Ok(payload) => return Some((Ok(Event::default().data(payload)), rx)),
-                Err(RecvError::Lagged(_)) => continue,
-                Err(RecvError::Closed) => return None,
+            tokio::select! {
+                result = rx.recv() => match result {
+                    Ok(payload) => return Some((Ok(Event::default().data(payload)), (rx, shutdown_rx))),
+                    Err(RecvError::Lagged(_)) => continue,
+                    Err(RecvError::Closed) => return None,
+                },
+                _ = shutdown_rx.changed() => {
+                    if *shutdown_rx.borrow() {
+                        return None;
+                    }
+                }
             }
         }
     });
