@@ -69,7 +69,7 @@ url = "2"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 
 # Identifiers
-uuid = { version = "1", features = ["v4"] }
+ulid = "1"
 
 # CLI
 assert_cmd = "2"
