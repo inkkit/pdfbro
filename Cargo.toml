@@ -83,6 +83,12 @@ walkdir = "2"
 lopdf = "0.34"
 zip = "2"
 
+# Chrome auto-download
+sha2 = "0.10"
+flate2 = "1"
+tar = "0.4"
+dirs = "5"
+
 # Bindings
 pyo3 = { version = "0.22", features = ["extension-module"] }
 napi = { version = "2", features = ["napi8"] }
