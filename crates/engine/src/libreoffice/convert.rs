@@ -31,7 +31,10 @@ pub(super) async fn run_convert(
         .extension()
         .and_then(|s| s.to_str())
         .unwrap_or_default();
-    let filtername = for_extension(ext);
+    let lo_filter = for_extension(ext);
+    // for_extension returns "pdf:writer_pdf_Export" (CLI format).
+    // unoserver expects just the filter name: "writer_pdf_Export".
+    let filtername = lo_filter.split_once(':').map(|(_, name)| name);
 
     let file_part = reqwest::multipart::Part::bytes(file_bytes).file_name(filename);
 
@@ -39,8 +42,8 @@ pub(super) async fn run_convert(
         .text("output-file", "output.pdf")
         .part("file", file_part);
 
-    if filtername != "pdf" {
-        form = form.text("filtername", filtername.to_string());
+    if let Some(name) = filtername {
+        form = form.text("filtername", name);
     }
     if let Some(blob) = opts.filter_blob() {
         form = form.text("filteroptions", blob);
@@ -150,5 +153,99 @@ mod tests {
         // Port 19877 — nothing is listening here.
         let result = run_convert(&client, 19877, Duration::from_millis(200), tmp.path(), &OfficeOptions::default()).await;
         assert!(result.is_err(), "expected error when nothing listening");
+    }
+
+    #[tokio::test]
+    async fn run_convert_sends_correct_filtername_for_docx() {
+        use axum::extract::Multipart;
+        use std::sync::{Arc, Mutex};
+
+        let captured_filtername: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let captured_clone = Arc::clone(&captured_filtername);
+
+        let app = Router::new().route(
+            "/",
+            post(move |mut multipart: Multipart| {
+                let captured = Arc::clone(&captured_clone);
+                async move {
+                    while let Ok(Some(field)) = multipart.next_field().await {
+                        if field.name() == Some("filtername") {
+                            let val = field.text().await.unwrap_or_default();
+                            *captured.lock().unwrap() = Some(val);
+                        } else {
+                            // drain other fields
+                            let _ = field.bytes().await;
+                        }
+                    }
+                    Response::builder()
+                        .status(StatusCode::OK)
+                        .header("Content-Type", "application/pdf")
+                        .body(Body::from(b"%PDF-1.4".to_vec()))
+                        .unwrap()
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+
+        let tmp = Builder::new().suffix(".docx").tempfile().unwrap();
+        std::fs::write(tmp.path(), b"PK fake docx").unwrap();
+
+        let client = reqwest::Client::new();
+        let result = run_convert(&client, port, Duration::from_secs(5), tmp.path(), &OfficeOptions::default()).await;
+        assert!(result.is_ok(), "{result:?}");
+
+        let name = captured_filtername.lock().unwrap().clone();
+        assert_eq!(
+            name.as_deref(),
+            Some("writer_pdf_Export"),
+            "expected 'writer_pdf_Export', got: {name:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn run_convert_omits_filtername_for_unknown_extension() {
+        use axum::extract::Multipart;
+        use std::sync::{Arc, Mutex};
+
+        let saw_filtername: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+        let saw_clone = Arc::clone(&saw_filtername);
+
+        let app = Router::new().route(
+            "/",
+            post(move |mut multipart: Multipart| {
+                let saw = Arc::clone(&saw_clone);
+                async move {
+                    while let Ok(Some(field)) = multipart.next_field().await {
+                        if field.name() == Some("filtername") {
+                            *saw.lock().unwrap() = true;
+                        }
+                        let _ = field.bytes().await;
+                    }
+                    Response::builder()
+                        .status(StatusCode::OK)
+                        .header("Content-Type", "application/pdf")
+                        .body(Body::from(b"%PDF-1.4".to_vec()))
+                        .unwrap()
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+
+        // ".zzz" is an unknown extension — for_extension returns "pdf" (no colon)
+        let tmp = Builder::new().suffix(".zzz").tempfile().unwrap();
+        std::fs::write(tmp.path(), b"unknown content").unwrap();
+
+        let client = reqwest::Client::new();
+        let result = run_convert(&client, port, Duration::from_secs(5), tmp.path(), &OfficeOptions::default()).await;
+        assert!(result.is_ok(), "{result:?}");
+        assert!(!*saw_filtername.lock().unwrap(), "filtername should not be sent for unknown extensions");
     }
 }
