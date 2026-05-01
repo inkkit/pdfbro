@@ -32,8 +32,8 @@ pub(super) async fn run_convert(
         .and_then(|s| s.to_str())
         .unwrap_or_default();
     let lo_filter = for_extension(ext);
-    // for_extension returns "pdf:writer_pdf_Export" (CLI format).
-    // unoserver expects just the filter name: "writer_pdf_Export".
+    // for_extension returns the soffice CLI format ("pdf:writer_pdf_Export").
+    // unoserver's HTTP API takes only the bare LO filter name ("writer_pdf_Export").
     let filtername = lo_filter.split_once(':').map(|(_, name)| name);
 
     let file_part = reqwest::multipart::Part::bytes(file_bytes).file_name(filename);
