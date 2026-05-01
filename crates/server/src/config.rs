@@ -128,6 +128,14 @@ pub struct ServerArgs {
     #[arg(long, value_name = "DUR", env = "LIBREOFFICE_IDLE_SHUTDOWN_TIMEOUT")]
     pub libreoffice_idle_shutdown_timeout: Option<String>,
 
+    /// Port unoserver listens on (default: 2003).
+    #[arg(long, value_name = "PORT", env = "LIBREOFFICE_UNOSERVER_PORT")]
+    pub libreoffice_unoserver_port: Option<u16>,
+
+    /// Maximum time to wait for unoserver to be ready (e.g., "60s", "2m"). Default: 60s.
+    #[arg(long, value_name = "DUR", env = "LIBREOFFICE_UNOSERVER_READY_TIMEOUT")]
+    pub libreoffice_unoserver_ready_timeout: Option<String>,
+
     // === API Server Flags ===
     /// Disable telemetry for health check route.
     #[arg(long, env = "API_DISABLE_HEALTH_ROUTE_TELEMETRY")]
@@ -263,6 +271,10 @@ pub struct ServerConfig {
     pub libreoffice_lazy_start: bool,
     /// Idle shutdown timeout for LibreOffice (None = disabled).
     pub libreoffice_idle_shutdown_timeout: Option<Duration>,
+    /// Port unoserver listens on. Default: 2003.
+    pub libreoffice_unoserver_port: u16,
+    /// Maximum time to wait for unoserver to be ready at startup. Default: 60s.
+    pub libreoffice_unoserver_ready_timeout: Duration,
 
     // === API Server Config ===
     /// Disable telemetry for health check route.
@@ -461,6 +473,24 @@ impl ServerConfig {
                     .filter(|d| !d.is_zero())
             });
 
+        let libreoffice_unoserver_port = match args.libreoffice_unoserver_port {
+            Some(p) => p,
+            None => match env.get("LIBREOFFICE_UNOSERVER_PORT") {
+                Some(v) => v.parse::<u16>().map_err(|e| ConfigError::Parse {
+                    field: "libreoffice_unoserver_port",
+                    message: e.to_string(),
+                })?,
+                None => 2003,
+            },
+        };
+
+        let libreoffice_unoserver_ready_timeout = args
+            .libreoffice_unoserver_ready_timeout
+            .as_deref()
+            .or_else(|| env.get("LIBREOFFICE_UNOSERVER_READY_TIMEOUT").map(|v| v.as_str()))
+            .and_then(|v| humantime::parse_duration(v).ok())
+            .unwrap_or(Duration::from_secs(60));
+
         // === API Server Config Resolution ===
         let api_disable_health_route_telemetry = args.api_disable_health_route_telemetry
             || env.get("API_DISABLE_HEALTH_ROUTE_TELEMETRY").map(|v| is_truthy(v)).unwrap_or(false);
@@ -543,6 +573,8 @@ impl ServerConfig {
             chromium_idle_shutdown_timeout,
             libreoffice_lazy_start,
             libreoffice_idle_shutdown_timeout,
+            libreoffice_unoserver_port,
+            libreoffice_unoserver_ready_timeout,
             api_disable_health_route_telemetry,
             api_disable_root_route_telemetry,
             api_disable_debug_route_telemetry,
@@ -870,6 +902,29 @@ mod tests {
         )
         .unwrap();
         assert_eq!(cfg.api_correlation_id_header, "x-trace-id");
+    }
+
+    #[test]
+    fn libreoffice_unoserver_defaults() {
+        let args = ServerArgs::default();
+        let cfg = ServerConfig::resolve(&args, &env(&[])).unwrap();
+        assert_eq!(cfg.libreoffice_unoserver_port, 2003);
+        assert_eq!(cfg.libreoffice_unoserver_ready_timeout, Duration::from_secs(60));
+    }
+
+    #[test]
+    fn libreoffice_unoserver_env_override() {
+        let args = ServerArgs::default();
+        let cfg = ServerConfig::resolve(
+            &args,
+            &env(&[
+                ("LIBREOFFICE_UNOSERVER_PORT", "2004"),
+                ("LIBREOFFICE_UNOSERVER_READY_TIMEOUT", "90s"),
+            ]),
+        )
+        .unwrap();
+        assert_eq!(cfg.libreoffice_unoserver_port, 2004);
+        assert_eq!(cfg.libreoffice_unoserver_ready_timeout, Duration::from_secs(90));
     }
 
     #[test]
