@@ -83,25 +83,36 @@ impl FolioWorld {
         }
     }
 
-    /// Locate the pre-built `folio-server` binary.
+    /// Locate the `folio-server` binary.
     ///
-    /// Searches `target/debug` and `target/release` relative to the workspace root,
-    /// deriving the workspace root from the current executable's path when running
-    /// under `cargo test`.
+    /// Resolution order:
+    /// 1. `CARGO_BIN_EXE_folio-server` — set by cargo (and cargo-llvm-cov) when
+    ///    building integration tests; points to the correct instrumented binary.
+    /// 2. Fallback: walk `target/{debug,release}` relative to the workspace root,
+    ///    preferring whichever profile matches the running test binary.
     fn find_folio_server_binary() -> std::path::PathBuf {
+        // Prefer the env var: works with cargo test, cargo-llvm-cov, cargo-nextest.
+        // cargo-llvm-cov places instrumented binaries in target/llvm-cov-target/,
+        // which the path-walk below would miss.
+        if let Ok(path) = std::env::var("CARGO_BIN_EXE_folio-server") {
+            let p = std::path::PathBuf::from(&path);
+            if p.exists() {
+                return p;
+            }
+        }
+
         let current_exe = std::env::current_exe().expect("current_exe unavailable");
         // current_exe is roughly target/<profile>/deps/<crate>-<hash>
         // Workspace root is four levels up from there.
         let workspace_root = current_exe
             .parent()
             .and_then(|p| p.parent()) // <profile>
-            .and_then(|p| p.parent()) // target
+            .and_then(|p| p.parent()) // target (or llvm-cov-target)
             .and_then(|p| p.parent()) // workspace root
             .expect("Cannot derive workspace root from current_exe path")
             .to_path_buf();
 
-        // Derive active profile from current_exe path so debug tests
-        // pick the debug binary and release tests pick release.
+        // Prefer whichever profile the test was compiled under.
         let exe = current_exe.to_string_lossy();
         let preferred = if exe.contains("/release/") || exe.contains("\\release\\") {
             ["release", "debug"]
@@ -116,8 +127,8 @@ impl FolioWorld {
         }
 
         panic!(
-            "folio-server binary not found in target/debug or target/release. \
-             Build it first with `cargo build --bin folio-server`"
+            "folio-server binary not found. Run `cargo build --bin folio-server` first, \
+             or use `cargo llvm-cov --workspace` which builds it automatically."
         );
     }
 
