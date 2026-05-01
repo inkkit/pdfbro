@@ -4,7 +4,7 @@
 //! contract used by the HTTP server.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString, PyStringMethods as _};
+use pyo3::types::{PyDict, PyString};
 use serde::de::DeserializeOwned;
 
 pub fn from_py<T: DeserializeOwned + Default>(opts: Option<&Bound<'_, PyDict>>) -> PyResult<T> {

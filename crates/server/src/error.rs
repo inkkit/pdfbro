@@ -16,7 +16,6 @@ use axum::response::{IntoResponse, Response};
 use engine::EngineError;
 use serde::Serialize;
 use serde_json::{Value, json};
-use std::time::Duration;
 
 /// Convenient `Result` alias for handlers and helpers.
 pub type ApiResult<T> = Result<T, ApiError>;

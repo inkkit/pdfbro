@@ -11,7 +11,7 @@ use axum::response::IntoResponse;
 use axum::Json;
 use regex::Regex;
 use serde::Serialize;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::error::{ApiError, ApiResult};
 use crate::multipart::FormFields;

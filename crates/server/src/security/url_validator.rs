@@ -3,7 +3,7 @@
 //! Blocks access to internal networks, localhost, and other potentially
 //! dangerous destinations to prevent attacks via the `url_to_pdf` endpoint.
 
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::IpAddr;
 
 use crate::error::ApiError;
 
