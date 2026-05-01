@@ -74,12 +74,10 @@ fn serve_asset(path: &str) -> axum::response::Response {
     match asset {
         Some(content) => {
             let mime = mime_guess::from_path(path).first_or_octet_stream();
+            let ct = HeaderValue::from_str(mime.as_ref())
+                .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream"));
             let body = Body::from(content.data.into_owned());
-            (
-                StatusCode::OK,
-                [(header::CONTENT_TYPE, HeaderValue::from_str(mime.as_ref()).unwrap())],
-                body,
-            ).into_response()
+            (StatusCode::OK, [(header::CONTENT_TYPE, ct)], body).into_response()
         }
         None => StatusCode::NOT_FOUND.into_response(),
     }
