@@ -588,6 +588,7 @@ pub async fn process_webhook_job(
 async fn execute_job(job: &WebhookJob, ctx: &WebhookEngineContext) -> Result<WebhookPayload, String> {
     match &job.operation {
         // ── Chromium PDF conversions ──
+        #[cfg(feature = "chromium")]
         WebhookOperation::ChromiumConvertHtml => {
             let (html, options, req_ctx) = match &job.data {
                 JobData::ChromiumHtml { html, options, ctx } => (html, options, ctx),
@@ -600,6 +601,7 @@ async fn execute_job(job: &WebhookJob, ctx: &WebhookEngineContext) -> Result<Web
                 .map_err(|e| e.to_string())?;
             Ok(WebhookPayload::Pdf { data: pdf, filename: "result.pdf".into() })
         }
+        #[cfg(feature = "chromium")]
         WebhookOperation::ChromiumConvertUrl => {
             let (url, options, req_ctx) = match &job.data {
                 JobData::ChromiumUrl { url, options, ctx } => (url, options, ctx),
@@ -611,6 +613,7 @@ async fn execute_job(job: &WebhookJob, ctx: &WebhookEngineContext) -> Result<Web
                 .map_err(|e| e.to_string())?;
             Ok(WebhookPayload::Pdf { data: pdf, filename: "result.pdf".into() })
         }
+        #[cfg(feature = "chromium")]
         WebhookOperation::ChromiumConvertMarkdown => {
             let (html, options, req_ctx) = match &job.data {
                 JobData::ChromiumMarkdown { html, options, ctx } => (html, options, ctx),
@@ -624,6 +627,7 @@ async fn execute_job(job: &WebhookJob, ctx: &WebhookEngineContext) -> Result<Web
             Ok(WebhookPayload::Pdf { data: pdf, filename: "result.pdf".into() })
         }
         // ── Chromium screenshots ──
+        #[cfg(feature = "chromium")]
         WebhookOperation::ChromiumScreenshotHtml => {
             let (html, options) = match &job.data {
                 JobData::ChromiumScreenshotHtml { html, options } => (html, options),
@@ -637,6 +641,7 @@ async fn execute_job(job: &WebhookJob, ctx: &WebhookEngineContext) -> Result<Web
             let ext = options.format.extension();
             Ok(WebhookPayload::Pdf { data: img, filename: format!("result.{ext}") })
         }
+        #[cfg(feature = "chromium")]
         WebhookOperation::ChromiumScreenshotUrl => {
             let (url, options) = match &job.data {
                 JobData::ChromiumScreenshotUrl { url, options } => (url, options),
@@ -649,6 +654,7 @@ async fn execute_job(job: &WebhookJob, ctx: &WebhookEngineContext) -> Result<Web
             let ext = options.format.extension();
             Ok(WebhookPayload::Pdf { data: img, filename: format!("result.{ext}") })
         }
+        #[cfg(feature = "chromium")]
         WebhookOperation::ChromiumScreenshotMarkdown => {
             let (html, options) = match &job.data {
                 JobData::ChromiumScreenshotMarkdown { html, options } => (html, options),
@@ -662,7 +668,17 @@ async fn execute_job(job: &WebhookJob, ctx: &WebhookEngineContext) -> Result<Web
             let ext = options.format.extension();
             Ok(WebhookPayload::Pdf { data: img, filename: format!("result.{ext}") })
         }
+        #[cfg(not(feature = "chromium"))]
+        WebhookOperation::ChromiumConvertHtml
+        | WebhookOperation::ChromiumConvertUrl
+        | WebhookOperation::ChromiumConvertMarkdown
+        | WebhookOperation::ChromiumScreenshotHtml
+        | WebhookOperation::ChromiumScreenshotUrl
+        | WebhookOperation::ChromiumScreenshotMarkdown => {
+            Err("Chromium feature not enabled".into())
+        }
         // ── LibreOffice ──
+        #[cfg(feature = "libreoffice")]
         WebhookOperation::LibreOfficeConvert => {
             let (files, options, merge) = match &job.data {
                 JobData::LibreOffice { files, options, merge } => (files, options, *merge),
@@ -693,6 +709,10 @@ async fn execute_job(job: &WebhookJob, ctx: &WebhookEngineContext) -> Result<Web
                     .map_err(|e| e.to_string())?;
                 Ok(WebhookPayload::Zip { data: zip, filename: "result.zip".into() })
             }
+        }
+        #[cfg(not(feature = "libreoffice"))]
+        WebhookOperation::LibreOfficeConvert => {
+            Err("LibreOffice feature not enabled".into())
         }
         // ── PDF merge ──
         WebhookOperation::PdfMerge => {
