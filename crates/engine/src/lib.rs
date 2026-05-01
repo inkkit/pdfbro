@@ -16,6 +16,9 @@ pub mod chromium;
 #[cfg(feature = "libreoffice")]
 pub mod libreoffice;
 
+#[cfg(feature = "chrome-fetch")]
+pub mod chrome_fetch;
+
 pub use bookmarks::{Bookmark, read_bookmarks, write_bookmarks, flatten_bookmarks};
 pub use encrypt::{EncryptionAlgorithm, Permissions, encrypt_pdf, decrypt_pdf, is_encrypted, qpdf_available as encrypt_qpdf_available};
 pub use pdfa::{PdfAProfile, convert_to_pdfa, ghostscript_available, qpdf_available};
