@@ -546,6 +546,15 @@ pub struct BrowserConfig {
     /// networkIdle is skipped entirely, matching gotenberg's default.
     #[serde(with = "humantime_serde")]
     pub network_idle_timeout: Option<Duration>,
+    /// Maximum memory per page in MB (Chrome flag: --max-old-space-size).
+    /// Default: 512 MB.
+    pub max_page_memory_mb: usize,
+    /// Maximum total browser memory in MB.
+    /// Default: 2048 MB (2 GB).
+    pub max_browser_memory_mb: usize,
+    /// Maximum concurrent renders per browser instance.
+    /// Default: 10.
+    pub max_concurrent_renders: usize,
 }
 
 impl Default for BrowserConfig {
@@ -559,6 +568,9 @@ impl Default for BrowserConfig {
             lazy_start: false,
             idle_shutdown_timeout: None,
             network_idle_timeout: None,
+            max_page_memory_mb: 512,
+            max_browser_memory_mb: 2048,
+            max_concurrent_renders: 10,
         }
     }
 }
