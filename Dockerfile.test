@@ -68,4 +68,4 @@ COPY . .
 RUN cargo build
 
 # Run the full test suite: unit tests + BDD integration tests
-CMD ["sh", "-c", "cargo test && cargo test -p server --test bdd"]
+CMD ["cargo", "test"]
