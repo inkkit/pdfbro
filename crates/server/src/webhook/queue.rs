@@ -5,7 +5,6 @@ use std::time::Instant;
 
 use tokio::sync::{Mutex, mpsc};
 use tracing::{error, info, warn};
-use uuid::Uuid;
 
 
 use super::{WebhookClient, WebhookConfig, WebhookEngineContext, WebhookError, WebhookJob, WebhookOperation, process_webhook_job};
@@ -39,7 +38,7 @@ pub async fn spawn_job(
     config: WebhookConfig,
     data: super::JobData,
 ) -> Result<String, WebhookError> {
-    let job_id = Uuid::new_v4().to_string();
+    let job_id = ulid::Ulid::new().to_string().to_lowercase();
 
     let operation_str = operation.as_str();
     let job = WebhookJob {

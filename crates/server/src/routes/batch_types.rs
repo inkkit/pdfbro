@@ -7,7 +7,6 @@
 use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use crate::error::ApiError;
 use crate::multipart::UploadedFile;
@@ -26,9 +25,12 @@ pub const DEFAULT_RETENTION_MINUTES: u64 = 60;
 pub struct BatchId(String);
 
 impl BatchId {
-    /// Generate a new unique batch ID.
+    /// Generate a new unique batch ID using ULID.
+    ///
+    /// ULID provides lexicographic sorting (chronological order),
+    /// 26 lowercase characters, and collision resistance.
     pub fn new() -> Self {
-        Self(format!("batch_{}", Uuid::new_v4().simple()))
+        Self(format!("batch_{}", ulid::Ulid::new().to_string().to_lowercase()))
     }
 
     /// Create a BatchId from an existing string (for parsing URLs).

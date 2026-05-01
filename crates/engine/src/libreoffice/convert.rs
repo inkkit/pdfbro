@@ -29,6 +29,13 @@ pub(super) async fn run_convert(
     let convert_to = build_convert_to(input, opts);
     let user_url = path_to_file_url(&user_dir);
 
+    // SECURITY: Create macro security policy file in UserInstallation
+    // This disables all macro execution for this conversion
+    let user_config_dir = user_dir.join("user").join("config");
+    std::fs::create_dir_all(&user_config_dir)?;
+    let macro_security_file = user_config_dir.join("soffice.cfg");
+    std::fs::write(&macro_security_file, b"[Security]\nMacroSecurityLevel=3\n")?;
+
     let mut cmd = tokio::process::Command::new(exe);
     cmd.arg("--headless")
         .arg("--norestore")
