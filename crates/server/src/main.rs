@@ -141,6 +141,12 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
     #[cfg(feature = "libreoffice")]
     let state = state.with_libreoffice(Some(Arc::new(libreoffice)));
 
+    {
+        use server::console_store::spawn_console_sampler;
+        let console_started_at = std::time::Instant::now();
+        spawn_console_sampler(state.clone(), console_started_at);
+    }
+
     let router = build_router(state, &config);
     let addr: SocketAddr = SocketAddr::new(config.host, config.port);
 
