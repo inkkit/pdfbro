@@ -52,6 +52,8 @@ struct Inner {
     exe: PathBuf,
     timeout: Duration,
     semaphore: Semaphore,
+    client: reqwest::Client,
+    port: u16,
 }
 
 /// Engine-wide configuration. Pass to [`LibreOfficeEngine::launch`].
@@ -133,6 +135,8 @@ impl LibreOfficeEngine {
                 exe,
                 timeout: config.timeout,
                 semaphore: Semaphore::new(max),
+                client: reqwest::Client::new(),
+                port: 2003,
             }),
         })
     }
@@ -161,7 +165,7 @@ impl LibreOfficeEngine {
             .map_err(|e| EngineError::Internal(format!("semaphore closed: {e}")))?;
         debug!("Starting LibreOffice conversion");
         let start = std::time::Instant::now();
-        let result = convert::run_convert(&self.inner.exe, self.inner.timeout, input, opts).await;
+        let result = convert::run_convert(&self.inner.client, self.inner.port, self.inner.timeout, input, opts).await;
         let duration = start.elapsed();
         match &result {
             Ok(_) => info!(
