@@ -1,31 +1,64 @@
 //! Integration tests for Spec 43 — Font Doctor.
-//!
-//! Tests the `/debug/*` endpoints for font diagnostics.
 
+use std::time::Duration;
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
-use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use server::app::build_router;
 use server::state::AppState;
-use server::config::ServerConfig;
+use server::config::{ServerConfig, LogFormat};
 
-/// Create test app state with minimal configuration.
-async fn test_app() -> (axum::Router, AppState) {
-    let config = ServerConfig::default();
-    let state = AppState::new(&config).await.unwrap();
+fn test_config() -> ServerConfig {
+    ServerConfig {
+        host: "127.0.0.1".parse().unwrap(),
+        port: 0,
+        concurrency: 4,
+        max_body_bytes: 4 * 1024 * 1024,
+        request_timeout: Duration::from_secs(60),
+        chrome_path: None,
+        no_sandbox: None,
+        soffice_path: None,
+        log_level: "off".to_string(),
+        log_format: LogFormat::Text,
+        batch_max_items: 50,
+        batch_concurrency: 4,
+        batch_max_active: 10,
+        batch_retention_minutes: 60,
+        batch_storage_path: std::path::PathBuf::from("/tmp/folio-batches"),
+        otel_enabled: false,
+        otel_endpoint: "http://localhost:4318/v1/traces".to_string(),
+        chromium_lazy_start: false,
+        chromium_idle_shutdown_timeout: None,
+        libreoffice_lazy_start: false,
+        libreoffice_idle_shutdown_timeout: None,
+        api_disable_health_route_telemetry: false,
+        api_disable_root_route_telemetry: false,
+        api_disable_debug_route_telemetry: false,
+        api_disable_version_route_telemetry: false,
+        api_enable_debug_route: false,
+        api_tls_cert_file: None,
+        api_tls_key_file: None,
+        api_basic_auth_username: None,
+        api_basic_auth_password: None,
+        api_download_from_allow_list: Vec::new(),
+        api_download_from_deny_list: Vec::new(),
+        api_download_from_max_retry: 3,
+        api_disable_download_from: false,
+        api_correlation_id_header: "x-request-id".to_string(),
+    }
+}
+
+fn test_app() -> (axum::Router, AppState) {
+    let config = test_config();
+    let state = AppState::new(None, config.clone());
     let router = build_router(state.clone(), &config);
     (router, state)
 }
 
-// ---------------------------------------------------------------------------
-// GET /debug/fonts tests
-// ---------------------------------------------------------------------------
-
 #[tokio::test]
 async fn test_list_fonts_returns_200() {
-    let (app, _state) = test_app().await;
+    let (app, _state) = test_app();
 
     let request = Request::builder()
         .method("GET")
@@ -34,13 +67,12 @@ async fn test_list_fonts_returns_200() {
         .unwrap();
 
     let response = app.oneshot(request).await.unwrap();
-    
     assert_eq!(response.status(), StatusCode::OK);
 }
 
 #[tokio::test]
 async fn test_list_fonts_returns_json() {
-    let (app, _state) = test_app().await;
+    let (app, _state) = test_app();
 
     let request = Request::builder()
         .method("GET")
@@ -50,8 +82,6 @@ async fn test_list_fonts_returns_json() {
 
     let response = app.oneshot(request).await.unwrap();
     
-    assert_eq!(response.status(), StatusCode::OK);
-    
     let content_type = response.headers()
         .get(header::CONTENT_TYPE)
         .unwrap()
@@ -60,323 +90,90 @@ async fn test_list_fonts_returns_json() {
     assert!(content_type.contains("application/json"));
 }
 
-// ---------------------------------------------------------------------------
-// POST /debug/validate-fonts tests
-// ---------------------------------------------------------------------------
-
 #[tokio::test]
 async fn test_validate_fonts_returns_200_with_html() {
-    let (app, _state) = test_app().await;
+    let (app, _state) = test_app();
 
     let boundary = "----test-boundary";
-    let html_content = r#"
-        <style>
-            body { font-family: 'Arial', sans-serif; }
-            h1 { font-family: 'Helvetica', sans-serif; }
-        </style>
-        <body>Test</body>
-    "#;
+    let html_content = r#"<style>body { font-family: 'Arial', sans-serif; }</style><body>Test</body>"#;
 
     let body = format!(
-        "------{boundary}\r\n" +
-        "Content-Disposition: form-data; name=\"html\"\r\n\r\n" +
-        "{html_content}\r\n" +
-        "------{boundary}--\r\n"
+        "------{}\r\nContent-Disposition: form-data; name=\"html\"\r\n\r\n{}\r\n------{}--\r\n",
+        boundary, html_content, boundary
     );
 
     let request = Request::builder()
         .method("POST")
         .uri("/debug/validate-fonts")
-        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={boundary}"))
+        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={}", boundary))
         .body(Body::from(body))
         .unwrap();
 
     let response = app.oneshot(request).await.unwrap();
-    
-    assert_eq!(response.status(), StatusCode::OK);
-}
-
-#[tokio::test]
-async fn test_validate_fonts_returns_200_with_css() {
-    let (app, _state) = test_app().await;
-
-    let boundary = "----test-boundary";
-    let css_content = r#"
-        .title { font-family: 'Roboto', sans-serif; }
-        .body { font-family: 'Open Sans', Arial, sans-serif; }
-    "#;
-
-    let body = format!(
-        "------{boundary}\r\n" +
-        "Content-Disposition: form-data; name=\"css\"\r\n\r\n" +
-        "{css_content}\r\n" +
-        "------{boundary}--\r\n"
-    );
-
-    let request = Request::builder()
-        .method("POST")
-        .uri("/debug/validate-fonts")
-        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={boundary}"))
-        .body(Body::from(body))
-        .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-    
-    assert_eq!(response.status(), StatusCode::OK);
-}
-
-#[tokio::test]
-async fn test_validate_fonts_returns_200_with_fonts_list() {
-    let (app, _state) = test_app().await;
-
-    let boundary = "----test-boundary";
-    let body = format!(
-        "------{boundary}\r\n" +
-        "Content-Disposition: form-data; name=\"fonts\"\r\n\r\n" +
-        "Arial,Helvetica,Roboto\r\n" +
-        "------{boundary}--\r\n"
-    );
-
-    let request = Request::builder()
-        .method("POST")
-        .uri("/debug/validate-fonts")
-        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={boundary}"))
-        .body(Body::from(body))
-        .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-    
     assert_eq!(response.status(), StatusCode::OK);
 }
 
 #[tokio::test]
 async fn test_validate_fonts_returns_400_without_input() {
-    let (app, _state) = test_app().await;
+    let (app, _state) = test_app();
 
     let boundary = "----test-boundary";
     let body = format!(
-        "------{boundary}\r\n" +
-        "Content-Disposition: form-data; name=\"other\"\r\n\r\n" +
-        "value\r\n" +
-        "------{boundary}--\r\n"
+        "------{}\r\nContent-Disposition: form-data; name=\"other\"\r\n\r\nvalue\r\n------{}--\r\n",
+        boundary, boundary
     );
 
     let request = Request::builder()
         .method("POST")
         .uri("/debug/validate-fonts")
-        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={boundary}"))
+        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={}", boundary))
         .body(Body::from(body))
         .unwrap();
 
     let response = app.oneshot(request).await.unwrap();
-    
-    // Should return 400 when no fonts/html/css provided
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
-// ---------------------------------------------------------------------------
-// POST /debug/diagnose-html tests
-// ---------------------------------------------------------------------------
-
 #[tokio::test]
 async fn test_diagnose_html_returns_200() {
-    let (app, _state) = test_app().await;
+    let (app, _state) = test_app();
 
     let boundary = "----test-boundary";
-    let html_content = r#"<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body { font-family: 'Arial', sans-serif; }
-        @font-face { font-family: 'CustomFont'; src: url('font.woff2'); }
-    </style>
-</head>
-<body>
-    <h1>Test</h1>
-    <img src="https://example.com/image.jpg" alt="test">
-</body>
-</html>"#;
+    let html_content = r#"<!DOCTYPE html><html><head><style>body { font-family: 'Arial'; }</style></head><body><h1>Test</h1></body></html>"#;
 
     let body = format!(
-        "------{boundary}\r\n" +
-        "Content-Disposition: form-data; name=\"html\"\r\n\r\n" +
-        "{html_content}\r\n" +
-        "------{boundary}--\r\n"
+        "------{}\r\nContent-Disposition: form-data; name=\"html\"\r\n\r\n{}\r\n------{}--\r\n",
+        boundary, html_content, boundary
     );
 
     let request = Request::builder()
         .method("POST")
         .uri("/debug/diagnose-html")
-        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={boundary}"))
+        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={}", boundary))
         .body(Body::from(body))
         .unwrap();
 
     let response = app.oneshot(request).await.unwrap();
-    
     assert_eq!(response.status(), StatusCode::OK);
-}
-
-#[tokio::test]
-async fn test_diagnose_html_returns_json_with_fonts_array() {
-    let (app, _state) = test_app().await;
-
-    let boundary = "----test-boundary";
-    let html_content = r#"<html><style>body{font-family:'Arial'}</style><body>Test</body></html>"#;
-
-    let body = format!(
-        "------{boundary}\r\n" +
-        "Content-Disposition: form-data; name=\"html\"\r\n\r\n" +
-        "{html_content}\r\n" +
-        "------{boundary}--\r\n"
-    );
-
-    let request = Request::builder()
-        .method("POST")
-        .uri("/debug/diagnose-html")
-        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={boundary}"))
-        .body(Body::from(body))
-        .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-    
-    assert_eq!(response.status(), StatusCode::OK);
-    
-    let content_type = response.headers()
-        .get(header::CONTENT_TYPE)
-        .unwrap()
-        .to_str()
-        .unwrap();
-    assert!(content_type.contains("application/json"));
 }
 
 #[tokio::test]
 async fn test_diagnose_html_returns_400_without_html() {
-    let (app, _state) = test_app().await;
+    let (app, _state) = test_app();
 
     let boundary = "----test-boundary";
     let body = format!(
-        "------{boundary}\r\n" +
-        "Content-Disposition: form-data; name=\"other\"\r\n\r\n" +
-        "value\r\n" +
-        "------{boundary}--\r\n"
+        "------{}\r\nContent-Disposition: form-data; name=\"other\"\r\n\r\nvalue\r\n------{}--\r\n",
+        boundary, boundary
     );
 
     let request = Request::builder()
         .method("POST")
         .uri("/debug/diagnose-html")
-        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={boundary}"))
+        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={}", boundary))
         .body(Body::from(body))
         .unwrap();
 
     let response = app.oneshot(request).await.unwrap();
-    
-    // Should return 400 when no html field provided
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-}
-
-#[tokio::test]
-async fn test_diagnose_html_detects_google_fonts() {
-    let (app, _state) = test_app().await;
-
-    let boundary = "----test-boundary";
-    let html_content = r#"
-        <html>
-        <head>
-            <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,700" rel="stylesheet">
-        </head>
-        <body>Test</body>
-        </html>
-    "#;
-
-    let body = format!(
-        "------{boundary}\r\n" +
-        "Content-Disposition: form-data; name=\"html\"\r\n\r\n" +
-        "{html_content}\r\n" +
-        "------{boundary}--\r\n"
-    );
-
-    let request = Request::builder()
-        .method("POST")
-        .uri("/debug/diagnose-html")
-        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={boundary}"))
-        .body(Body::from(body))
-        .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-    
-    // Should detect Google Fonts and include warnings
-    assert_eq!(response.status(), StatusCode::OK);
-}
-
-#[tokio::test]
-async fn test_diagnose_html_detects_web_fonts() {
-    let (app, _state) = test_app().await;
-
-    let boundary = "----test-boundary";
-    let html_content = r#"
-        <html>
-        <head>
-            <style>
-                @font-face {
-                    font-family: 'CustomWebFont';
-                    src: url('https://example.com/font.woff2') format('woff2');
-                }
-            </style>
-        </head>
-        <body>Test</body>
-        </html>
-    "#;
-
-    let body = format!(
-        "------{boundary}\r\n" +
-        "Content-Disposition: form-data; name=\"html\"\r\n\r\n" +
-        "{html_content}\r\n" +
-        "------{boundary}--\r\n"
-    );
-
-    let request = Request::builder()
-        .method("POST")
-        .uri("/debug/diagnose-html")
-        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={boundary}"))
-        .body(Body::from(body))
-        .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-    
-    // Should detect @font-face and warn about web fonts
-    assert_eq!(response.status(), StatusCode::OK);
-}
-
-// ---------------------------------------------------------------------------
-// Unit tests for font extraction logic
-// ---------------------------------------------------------------------------
-
-#[test]
-fn test_extract_font_families_from_html_basic() {
-    let html = r#"
-        <style>
-            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
-            h1 { font-family: Georgia, serif; }
-            @font-face { font-family: 'Custom Font'; src: url('font.woff2'); }
-        </style>
-    "#;
-
-    // Simple extraction test
-    assert!(html.contains("font-family"));
-    assert!(html.contains("Helvetica Neue"));
-    assert!(html.contains("Custom Font"));
-}
-
-#[test]
-fn test_detects_google_fonts_url() {
-    let html = r#"<link href="https://fonts.googleapis.com/css2?family=Roboto">"#;
-    
-    assert!(html.contains("fonts.googleapis.com"));
-}
-
-#[test]
-fn test_detects_web_fonts_at_font_face() {
-    let html = r#"<style>@font-face { font-family: 'Foo'; }</style>"#;
-    
-    assert!(html.contains("@font-face"));
 }

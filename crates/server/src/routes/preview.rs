@@ -544,11 +544,11 @@ mod tests {
     fn parse_screenshot_format_png() {
         #[cfg(feature = "chromium")]
         assert!(matches!(
-            parse_screenshot_format("png").unwrap(),
+            parse_screenshot_format("png", None).unwrap(),
             ScreenshotFormat::Png
         ));
         #[cfg(not(feature = "chromium"))]
-        assert!(parse_screenshot_format("png").is_ok());
+        assert!(parse_screenshot_format("png", None).is_ok());
     }
 
     #[test]

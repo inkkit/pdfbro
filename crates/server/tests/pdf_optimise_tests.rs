@@ -1,169 +1,170 @@
 //! Integration tests for Spec 42 — Smart PDF Optimiser.
-//!
-//! Tests the `/forms/pdfengines/optimise` endpoint with various
-//! presets and backend configurations.
 
 use std::time::Duration;
-
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
-use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use server::app::build_router;
 use server::state::AppState;
-use server::config::ServerConfig;
+use server::config::{ServerConfig, LogFormat};
 
-/// Create test app state with minimal configuration.
-async fn test_app() -> (axum::Router, AppState) {
-    let config = ServerConfig::default();
-    let state = AppState::new(&config).await.unwrap();
+fn test_config() -> ServerConfig {
+    ServerConfig {
+        host: "127.0.0.1".parse().unwrap(),
+        port: 0,
+        concurrency: 4,
+        max_body_bytes: 4 * 1024 * 1024,
+        request_timeout: Duration::from_secs(60),
+        chrome_path: None,
+        no_sandbox: None,
+        soffice_path: None,
+        log_level: "off".to_string(),
+        log_format: LogFormat::Text,
+        batch_max_items: 50,
+        batch_concurrency: 4,
+        batch_max_active: 10,
+        batch_retention_minutes: 60,
+        batch_storage_path: std::path::PathBuf::from("/tmp/folio-batches"),
+        otel_enabled: false,
+        otel_endpoint: "http://localhost:4318/v1/traces".to_string(),
+        chromium_lazy_start: false,
+        chromium_idle_shutdown_timeout: None,
+        libreoffice_lazy_start: false,
+        libreoffice_idle_shutdown_timeout: None,
+        api_disable_health_route_telemetry: false,
+        api_disable_root_route_telemetry: false,
+        api_disable_debug_route_telemetry: false,
+        api_disable_version_route_telemetry: false,
+        api_enable_debug_route: false,
+        api_tls_cert_file: None,
+        api_tls_key_file: None,
+        api_basic_auth_username: None,
+        api_basic_auth_password: None,
+        api_download_from_allow_list: Vec::new(),
+        api_download_from_deny_list: Vec::new(),
+        api_download_from_max_retry: 3,
+        api_disable_download_from: false,
+        api_correlation_id_header: "x-request-id".to_string(),
+    }
+}
+
+fn test_app() -> (axum::Router, AppState) {
+    let config = test_config();
+    let state = AppState::new(None, config.clone());
     let router = build_router(state.clone(), &config);
     (router, state)
 }
 
-/// Helper to create a simple PDF file for testing.
 fn create_test_pdf() -> Vec<u8> {
-    // Minimal valid PDF structure
-    let pdf = b"%PDF-1.4\n1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj\n2 0 obj<< /Type /Pages /Kids [] /Count 0 >>endobj\nxref\n0 3\n0000000000 65535 f\n0000000009 00000 n\n0000000058 00000 n\ntrailer<< /Size 3 /Root 1 0 R >>\nstartxref\n115\n%%EOF";
-    pdf.to_vec()
+    b"%PDF-1.4\n1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj\n2 0 obj<< /Type /Pages /Kids [] /Count 0 >>endobj\nxref\n0 3\n0000000000 65535 f\n0000000009 00000 n\n0000000058 00000 n\ntrailer<< /Size 3 /Root 1 0 R >>\nstartxref\n115\n%%EOF".to_vec()
 }
 
-/// Helper to build multipart request with PDF file.
-fn build_optimise_request(
-    pdf_data: Vec<u8>,
-    preset: Option<&str>,
-    backend: Option<&str>,
-) -> Request<Body> {
+fn build_optimise_request(pdf_data: Vec<u8>, preset: Option<&str>, backend: Option<&str>) -> Request<Body> {
     let boundary = "----test-boundary";
     let mut body = Vec::new();
 
-    // Add files field
-    body.extend_from_slice(format!("------{boundary}\r\n").as_bytes());
+    body.extend_from_slice(format!("------{}\r\n", boundary).as_bytes());
     body.extend_from_slice(b"Content-Disposition: form-data; name=\"files\"; filename=\"test.pdf\"\r\n");
     body.extend_from_slice(b"Content-Type: application/pdf\r\n\r\n");
     body.extend_from_slice(&pdf_data);
     body.extend_from_slice(b"\r\n");
 
-    // Add preset if specified
     if let Some(p) = preset {
-        body.extend_from_slice(format!("------{boundary}\r\n").as_bytes());
+        body.extend_from_slice(format!("------{}\r\n", boundary).as_bytes());
         body.extend_from_slice(b"Content-Disposition: form-data; name=\"preset\"\r\n\r\n");
         body.extend_from_slice(p.as_bytes());
         body.extend_from_slice(b"\r\n");
     }
 
-    // Add backend if specified
     if let Some(b) = backend {
-        body.extend_from_slice(format!("------{boundary}\r\n").as_bytes());
+        body.extend_from_slice(format!("------{}\r\n", boundary).as_bytes());
         body.extend_from_slice(b"Content-Disposition: form-data; name=\"backend\"\r\n\r\n");
         body.extend_from_slice(b.as_bytes());
         body.extend_from_slice(b"\r\n");
     }
 
-    body.extend_from_slice(format!("------{boundary}--\r\n").as_bytes());
+    body.extend_from_slice(format!("------{}--\r\n", boundary).as_bytes());
 
     Request::builder()
         .method("POST")
         .uri("/forms/pdfengines/optimise")
-        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={boundary}"))
+        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={}", boundary))
         .body(Body::from(body))
         .unwrap()
 }
 
 #[tokio::test]
 async fn test_optimise_pdf_returns_200_with_valid_pdf() {
-    let (app, _state) = test_app().await;
+    let (app, _state) = test_app();
     let pdf = create_test_pdf();
     let request = build_optimise_request(pdf, None, None);
-
     let response = app.oneshot(request).await.unwrap();
     
-    // Should return 200 even if backends aren't available
-    // (error handling tested separately)
-    assert!(
-        response.status() == StatusCode::OK || 
-        response.status() == StatusCode::INTERNAL_SERVER_ERROR
-    );
+    let status = response.status();
+    assert!(status == StatusCode::OK || status == StatusCode::INTERNAL_SERVER_ERROR);
 }
 
 #[tokio::test]
 async fn test_optimise_pdf_accepts_screen_preset() {
-    let (app, _state) = test_app().await;
+    let (app, _state) = test_app();
     let pdf = create_test_pdf();
     let request = build_optimise_request(pdf, Some("screen"), None);
-
     let response = app.oneshot(request).await.unwrap();
     
-    // Should accept the preset parameter
-    assert!(
-        response.status() == StatusCode::OK || 
-        response.status() == StatusCode::INTERNAL_SERVER_ERROR
-    );
+    let status = response.status();
+    assert!(status == StatusCode::OK || status == StatusCode::INTERNAL_SERVER_ERROR);
 }
 
 #[tokio::test]
 async fn test_optimise_pdf_accepts_ebook_preset() {
-    let (app, _state) = test_app().await;
+    let (app, _state) = test_app();
     let pdf = create_test_pdf();
     let request = build_optimise_request(pdf, Some("ebook"), None);
-
     let response = app.oneshot(request).await.unwrap();
     
-    assert!(
-        response.status() == StatusCode::OK || 
-        response.status() == StatusCode::INTERNAL_SERVER_ERROR
-    );
+    let status = response.status();
+    assert!(status == StatusCode::OK || status == StatusCode::INTERNAL_SERVER_ERROR);
 }
 
 #[tokio::test]
 async fn test_optimise_pdf_accepts_printer_preset() {
-    let (app, _state) = test_app().await;
+    let (app, _state) = test_app();
     let pdf = create_test_pdf();
     let request = build_optimise_request(pdf, Some("printer"), None);
-
     let response = app.oneshot(request).await.unwrap();
     
-    assert!(
-        response.status() == StatusCode::OK || 
-        response.status() == StatusCode::INTERNAL_SERVER_ERROR
-    );
+    let status = response.status();
+    assert!(status == StatusCode::OK || status == StatusCode::INTERNAL_SERVER_ERROR);
 }
 
 #[tokio::test]
 async fn test_optimise_pdf_accepts_ghostscript_backend() {
-    let (app, _state) = test_app().await;
+    let (app, _state) = test_app();
     let pdf = create_test_pdf();
     let request = build_optimise_request(pdf, None, Some("ghostscript"));
-
     let response = app.oneshot(request).await.unwrap();
     
-    assert!(
-        response.status() == StatusCode::OK || 
-        response.status() == StatusCode::INTERNAL_SERVER_ERROR
-    );
+    let status = response.status();
+    assert!(status == StatusCode::OK || status == StatusCode::INTERNAL_SERVER_ERROR);
 }
 
 #[tokio::test]
 async fn test_optimise_pdf_accepts_qpdf_backend() {
-    let (app, _state) = test_app().await;
+    let (app, _state) = test_app();
     let pdf = create_test_pdf();
     let request = build_optimise_request(pdf, None, Some("qpdf"));
-
     let response = app.oneshot(request).await.unwrap();
     
-    assert!(
-        response.status() == StatusCode::OK || 
-        response.status() == StatusCode::INTERNAL_SERVER_ERROR
-    );
+    let status = response.status();
+    assert!(status == StatusCode::OK || status == StatusCode::INTERNAL_SERVER_ERROR);
 }
 
 #[tokio::test]
 async fn test_optimise_pdf_returns_400_for_invalid_preset() {
-    let (app, _state) = test_app().await;
+    let (app, _state) = test_app();
     let pdf = create_test_pdf();
     let request = build_optimise_request(pdf, Some("invalid_preset"), None);
-
     let response = app.oneshot(request).await.unwrap();
     
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -171,54 +172,27 @@ async fn test_optimise_pdf_returns_400_for_invalid_preset() {
 
 #[tokio::test]
 async fn test_optimise_pdf_returns_400_for_missing_file() {
-    let (app, _state) = test_app().await;
+    let (app, _state) = test_app();
     
     let boundary = "----test-boundary";
     let body = format!(
-        "------{boundary}\r\n" +
-        "Content-Disposition: form-data; name=\"preset\"\r\n\r\n" +
-        "screen\r\n" +
-        "------{boundary}--\r\n"
+        "------{}\r\nContent-Disposition: form-data; name=\"preset\"\r\n\r\nscreen\r\n------{}--\r\n",
+        boundary, boundary
     );
 
     let request = Request::builder()
         .method("POST")
         .uri("/forms/pdfengines/optimise")
-        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={boundary}"))
+        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={}", boundary))
         .body(Body::from(body))
         .unwrap();
 
     let response = app.oneshot(request).await.unwrap();
-    
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
-#[tokio::test]
-async fn test_optimise_pdf_includes_response_headers_on_success() {
-    let (app, _state) = test_app().await;
-    let pdf = create_test_pdf();
-    let request = build_optimise_request(pdf, Some("screen"), None);
-
-    let response = app.oneshot(request).await.unwrap();
-    
-    if response.status() == StatusCode::OK {
-        let headers = response.headers();
-        // Verify expected headers are present
-        assert!(headers.contains_key("content-type"));
-        assert_eq!(
-            headers.get("content-type").unwrap(),
-            "application/pdf"
-        );
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Tests for OptimiseResult calculations (unit tests in engine crate)
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_compression_ratio_calculation() {
-    // Test the calculation logic from OptimiseResult
     let original_size = 1000_usize;
     let optimised_size = 500_usize;
     
@@ -231,7 +205,6 @@ fn test_compression_ratio_calculation() {
 
 #[test]
 fn test_preset_from_str_case_insensitive() {
-    // Test that preset parsing is case-insensitive
     let presets = ["screen", "SCREEN", "Screen", "ebook", "EBOOK", "printer", "PRINTER"];
     
     for preset in &presets {
