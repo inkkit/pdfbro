@@ -79,6 +79,62 @@ pub fn validate_webhook_url(url_str: &str) -> Result<(), ValidationError> {
     Ok(())
 }
 
+/// Compiled allow/deny regex sets layered on top of [`validate_webhook_url`].
+///
+/// Order of checks for `is_allowed(url)`:
+/// 1. SSRF check via `validate_webhook_url` (private/loopback/etc).
+/// 2. Allow-list — if non-empty, the URL must match at least one regex.
+/// 3. Deny-list — the URL must not match any regex.
+#[derive(Debug, Clone, Default)]
+pub struct WebhookUrlValidator {
+    allow: Vec<regex::Regex>,
+    deny: Vec<regex::Regex>,
+}
+
+impl WebhookUrlValidator {
+    /// Compile the user-supplied regex strings. Returns the offending
+    /// pattern + compile error on first failure so the operator can fix
+    /// their config.
+    pub fn compile(allow: &[String], deny: &[String]) -> Result<Self, String> {
+        let allow = compile_patterns("webhook-allow-list", allow)?;
+        let deny = compile_patterns("webhook-deny-list", deny)?;
+        Ok(Self { allow, deny })
+    }
+
+    /// True if neither list has any entries — used by callers to skip
+    /// the regex passes when they're a no-op.
+    pub fn is_empty(&self) -> bool {
+        self.allow.is_empty() && self.deny.is_empty()
+    }
+
+    /// Run SSRF + allow + deny checks against the given URL.
+    pub fn is_allowed(&self, url: &str) -> Result<(), ValidationError> {
+        validate_webhook_url(url)?;
+        if !self.allow.is_empty() && !self.allow.iter().any(|r| r.is_match(url)) {
+            return Err(ValidationError::BlockedHost(format!(
+                "url did not match any --webhook-allow-list pattern: {url}"
+            )));
+        }
+        if let Some(matched) = self.deny.iter().find(|r| r.is_match(url)) {
+            return Err(ValidationError::BlockedHost(format!(
+                "url matched --webhook-deny-list pattern `{}`: {url}",
+                matched.as_str()
+            )));
+        }
+        Ok(())
+    }
+}
+
+fn compile_patterns(field: &str, patterns: &[String]) -> Result<Vec<regex::Regex>, String> {
+    patterns
+        .iter()
+        .map(|p| {
+            regex::Regex::new(p)
+                .map_err(|e| format!("invalid {field} regex `{p}`: {e}"))
+        })
+        .collect()
+}
+
 /// Validate IPv4 address.
 fn validate_ipv4(ip: Ipv4Addr) -> Result<(), ValidationError> {
     // Check loopback
@@ -191,5 +247,54 @@ mod tests {
     #[test]
     fn rejects_ipv6_loopback() {
         assert!(validate_webhook_url("http://[::1]/webhook").is_err());
+    }
+
+    #[test]
+    fn validator_empty_allows_public_url() {
+        let v = WebhookUrlValidator::compile(&[], &[]).unwrap();
+        assert!(v.is_allowed("https://hooks.example.com/x").is_ok());
+        assert!(v.is_empty());
+    }
+
+    #[test]
+    fn validator_allow_list_blocks_unmatched() {
+        let v =
+            WebhookUrlValidator::compile(&["^https://hooks\\.example\\.com/".into()], &[]).unwrap();
+        assert!(v.is_allowed("https://hooks.example.com/x").is_ok());
+        assert!(v.is_allowed("https://other.example.org/x").is_err());
+    }
+
+    #[test]
+    fn validator_deny_list_blocks_matched() {
+        let v = WebhookUrlValidator::compile(&[], &["evil\\.example\\.com".into()]).unwrap();
+        assert!(v.is_allowed("https://safe.example.com/x").is_ok());
+        assert!(v.is_allowed("https://evil.example.com/x").is_err());
+    }
+
+    #[test]
+    fn validator_ssrf_check_runs_first() {
+        // Even with a permissive allow-list, private IPs must be rejected
+        // because SSRF is the first check.
+        let v = WebhookUrlValidator::compile(&[".*".into()], &[]).unwrap();
+        assert!(v.is_allowed("http://10.0.0.1/x").is_err());
+    }
+
+    #[test]
+    fn validator_compile_returns_pattern_in_error() {
+        let err = WebhookUrlValidator::compile(&["[".into()], &[]).unwrap_err();
+        assert!(err.contains("webhook-allow-list"), "msg was: {err}");
+        assert!(err.contains('['), "msg was: {err}");
+    }
+
+    #[test]
+    fn validator_deny_takes_precedence_when_both_match() {
+        let v = WebhookUrlValidator::compile(
+            &["example\\.com".into()],
+            &["evil\\.example\\.com".into()],
+        )
+        .unwrap();
+        assert!(v.is_allowed("https://safe.example.com/x").is_ok());
+        // matches both, but deny wins
+        assert!(v.is_allowed("https://evil.example.com/x").is_err());
     }
 }
