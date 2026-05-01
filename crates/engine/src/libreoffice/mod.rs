@@ -24,7 +24,7 @@ use crate::types::{EngineError, EngineResult, PageRanges};
 // Engine
 // ---------------------------------------------------------------------------
 
-/// Wrapper around the `soffice` binary. Cheap to clone (`Arc` inside).
+/// Wrapper around a persistent `unoserver` process. Cheap to clone (`Arc` inside).
 ///
 /// # Example
 ///
@@ -135,17 +135,18 @@ impl LibreOfficeEngine {
         // Background task: detect unoserver crashes and restart.
         let inner_weak = Arc::downgrade(&inner);
         tokio::spawn(async move {
-            loop {
+            'monitor: loop {
                 tokio::time::sleep(Duration::from_secs(5)).await;
                 let Some(inner) = inner_weak.upgrade() else { break };
 
+                // try_wait() is non-blocking — it does not yield the lock for long.
                 let exited = inner.unoserver.lock().await.try_wait().ok().flatten();
 
                 if exited.is_some() {
                     tracing::warn!("unoserver exited unexpectedly, attempting restart");
                     for attempt in 0..3u32 {
                         tokio::time::sleep(Duration::from_secs(1 << attempt)).await;
-                        let Some(inner) = inner_weak.upgrade() else { return };
+                        let Some(inner) = inner_weak.upgrade() else { break 'monitor };
                         match unoserver::UnoserverProcess::spawn(
                             inner.port,
                             inner.unoserver_ready_timeout,
@@ -163,6 +164,7 @@ impl LibreOfficeEngine {
                             }
                             Err(_) => {
                                 tracing::error!("unoserver failed to restart after 3 attempts, conversions will fail");
+                                break 'monitor;
                             }
                         }
                     }
