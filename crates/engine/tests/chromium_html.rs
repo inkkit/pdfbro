@@ -378,6 +378,8 @@ async fn cookies_and_headers_round_trip() {
         fail_on_resource_status: vec![],
         fail_on_console_exceptions: false,
         fail_on_resource_loading_failed: false,
+        skip_network_idle: false,
+        ignore_resource_status_domains: vec![],
     };
 
     let bytes = engine

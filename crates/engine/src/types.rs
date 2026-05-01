@@ -1098,6 +1098,9 @@ mod tests {
             lazy_start: false,
             idle_shutdown_timeout: None,
             network_idle_timeout: None,
+            max_page_memory_mb: 512,
+            max_browser_memory_mb: 2048,
+            max_concurrent_renders: 10,
         };
         let json = serde_json::to_string(&c).unwrap();
         let back: BrowserConfig = serde_json::from_str(&json).unwrap();
