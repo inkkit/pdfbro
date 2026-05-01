@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use chromiumoxide::Page;
 use chromiumoxide::cdp::browser_protocol::dom::Rgba;
 use chromiumoxide::cdp::browser_protocol::emulation::{
-    SetDefaultBackgroundColorOverrideParams, SetEmulatedMediaParams,
+    MediaFeature, SetDefaultBackgroundColorOverrideParams, SetEmulatedMediaParams,
 };
 use chromiumoxide::cdp::browser_protocol::network::{
     CookieParam, EventLoadingFailed, EventResponseReceived, Headers, ResourceType,
@@ -24,7 +24,7 @@ use futures_util::StreamExt;
 use tokio::task::JoinHandle;
 use tracing::debug;
 
-use crate::types::{EngineError, EngineResult, PdfOptions};
+use crate::types::{EngineError, EngineResult, Margins, PageRanges, PaperSize, PdfOptions};
 
 use super::pdf_params::{build_printtopdf_params, media_kind};
 use super::wait;
@@ -106,7 +106,8 @@ async fn render_html_on(
     apply_omit_background(engine, page, opts.omit_background).await?;
     inject_print_color_adjust(engine, page, opts.print_background).await?;
     wait::apply(page, &opts.wait).await?;
-    print_to_pdf(engine, page, opts).await
+    let print_opts = apply_single_page(engine, page, opts).await?;
+    print_to_pdf(engine, page, &print_opts).await
 }
 
 async fn render_url(
@@ -224,7 +225,8 @@ async fn render_url_on(
     debug!("render_url_on: applying wait condition {:?}", opts.wait);
     wait::apply(page, &opts.wait).await?;
     debug!("render_url_on: printing to PDF");
-    print_to_pdf(engine, page, opts).await
+    let print_opts = apply_single_page(engine, page, opts).await?;
+    print_to_pdf(engine, page, &print_opts).await
 }
 
 // ---------------------------------------------------------------------------
@@ -317,15 +319,76 @@ async fn apply_emulated_media(
     page: &Page,
     opts: &PdfOptions,
 ) -> EngineResult<()> {
-    if let Some(media) = opts.emulate_media {
+    let has_features = !opts.emulated_media_features.is_empty();
+    if opts.emulate_media.is_some() || has_features {
+        let features: Vec<MediaFeature> = opts
+            .emulated_media_features
+            .iter()
+            .map(|(name, value)| MediaFeature::new(name.clone(), value.clone()))
+            .collect();
         page.execute(SetEmulatedMediaParams {
-            media: Some(media_kind(media).to_string()),
-            features: None,
+            media: opts.emulate_media.map(|m| media_kind(m).to_string()),
+            features: if features.is_empty() { None } else { Some(features) },
         })
         .await
         .map_err(|e| engine.map_cdp_error(e))?;
     }
     Ok(())
+}
+
+/// When `single_page` is set, measure the page's natural content height
+/// (in screen media, so CSS print page-breaks do not inflate the measurement),
+/// then restore the original media type and return cloned `PdfOptions` with:
+/// - paper height = measured content height
+/// - page_ranges = "1" (Chrome still honors `page-break-after` even with a
+///   tall paper, so restricting to page 1 gives the correct single-page result)
+/// - zero margins
+///
+/// Otherwise returns a clone of `opts` unchanged.
+async fn apply_single_page(
+    engine: &ChromiumEngine,
+    page: &Page,
+    opts: &PdfOptions,
+) -> EngineResult<PdfOptions> {
+    if !opts.single_page {
+        return Ok(opts.clone());
+    }
+
+    // Switch to screen media so CSS page-break rules don't inflate scrollHeight.
+    page.execute(SetEmulatedMediaParams {
+        media: Some("screen".to_string()),
+        features: None,
+    })
+    .await
+    .map_err(|e| engine.map_cdp_error(e))?;
+
+    let height_px = page
+        .evaluate("document.documentElement.scrollHeight")
+        .await
+        .ok()
+        .and_then(|r| r.into_value::<f64>().ok())
+        .unwrap_or(0.0);
+
+    // Restore the original emulated media type so printToPDF uses print mode.
+    page.execute(SetEmulatedMediaParams {
+        media: opts.emulate_media.map(|m| media_kind(m).to_string()),
+        features: None,
+    })
+    .await
+    .map_err(|e| engine.map_cdp_error(e))?;
+
+    if height_px <= 0.0 {
+        return Ok(opts.clone());
+    }
+    let height_in = (height_px / 96.0) as f32;
+    Ok(PdfOptions {
+        paper: PaperSize { width_in: opts.paper.width_in, height_in },
+        margin: Margins::ZERO,
+        // Chrome honors print page-breaks regardless of paper height,
+        // so we restrict to page 1 to get a true single-page output.
+        page_ranges: Some(PageRanges::parse("1").expect("static range")),
+        ..opts.clone()
+    })
 }
 
 /// Inject CSS that matches gotenberg's `forceExactColorsActionFunc`:

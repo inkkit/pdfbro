@@ -1,5 +1,7 @@
 //! `/health`, `/version`, and `/prometheus/metrics` routes.
 
+use std::time::SystemTime;
+
 use axum::Json;
 use axum::extract::State;
 use axum::http::header;
@@ -28,12 +30,26 @@ pub async fn health(State(state): State<AppState>) -> impl IntoResponse {
     // Update engine health metrics
     state.metrics.update_engine_health(chromium_up, lo_up);
 
-    let uptime_secs = state.started_at.elapsed().as_secs();
+    let _uptime_secs = state.started_at.elapsed().as_secs();
+    let ts = {
+        let secs = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        format!("{secs}")
+    };
     let body = json!({
         "status": "up",
-        "uptime_secs": uptime_secs,
-        "chromium": if chromium_up { "up" } else { "down" },
-        "libreoffice": if lo_up { "up" } else { "down" },
+        "details": {
+            "chromium": {
+                "status": if chromium_up { "up" } else { "down" },
+                "timestamp": ts
+            },
+            "libreoffice": {
+                "status": if lo_up { "up" } else { "down" },
+                "timestamp": ts
+            }
+        }
     });
     (
         [(header::CONTENT_TYPE, "application/json; charset=utf-8")],

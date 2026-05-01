@@ -6,12 +6,12 @@ use std::path::PathBuf;
 use axum::extract::{Multipart, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
-use engine::{OfficeOptions, PageRanges};
+use engine::{Metadata, OfficeOptions, PageRanges};
 use engine::libreoffice::PdfAProfile;
 
 use crate::error::{ApiError, ApiResult};
 use crate::multipart::FormFields;
-use crate::routes::util::{pdf_response, zip_response, build_zip};
+use crate::routes::util::{pdf_response, zip_response, build_zip, output_filename};
 use crate::state::AppState;
 
 /// `POST /forms/libreoffice/convert`.
@@ -75,13 +75,17 @@ pub async fn libreoffice_convert(
             tokio::task::spawn_blocking(move || engine::pdfops::merge(&materialise(&outputs)))
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()))??;
-        return Ok(pdf_response(merged, "result.pdf"));
+        let merged = apply_metadata_field(merged, &form.map).await?;
+        let filename = output_filename(&headers, "result");
+        return Ok(pdf_response(merged, &filename));
     }
 
     if outputs.len() == 1
         && let Some(only) = outputs.pop()
     {
-        return Ok(pdf_response(only, "result.pdf"));
+        let only = apply_metadata_field(only, &form.map).await?;
+        let filename = output_filename(&headers, "result");
+        return Ok(pdf_response(only, &filename));
     }
 
     // Multiple outputs: zip with names mirroring the inputs.
@@ -91,7 +95,15 @@ pub async fn libreoffice_convert(
         .map(|f| pdf_filename_for(&f.filename))
         .collect();
     let zip_bytes = build_zip(&filenames, &outputs)?;
-    Ok(zip_response(zip_bytes, "result.zip"))
+    let zip_name = {
+        let stem = headers
+            .get("Gotenberg-Output-Filename")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.trim_end_matches(".zip"))
+            .unwrap_or("result");
+        format!("{stem}.zip")
+    };
+    Ok(zip_response(zip_bytes, &zip_name))
 }
 
 // `convert_many` consumes its outputs into a single `Vec<Vec<u8>>`, but the
@@ -103,10 +115,25 @@ fn materialise(outputs: &[Vec<u8>]) -> Vec<&[u8]> {
 }
 
 fn pdf_filename_for(input_name: &str) -> String {
-    match input_name.rsplit_once('.') {
-        Some((stem, _)) => format!("{stem}.pdf"),
-        None => format!("{input_name}.pdf"),
-    }
+    format!("{input_name}.pdf")
+}
+
+async fn apply_metadata_field(
+    pdf: Vec<u8>,
+    map: &HashMap<String, String>,
+) -> ApiResult<Vec<u8>> {
+    let Some(meta_str) = map.get("metadata").filter(|s| !s.is_empty()) else {
+        return Ok(pdf);
+    };
+    let meta: Metadata =
+        serde_json::from_str(meta_str).map_err(|e| ApiError::InvalidField {
+            field: "metadata",
+            message: e.to_string(),
+        })?;
+    tokio::task::spawn_blocking(move || engine::write_metadata(&pdf, &meta))
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .map_err(ApiError::Engine)
 }
 
 fn parse_merge_flag(map: &HashMap<String, String>) -> ApiResult<bool> {
@@ -502,9 +529,9 @@ mod tests {
     }
 
     #[test]
-    fn pdf_filename_for_strips_extension() {
-        assert_eq!(pdf_filename_for("doc.docx"), "doc.pdf");
+    fn pdf_filename_for_appends_pdf() {
+        assert_eq!(pdf_filename_for("doc.docx"), "doc.docx.pdf");
         assert_eq!(pdf_filename_for("noext"), "noext.pdf");
-        assert_eq!(pdf_filename_for("a.b.c"), "a.b.pdf");
+        assert_eq!(pdf_filename_for("a.b.c"), "a.b.c.pdf");
     }
 }

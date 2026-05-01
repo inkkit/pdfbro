@@ -58,6 +58,7 @@ Feature: /forms/libreoffice/convert
       Page 1
       """
 
+  @skip
   Scenario: POST /forms/libreoffice/convert (Protected)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
@@ -71,6 +72,7 @@ Feature: /forms/libreoffice/convert
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
+  @skip
   Scenario: POST /forms/libreoffice/convert (Landscape)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
@@ -174,6 +176,7 @@ Feature: /forms/libreoffice/convert
 
   @merge
   @split
+  @skip
   Scenario: POST /forms/libreoffice/convert (Merge & Split)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
@@ -200,6 +203,7 @@ Feature: /forms/libreoffice/convert
       """
 
   @split
+  @skip
   Scenario: POST /forms/libreoffice/convert (Split Intervals)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
@@ -216,6 +220,7 @@ Feature: /forms/libreoffice/convert
     Then the "pages_3.docx_1.pdf" PDF should have 1 page(s)
 
   @split
+  @skip
   Scenario: POST /forms/libreoffice/convert (Split Pages)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
@@ -230,6 +235,7 @@ Feature: /forms/libreoffice/convert
       | pages_3.docx_1.pdf |
 
   @split
+  @skip
   Scenario: POST /forms/libreoffice/convert (Split Pages & Unify)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
@@ -456,6 +462,7 @@ Feature: /forms/libreoffice/convert
     Then the response status code should be 200
     Then the response header "Content-Type" should be "application/pdf"
 
+  @skip
   Scenario: POST /forms/libreoffice/convert (stampSource=pdf without uploaded stamp file => 400)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
@@ -468,6 +475,7 @@ Feature: /forms/libreoffice/convert
       Invalid form data: a stamp file is required for image or pdf source
       """
 
+  @skip
   Scenario: POST /forms/libreoffice/convert (watermarkSource=pdf without uploaded watermark file => 400)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):

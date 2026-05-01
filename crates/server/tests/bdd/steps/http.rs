@@ -155,9 +155,53 @@ pub async fn make_request_with_form(
         .to_vec();
 
     // Store body, status, and headers
-    world.body = Some(body);
+    world.body = Some(body.clone());
     world.status_code = Some(status);
-    world.response_headers = Some(resp_headers);
+    world.response_headers = Some(resp_headers.clone());
+
+    // Teststore: save successful PDF/ZIP responses so subsequent steps can reference them
+    if status == 200 {
+        let content_type = resp_headers.get("content-type").cloned().unwrap_or_default();
+        let content_disp = resp_headers.get("content-disposition").cloned().unwrap_or_default();
+        let filename = extract_filename_from_disposition(&content_disp);
+        let teststore = std::path::Path::new("tests/bdd/testdata/teststore");
+        let _ = std::fs::create_dir_all(teststore);
+
+        if content_type.starts_with("application/pdf") {
+            if !filename.is_empty() {
+                let _ = std::fs::write(teststore.join(&filename), &body);
+            }
+        } else if content_type.starts_with("application/zip") {
+            if !filename.is_empty() {
+                let _ = std::fs::write(teststore.join(&filename), &body);
+            }
+            // Also extract zip contents into teststore
+            if let Ok(mut archive) = zip::ZipArchive::new(std::io::Cursor::new(&body)) {
+                for i in 0..archive.len() {
+                    if let Ok(mut entry) = archive.by_index(i) {
+                        let entry_name = entry.name().to_string();
+                        if entry_name.ends_with(".pdf") {
+                            let mut contents = Vec::new();
+                            use std::io::Read;
+                            let _ = entry.read_to_end(&mut contents);
+                            let _ = std::fs::write(teststore.join(&entry_name), &contents);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn extract_filename_from_disposition(disposition: &str) -> String {
+    // Parse: attachment; filename="foo.pdf"
+    for part in disposition.split(';') {
+        let part = part.trim();
+        if let Some(rest) = part.strip_prefix("filename=") {
+            return rest.trim_matches('"').to_string();
+        }
+    }
+    String::new()
 }
 
 /// Build multipart form from Gherkin table, also extracting headers.

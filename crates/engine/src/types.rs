@@ -521,6 +521,13 @@ pub struct PdfOptions {
     pub footer_template: Option<String>,
     /// What to wait for before printing.
     pub wait: WaitCondition,
+    /// When `true`, render entire content on a single page: measure scroll
+    /// height via JS and set paper height to match, with zero margins.
+    pub single_page: bool,
+    /// CSS media features to emulate (`prefers-reduced-motion`, etc.).
+    /// Each element is a `(name, value)` pair passed to
+    /// `Emulation.setEmulatedMedia` alongside [`Self::emulate_media`].
+    pub emulated_media_features: Vec<(String, String)>,
 }
 
 impl Default for PdfOptions {
@@ -538,6 +545,8 @@ impl Default for PdfOptions {
             header_template: None,
             footer_template: None,
             wait: WaitCondition::Load,
+            single_page: false,
+            emulated_media_features: Vec::new(),
         }
     }
 }

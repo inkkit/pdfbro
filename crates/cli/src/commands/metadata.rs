@@ -53,7 +53,7 @@ fn apply_set(meta: &mut Metadata, key: &str, value: &str) -> anyhow::Result<()> 
         "Title" => meta.title = Some(v),
         "Author" => meta.author = Some(v),
         "Subject" => meta.subject = Some(v),
-        "Keywords" => meta.keywords = Some(v),
+        "Keywords" => meta.keywords = Some(v.split(", ").map(|s| s.to_string()).collect()),
         "Creator" => meta.creator = Some(v),
         "Producer" => meta.producer = Some(v),
         "CreationDate" => meta.creation_date = Some(v),
@@ -62,7 +62,7 @@ fn apply_set(meta: &mut Metadata, key: &str, value: &str) -> anyhow::Result<()> 
             return Err(anyhow!("--set: empty key").context(UsageError));
         }
         other => {
-            meta.custom.insert(other.to_string(), v);
+            meta.custom.insert(other.to_string(), serde_json::Value::String(v));
         }
     }
     Ok(())

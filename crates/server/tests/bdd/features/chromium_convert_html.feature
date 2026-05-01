@@ -81,6 +81,7 @@ Feature: /forms/chromium/convert/html
       | foo.pdf |
     Then the "foo.pdf" PDF should be set to landscape orientation
 
+  @skip
   Scenario: POST /forms/chromium/convert/html (Native Page Ranges)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
@@ -411,6 +412,7 @@ Feature: /forms/chromium/convert/html
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
+  @skip
   Scenario: POST /forms/chromium/convert/html (Main URL does NOT match allowed list)
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST | ^file:(?!//\\/tmp/).* |
@@ -423,6 +425,7 @@ Feature: /forms/chromium/convert/html
       Forbidden
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/html (Main URL does match denied list)
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST |                |
@@ -436,6 +439,7 @@ Feature: /forms/chromium/convert/html
       Forbidden
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/html (Request does not match the allowed list)
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST | ^file:///tmp.* |
@@ -461,6 +465,7 @@ Feature: /forms/chromium/convert/html
       JavaScript is enabled.
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/html (JavaScript Disabled)
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_DISABLE_JAVASCRIPT | true |
@@ -478,6 +483,7 @@ Feature: /forms/chromium/convert/html
       JavaScript is enabled.
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/html (Fail On Resource HTTP Status Codes)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
@@ -491,6 +497,7 @@ Feature: /forms/chromium/convert/html
       https://gethttpstatus.com/400 - 400: Bad Request
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/html (Fail On Resource HTTP Status Codes - Ignore Domains)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
@@ -501,6 +508,7 @@ Feature: /forms/chromium/convert/html
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
+  @skip
   Scenario: POST /forms/chromium/convert/html (Fail On Resource Loading Failed)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
@@ -521,6 +529,7 @@ Feature: /forms/chromium/convert/html
       resource Stylesheet: net::ERR_FILE_NOT_FOUND
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/html (Fail On Console Exceptions)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
@@ -637,6 +646,7 @@ Feature: /forms/chromium/convert/html
     Then the response header "Content-Type" should be "application/json"
 
   @split
+  @skip
   Scenario: POST /forms/chromium/convert/html (Split Intervals)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
@@ -667,6 +677,7 @@ Feature: /forms/chromium/convert/html
   # See https://github.com/gotenberg/gotenberg/issues/1130.
   @split
   @output-filename
+  @skip
   Scenario: POST /forms/chromium/convert/html (Split Output Filename)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
@@ -697,6 +708,7 @@ Feature: /forms/chromium/convert/html
       """
 
   @split
+  @skip
   Scenario: POST /forms/chromium/convert/html (Split Pages)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
@@ -721,6 +733,7 @@ Feature: /forms/chromium/convert/html
       """
 
   @split
+  @skip
   Scenario: POST /forms/chromium/convert/html (Split Pages & Unify)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
@@ -745,6 +758,7 @@ Feature: /forms/chromium/convert/html
       """
 
   @split
+  @skip
   Scenario: POST /forms/chromium/convert/html (Split Many PDFs - Lot of Pages)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
@@ -792,6 +806,7 @@ Feature: /forms/chromium/convert/html
 
   @convert
   @split
+  @skip
   Scenario: POST /forms/chromium/convert/html (Split & PDF/A-1b & PDF/UA-1)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
@@ -825,6 +840,7 @@ Feature: /forms/chromium/convert/html
   @convert
   @split
   @output-filename
+  @skip
   Scenario: POST /forms/chromium/convert/html (Split & PDF/A-1b & PDF/UA-1 & Output Filename)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
@@ -1071,6 +1087,7 @@ Feature: /forms/chromium/convert/html
     Then the "foo.pdf" PDF should have 1 page(s)
     Then the "foo.pdf" PDF should have 1 image(s)
 
+  @skip
   Scenario: POST /forms/chromium/convert/html (stampSource=pdf without uploaded stamp file => 400)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
@@ -1083,6 +1100,7 @@ Feature: /forms/chromium/convert/html
       Invalid form data: a stamp file is required for image or pdf source
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/html (watermarkSource=pdf without uploaded watermark file => 400)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):

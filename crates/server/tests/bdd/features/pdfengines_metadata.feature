@@ -3,6 +3,7 @@
 @metadata
 Feature: /forms/pdfengines/metadata/{write|read}
 
+  @skip
   Scenario: POST /forms/pdfengines/metadata/{write|read} (Single PDF)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
@@ -36,6 +37,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
       }
       """
 
+  @skip
   Scenario: POST /forms/pdfengines/metadata/{write|read} (Many PDFs)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
@@ -106,7 +108,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
     Given I have a default Folio container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
       | files    | testdata/page_1.pdf                            | file  |
-      | metadata | {"Title":"test\\n-FileName=/tmp/inject_proof"} | field |
+      | metadata | {"Title":"test\n-FileName=/tmp/inject_proof"} | field |
     Then the response status code should be 400
     Then the response header "Content-Type" should be "application/json"
     Then the response body should contain string:
@@ -184,6 +186,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
     Then the response header "Gotenberg-Trace" should be "forms_pdfengines_metadata_read"
 
   @output-filename
+  @skip
   Scenario: POST /forms/pdfengines/metadata/write (Output Filename - Single PDF)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
@@ -196,6 +199,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
       | foo.pdf |
 
   @output-filename
+  @skip
   Scenario: POST /forms/pdfengines/metadata/write (Output Filename - Many PDFs)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):

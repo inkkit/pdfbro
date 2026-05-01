@@ -56,8 +56,9 @@ fn is_zip_content(bytes: &[u8]) -> bool {
 /// Step: Then the "foo.pdf" PDF should have 2 page(s)
 pub async fn check_page_count(world: &mut FolioWorld, filename: String, expected: usize) {
     let body = world.body.as_ref().expect("No response body");
+    let pdf_bytes = extract_named_pdf(body, &filename);
 
-    let doc = Document::load_mem(body).expect("Failed to parse PDF");
+    let doc = Document::load_mem(&pdf_bytes).expect("Failed to parse PDF");
     let page_count = doc.get_pages().len();
 
     assert_eq!(
@@ -75,7 +76,8 @@ pub async fn check_page_not_contain(
     excluded: String,
 ) {
     let body = world.body.as_ref().expect("No response body");
-    let text = extract_pdf_text(body, page_num).unwrap_or_default();
+    let pdf_bytes = extract_named_pdf(body, &filename);
+    let text = extract_pdf_text(&pdf_bytes, page_num).unwrap_or_default();
     let normalized = excluded.trim().replace("\r\n", "\n");
     assert!(
         !text.trim().replace("\r\n", "\n").contains(&normalized),
@@ -157,9 +159,10 @@ pub async fn check_page_content(
     expected: String,
 ) {
     let body = world.body.as_ref().expect("No response body");
+    let pdf_bytes = extract_named_pdf(body, &filename);
 
     // Extract text from PDF
-    let text = extract_pdf_text(body, page_num).expect("Failed to extract PDF text");
+    let text = extract_pdf_text(&pdf_bytes, page_num).expect("Failed to extract PDF text");
 
     // Normalize whitespace and compare
     let normalized_expected = expected.trim().replace("\r\n", "\n");
@@ -179,15 +182,35 @@ pub async fn check_page_content(
 /// | foo.pdf |
 /// | bar.pdf |
 pub async fn check_files_in_response(world: &mut FolioWorld, files: Vec<String>) {
+    let body = world.body.as_ref().expect("No response body");
     let headers = world.response_headers.as_ref().expect("No response headers available");
-    let cd = headers
-        .get("content-disposition")
-        .expect("Missing Content-Disposition header");
-    for expected in &files {
-        assert!(
-            cd.contains(expected),
-            "Content-Disposition `{cd}` does not contain expected filename `{expected}`"
-        );
+    let cd = headers.get("content-disposition").cloned().unwrap_or_default();
+
+    if is_zip_content(body) {
+        // Collect filenames from ZIP archive
+        use std::io::Cursor;
+        let mut archive = zip::ZipArchive::new(Cursor::new(body))
+            .expect("Response is not a valid ZIP archive");
+        let zip_names: Vec<String> = (0..archive.len())
+            .filter_map(|i| archive.by_index(i).ok().map(|e| e.name().to_string()))
+            .collect();
+        for expected in &files {
+            // Accept if in Content-Disposition (outer zip name) OR inside the archive
+            let in_cd = cd.contains(expected.as_str());
+            let in_zip = zip_names.iter().any(|n| n == expected);
+            assert!(
+                in_cd || in_zip,
+                "Expected file `{expected}` not found. Content-Disposition: `{cd}`. ZIP contents: {zip_names:?}"
+            );
+        }
+    } else {
+        // Single PDF — check Content-Disposition header
+        for expected in &files {
+            assert!(
+                cd.contains(expected.as_str()),
+                "Content-Disposition `{cd}` does not contain expected filename `{expected}`"
+            );
+        }
     }
 }
 
@@ -277,8 +300,36 @@ pub async fn check_image_count(world: &mut FolioWorld, filename: String, expecte
     assert_eq!(count, expected, "Expected {expected} image(s) in {filename}, found {count}");
 }
 
-/// Extract text from specific page of PDF
+/// Extract text from specific page of PDF using pdftotext (poppler) when available,
+/// falling back to lopdf-based extraction.
 fn extract_pdf_text(bytes: &[u8], page_num: usize) -> Result<String, Box<dyn std::error::Error>> {
+    // Try pdftotext first (handles chromium-generated PDFs with complex fonts)
+    if tool_available("pdftotext") {
+        if let Ok(text) = extract_pdf_text_pdftotext(bytes, page_num) {
+            return Ok(text);
+        }
+    }
+
+    // Fallback: lopdf-based extraction
+    extract_pdf_text_lopdf(bytes, page_num)
+}
+
+fn extract_pdf_text_pdftotext(bytes: &[u8], page_num: usize) -> Result<String, Box<dyn std::error::Error>> {
+    use std::io::Write as _;
+    let mut tmp = tempfile::NamedTempFile::new()?;
+    tmp.write_all(bytes)?;
+    let output = Command::new("pdftotext")
+        .args([
+            "-f", &page_num.to_string(),
+            "-l", &page_num.to_string(),
+            tmp.path().to_str().unwrap_or(""),
+            "-",
+        ])
+        .output()?;
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+fn extract_pdf_text_lopdf(bytes: &[u8], page_num: usize) -> Result<String, Box<dyn std::error::Error>> {
     let doc = Document::load_mem(bytes)?;
     let pages = doc.get_pages();
 
@@ -287,11 +338,9 @@ fn extract_pdf_text(bytes: &[u8], page_num: usize) -> Result<String, Box<dyn std
     }
 
     let page_id = pages.keys().nth(page_num - 1).unwrap();
-    let object_id = (*page_id, 0u16); // Convert u32 to ObjectId tuple
+    let object_id = (*page_id, 0u16);
     let page = doc.get_object(object_id)?;
 
-    // Simple text extraction using lopdf
-    // For full extraction, use pdf_extract crate
     let mut text = String::new();
 
     if let Ok(dict) = page.as_dict() {
@@ -300,11 +349,9 @@ fn extract_pdf_text(bytes: &[u8], page_num: usize) -> Result<String, Box<dyn std
                 if let Ok(content_obj) = doc.get_object(id) {
                     if let Ok(stream) = content_obj.as_stream() {
                         if let Ok(content) = stream.decode_content() {
-                            // Extract text operators
                             for operation in &content.operations {
                                 if operation.operator == "Tj" || operation.operator == "TJ" {
                                     for operand in &operation.operands {
-                                        // as_string returns Result<Cow<'_, str>, _> in lopdf 0.34
                                         if let Ok(s) = operand.as_string() {
                                             text.push_str(&s);
                                         }

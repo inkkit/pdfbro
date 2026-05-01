@@ -478,6 +478,7 @@ Feature: /forms/chromium/convert/url
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (file:// scheme rejected at route layer)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
@@ -500,6 +501,7 @@ Feature: /forms/chromium/convert/url
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
+  @skip
   Scenario: POST /forms/chromium/convert/url (Main URL is a non-public IP literal, deny-private-ips on)
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST       |      |

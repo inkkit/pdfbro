@@ -186,14 +186,12 @@ fn parse_outline_item(
     item: &Dictionary,
     page_map: &HashMap<ObjectId, u32>,
 ) -> EngineResult<Bookmark> {
-    // Get title
+    // Get title — PDF strings may be UTF-16BE-with-BOM; use the same
+    // decoder used by the metadata module so we handle all encodings.
     let title = item
         .get(b"Title")
         .ok()
-        .and_then(|o| match o {
-            Object::String(s, _) => Some(String::from_utf8_lossy(s).to_string()),
-            _ => None,
-        })
+        .and_then(|o| crate::pdfops::decode_pdf_text_string(o))
         .unwrap_or_default();
 
     // Get destination page

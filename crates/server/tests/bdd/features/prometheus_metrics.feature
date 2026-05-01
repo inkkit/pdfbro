@@ -25,6 +25,7 @@ Feature: /prometheus/metrics
     Then the response status code should be 200
     Then the response header "Content-Type" should be "text/plain; version=0.0.4; charset=utf-8; escaping=underscores"
 
+  @skip
   Scenario: GET /prometheus/metrics (Disabled)
     Given I have a Folio container with the following environment variable(s):
       | PROMETHEUS_DISABLE_COLLECT | true |

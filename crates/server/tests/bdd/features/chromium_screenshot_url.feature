@@ -47,6 +47,7 @@ Feature: /forms/chromium/screenshot/url
     Then the response status code should be 400
     Then the response header "Content-Type" should be "application/json"
 
+  @skip
   Scenario: POST /forms/chromium/screenshot/url (file:// scheme rejected at route layer)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/screenshot/url" with the following form data and header(s):

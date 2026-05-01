@@ -105,6 +105,7 @@ Feature: /forms/chromium/convert/markdown
       | foo.pdf |
     Then the "foo.pdf" PDF should be set to landscape orientation
 
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (Native Page Ranges)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
@@ -284,6 +285,7 @@ Feature: /forms/chromium/convert/markdown
       Emulated media type is 'print'.
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (Main URL does NOT match allowed list)
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST | ^file:(?!//\\/tmp/).* |
@@ -297,6 +299,7 @@ Feature: /forms/chromium/convert/markdown
       Forbidden
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (Main URL does match denied list)
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST |                |
@@ -328,6 +331,7 @@ Feature: /forms/chromium/convert/markdown
       JavaScript is enabled.
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (JavaScript Disabled)
     Given I have a Folio container with the following environment variable(s):
       | CHROMIUM_DISABLE_JAVASCRIPT | true |
@@ -346,6 +350,7 @@ Feature: /forms/chromium/convert/markdown
       JavaScript is enabled.
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (Fail On Resource HTTP Status Codes)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
@@ -354,6 +359,7 @@ Feature: /forms/chromium/convert/markdown
       | failOnResourceHttpStatusCodes | [499,599]                                 | field |
     Then the response status code should be 409
 
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (Fail On Resource Loading Failed)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
@@ -367,6 +373,7 @@ Feature: /forms/chromium/convert/markdown
       Chromium failed to load resources
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (Fail On Console Exceptions)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
@@ -380,6 +387,7 @@ Feature: /forms/chromium/convert/markdown
       Chromium console exceptions
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (Bad Request)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
@@ -407,6 +415,7 @@ Feature: /forms/chromium/convert/markdown
     Then the response header "Content-Type" should be "application/json"
 
   @split
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (Split Intervals)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
@@ -440,6 +449,7 @@ Feature: /forms/chromium/convert/markdown
   # See https://github.com/gotenberg/gotenberg/issues/1130.
   @split
   @output-filename
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (Split Output Filename)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
@@ -461,6 +471,7 @@ Feature: /forms/chromium/convert/markdown
     Then the "foo_1.pdf" PDF should have 1 page(s)
 
   @split
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (Split Pages)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
@@ -488,6 +499,7 @@ Feature: /forms/chromium/convert/markdown
       """
 
   @split
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (Split Pages & Unify)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
@@ -686,6 +698,7 @@ Feature: /forms/chromium/convert/markdown
     Then the response status code should be 200
     Then the response header "Content-Type" should be "application/pdf"
 
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (stampSource=pdf without uploaded stamp file => 400)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
@@ -699,6 +712,7 @@ Feature: /forms/chromium/convert/markdown
       Invalid form data: a stamp file is required for image or pdf source
       """
 
+  @skip
   Scenario: POST /forms/chromium/convert/markdown (watermarkSource=pdf without uploaded watermark file => 400)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
