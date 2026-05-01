@@ -1,0 +1,39 @@
+<!-- src/lib/components/side-rail/Concurrency.svelte -->
+<script lang="ts">
+    import type { ConcurrencyPayload } from '$lib/types';
+    import type { Theme } from '$lib/theme.svelte';
+    import Card from '../shared/Card.svelte';
+    import Pill from '../shared/Pill.svelte';
+
+    let { conc, t, D }: { conc: ConcurrencyPayload; t: Theme; D: { pad: number; fz: number } } = $props();
+
+    let tone = $derived((conc.active >= conc.crit_threshold ? 'err' : conc.active >= conc.warn_threshold ? 'warn' : 'ok') as 'ok' | 'warn' | 'err');
+    let pct = $derived(Math.round((conc.active / Math.max(1, conc.max)) * 100));
+
+    function slotColor(i: number): string {
+        const filled = i < conc.active;
+        if (!filled) return t.faint;
+        if (i >= conc.crit_threshold) return t.err;
+        if (i >= conc.warn_threshold) return t.warn;
+        return t.ok;
+    }
+</script>
+
+<Card {t} title="Concurrency" sub="semaphore · {conc.max} slots">
+    <div style="padding:{D.pad}px;font-size:{D.fz}px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px">
+            <div style="font-family:ui-monospace,monospace;font-size:26px;font-weight:600;letter-spacing:-0.01em">
+                {conc.active}<span style="color:{t.muted};font-weight:400"> / {conc.max}</span>
+            </div>
+            <Pill {tone} {t}>{pct}% · {tone}</Pill>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(16,1fr);gap:2px">
+            {#each Array.from({ length: Math.min(conc.max, 64) }, (_, i) => i) as i}
+                <div style="height:12px;background:{slotColor(i)};border-radius:2px"></div>
+            {/each}
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;font-family:ui-monospace,monospace;font-size:10px;color:{t.muted}">
+            <span>0</span><span>warn {conc.warn_threshold}</span><span>crit {conc.crit_threshold}</span><span>{conc.max}</span>
+        </div>
+    </div>
+</Card>
