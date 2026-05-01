@@ -570,6 +570,11 @@ impl ApiError {
                 "code": code,
                 "resource_errors": errors,
             }),
+            ApiError::MultipleValidationErrors(errors) => json!({
+                "error": format!("{} validation error(s)", errors.len()),
+                "code": code,
+                "errors": errors,
+            }),
         }
     }
 }
@@ -591,6 +596,9 @@ impl std::fmt::Display for ApiError {
             ApiError::Gone => write!(f, "resource gone"),
             ApiError::ResourceErrors(errors) => {
                 write!(f, "resource errors: {} failed", errors.len())
+            }
+            ApiError::MultipleValidationErrors(errors) => {
+                write!(f, "validation errors: {} failed", errors.len())
             }
         }
     }

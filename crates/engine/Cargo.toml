@@ -34,7 +34,6 @@ image = { workspace = true }
 urlencoding = { version = "2", optional = true }
 
 # Chrome auto-download (chrome-fetch feature)
-reqwest = { workspace = true, optional = true }
 sha2 = { workspace = true, optional = true }
 zip = { workspace = true, optional = true }
 flate2 = { workspace = true, optional = true }

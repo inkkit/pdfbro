@@ -246,6 +246,9 @@ fn browser_config_from(config: &ServerConfig) -> BrowserConfig {
         lazy_start: config.chromium_lazy_start,
         idle_shutdown_timeout: config.chromium_idle_shutdown_timeout,
         network_idle_timeout: None,
+        max_page_memory_mb: defaults.max_page_memory_mb,
+        max_browser_memory_mb: defaults.max_browser_memory_mb,
+        max_concurrent_renders: defaults.max_concurrent_renders,
     }
 }
 
