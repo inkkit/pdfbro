@@ -21,6 +21,7 @@ async fn main() {
     // flags don't cause a clap error in cucumber's runner.
     FolioWorld::cucumber()
         .with_default_cli()
+        .max_concurrent_scenarios(1)
         .filter_run("tests/bdd/features", |_, _, sc| {
             !sc.tags.iter().any(|t| t == "skip")
         })
