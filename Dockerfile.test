@@ -43,7 +43,18 @@ RUN apt-get update && apt-get install -y \
     chromium \
     libreoffice \
     jq \
+    poppler-utils \
+    default-jre-headless \
     && rm -rf /var/lib/apt/lists/*
+
+# Install verapdf (PDF/A validator)
+RUN VERAPDF_VERSION=1.26.2 && \
+    curl -fsSL "https://software.verapdf.org/releases/${VERAPDF_VERSION}/verapdf-greenfield-${VERAPDF_VERSION}-CLI.zip" \
+         -o /tmp/verapdf.zip && \
+    unzip /tmp/verapdf.zip -d /opt && \
+    mv "/opt/verapdf-greenfield-${VERAPDF_VERSION}" /opt/verapdf && \
+    ln -s /opt/verapdf/verapdf /usr/local/bin/verapdf && \
+    rm /tmp/verapdf.zip
 
 ENV CHROME_PATH=/usr/bin/chromium
 ENV RUST_LOG=info

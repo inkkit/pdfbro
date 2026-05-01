@@ -12,6 +12,7 @@ use crate::types::{EngineError, EngineResult};
 mod flatten;
 mod merge;
 mod metadata;
+mod optimise;
 mod rotate;
 mod split;
 mod watermark;
@@ -19,6 +20,7 @@ mod watermark;
 pub use flatten::flatten;
 pub use merge::merge;
 pub use metadata::{Metadata, read_metadata, write_metadata};
+pub use optimise::{OptimiseBackend, OptimisePreset, OptimiseResult, optimise_pdf};
 pub use rotate::rotate;
 pub use split::{SplitMode, split};
 pub use watermark::{Position, WatermarkKind, WatermarkOptions, watermark};
@@ -48,23 +50,30 @@ pub(crate) fn parse_input(bytes: &[u8]) -> EngineResult<Document> {
 
 /// Finalize a document for output: stamp `/Producer`, compress streams,
 /// and serialize to bytes.
-pub(crate) fn finalize(mut doc: Document) -> EngineResult<Vec<u8>> {
-    set_producer(&mut doc);
+pub(crate) fn finalize(doc: Document) -> EngineResult<Vec<u8>> {
+    finalize_with_producer(doc, None)
+}
+
+/// Like [`finalize`] but allows overriding the `/Producer` field. When
+/// `producer_override` is `Some(s)`, `s` is stamped instead of the default
+/// `folio/<version>` string. Pass `None` to use the default.
+pub(crate) fn finalize_with_producer(
+    mut doc: Document,
+    producer_override: Option<&str>,
+) -> EngineResult<Vec<u8>> {
+    let producer = match producer_override {
+        Some(p) => p.to_string(),
+        None => producer_string(),
+    };
+    let info_id = ensure_info_dict(&mut doc);
+    if let Ok(Object::Dictionary(dict)) = doc.get_object_mut(info_id) {
+        dict.set("Producer", encode_pdf_text_string(&producer));
+    }
     doc.compress();
     let mut out = Vec::new();
     doc.save_to(&mut out)
         .map_err(|e| EngineError::Internal(format!("failed to save PDF: {e}")))?;
     Ok(out)
-}
-
-/// Write `/Producer` into the document's `/Info` dict, creating the dict if
-/// it doesn't exist.
-fn set_producer(doc: &mut Document) {
-    let producer = producer_string();
-    let info_id = ensure_info_dict(doc);
-    if let Ok(Object::Dictionary(dict)) = doc.get_object_mut(info_id) {
-        dict.set("Producer", encode_pdf_text_string(&producer));
-    }
 }
 
 /// Return the `ObjectId` of the document's `/Info` dictionary, creating an

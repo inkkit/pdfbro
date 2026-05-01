@@ -1,0 +1,2318 @@
+{
+  "generated": "2026-05-01T00:00:00Z",
+  "total": 443,
+  "pass": 348,
+  "skip": 95,
+  "scenarios": [
+    {
+      "feature": "chromium_concurrent",
+      "scenario": "Concurrent HTML to PDF conversions with max concurrency 3",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_concurrent",
+      "scenario": "Concurrent conversions exceeding restart-after limit",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Default)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Single Page)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Landscape)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Native Page Ranges)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Header & Footer)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Wait Delay)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Wait For Expression)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (rAF / ResizeObserver / IntersectionObserver fire with waitForExpression)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (rAF / ResizeObserver / IntersectionObserver fire with waitDelay and emulatedMediaType=print)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Wait For Selector)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Emulated Media Type)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Emulated Media Features)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Default Allow / Deny Lists)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Main URL does NOT match allowed list)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Main URL does match denied list)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Request does not match the allowed list)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (JavaScript Enabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (JavaScript Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Fail On Resource HTTP Status Codes)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Fail On Resource HTTP Status Codes - Ignore Domains)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Fail On Resource Loading Failed)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Fail On Console Exceptions)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Bad Request)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Split Intervals)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Split Output Filename)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Split Pages)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Split Pages & Unify)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Split Many PDFs - Lot of Pages)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (PDF/A-1b & PDF/UA-1)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Split & PDF/A-1b & PDF/UA-1)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Split & PDF/A-1b & PDF/UA-1 & Output Filename)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Metadata)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Flatten)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Encrypt - user password only)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Encrypt - both user and owner passwords)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Watermark - Text)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Stamp - Text)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Rotate 90)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Embeds)",
+      "status": "skip",
+      "reason": "Embed file check step not yet implemented"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (PDF/A-3b & PDF/UA-1 & Metadata & Watermark & Stamp & Flatten & Embeds)",
+      "status": "skip",
+      "reason": "Embed file check step not yet implemented"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Routes Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Download From)",
+      "status": "skip",
+      "reason": "downloadFrom with live static server requires integration environment"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /foo/forms/chromium/convert/html (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Asset)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (stampSource=pdf without uploaded stamp file => 400)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (watermarkSource=pdf without uploaded watermark file => 400)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_html",
+      "scenario": "POST /forms/chromium/convert/html (Long Filename)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Default)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Single Page)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Landscape)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Native Page Ranges)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Header & Footer)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Wait Delay)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Wait For Expression)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Emulated Media Type)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Main URL does NOT match allowed list)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Main URL does match denied list)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (JavaScript Enabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (JavaScript Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Fail On Resource HTTP Status Codes)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Fail On Resource Loading Failed)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Fail On Console Exceptions)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Bad Request)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Split Intervals)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Split Output Filename)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Split Pages)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Split Pages & Unify)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (PDF/A-1b & PDF/UA-1)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Metadata)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Flatten)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Encrypt - user password only)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Encrypt - both user and owner passwords)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Embeds)",
+      "status": "skip",
+      "reason": "Embed file check step not yet implemented"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Routes Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Download From)",
+      "status": "skip",
+      "reason": "downloadFrom with live static server requires integration environment"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /foo/forms/chromium/convert/markdown (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (stampSource=pdf without uploaded stamp file => 400)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (watermarkSource=pdf without uploaded watermark file => 400)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_markdown",
+      "scenario": "POST /forms/chromium/convert/markdown (Long Filename)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Default)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Single Page)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Landscape)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Native Page Ranges)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Header & Footer)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Custom HTTP Headers)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Cookies)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (case-insensitive sameSite)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Wait Delay)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Wait For Expression)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Wait For Selector)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Emulated Media Type)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Emulated Media Features)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Default Allow / Deny Lists)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Main URL does NOT match allowed list)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Main URL does match denied list)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Request does not match the allowed list)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (file:// scheme rejected at route layer)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Main URL resolves to a non-public IP, permissive default)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Main URL is a non-public IP literal, deny-private-ips on)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Main URL resolves to a non-public IP, deny-private-ips on with allow-list bypass)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (JavaScript Enabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (JavaScript Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Fail On Resource HTTP Status Codes)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Fail On Resource Loading Failed)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Fail On Console Exceptions)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Bad Request)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Split Intervals)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Split Output Filename)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Split Pages)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Split Pages & Unify)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Split Many PDFs - Lot of Pages)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (PDF/A-1b & PDF/UA-1)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Split & PDF/A-1b & PDF/UA-1)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Split & PDF/A-1b & PDF/UA-1 & Output Filename)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Metadata)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Flatten)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Encrypt - user password only)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Encrypt - both user and owner passwords)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Embeds)",
+      "status": "skip",
+      "reason": "Embed file check step not yet implemented"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (PDF/A-3b & PDF/UA-1 & Metadata & Flatten & Embeds)",
+      "status": "skip",
+      "reason": "Embed file check step not yet implemented"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Routes Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /foo/forms/chromium/convert/url (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (stampSource=pdf without uploaded stamp file => 400)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (watermarkSource=pdf without uploaded watermark file => 400)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_convert_url",
+      "scenario": "POST /forms/chromium/convert/url (Long Filename)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_html",
+      "scenario": "POST /forms/chromium/screenshot/html (Default)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_html",
+      "scenario": "POST /forms/chromium/screenshot/html (JPEG)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_html",
+      "scenario": "POST /forms/chromium/screenshot/html (WebP)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_html",
+      "scenario": "POST /forms/chromium/screenshot/html (Custom Dimensions)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_html",
+      "scenario": "POST /forms/chromium/screenshot/html (Clip)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_html",
+      "scenario": "POST /forms/chromium/screenshot/html (Quality)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_html",
+      "scenario": "POST /forms/chromium/screenshot/html (Optimize for Speed)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_html",
+      "scenario": "POST /forms/chromium/screenshot/html (Omit Background)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_html",
+      "scenario": "POST /forms/chromium/screenshot/html (Emulated Media Type)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_html",
+      "scenario": "POST /forms/chromium/screenshot/html (Bad Request)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_html",
+      "scenario": "POST /forms/chromium/screenshot/html (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "chromium_screenshot_html",
+      "scenario": "POST /forms/chromium/screenshot/html (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_html",
+      "scenario": "POST /foo/forms/chromium/screenshot/html (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "chromium_screenshot_html",
+      "scenario": "POST /forms/chromium/screenshot/html (Long Filename)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_markdown",
+      "scenario": "POST /forms/chromium/screenshot/markdown (Default)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_markdown",
+      "scenario": "POST /forms/chromium/screenshot/markdown (JPEG)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_markdown",
+      "scenario": "POST /forms/chromium/screenshot/markdown (WebP)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_markdown",
+      "scenario": "POST /forms/chromium/screenshot/markdown (Bad Request - Missing Files)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_markdown",
+      "scenario": "POST /forms/chromium/screenshot/markdown (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "chromium_screenshot_markdown",
+      "scenario": "POST /forms/chromium/screenshot/markdown (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_markdown",
+      "scenario": "POST /foo/forms/chromium/screenshot/markdown (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "chromium_screenshot_url",
+      "scenario": "POST /forms/chromium/screenshot/url (Default)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_url",
+      "scenario": "POST /forms/chromium/screenshot/url (JPEG)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_url",
+      "scenario": "POST /forms/chromium/screenshot/url (WebP)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_url",
+      "scenario": "POST /forms/chromium/screenshot/url (Bad Request - Missing URL)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_url",
+      "scenario": "POST /forms/chromium/screenshot/url (file:// scheme rejected at route layer)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_url",
+      "scenario": "POST /forms/chromium/screenshot/url (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "chromium_screenshot_url",
+      "scenario": "POST /forms/chromium/screenshot/url (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "chromium_screenshot_url",
+      "scenario": "POST /foo/forms/chromium/screenshot/url (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "debug",
+      "scenario": "GET /debug (Disabled)",
+      "status": "skip",
+      "reason": "Folio has no pprof or Go debug endpoints"
+    },
+    {
+      "feature": "debug",
+      "scenario": "GET /debug (Enabled)",
+      "status": "skip",
+      "reason": "Folio has no pprof or Go debug endpoints"
+    },
+    {
+      "feature": "debug",
+      "scenario": "GET /debug (Environment based timezone)",
+      "status": "skip",
+      "reason": "Folio has no pprof or Go debug endpoints"
+    },
+    {
+      "feature": "debug",
+      "scenario": "GET /debug (No Debug Data)",
+      "status": "skip",
+      "reason": "Folio has no pprof or Go debug endpoints"
+    },
+    {
+      "feature": "debug",
+      "scenario": "GET /debug (Gotenberg Trace)",
+      "status": "skip",
+      "reason": "Folio has no pprof or Go debug endpoints"
+    },
+    {
+      "feature": "debug",
+      "scenario": "GET /debug (Basic Auth)",
+      "status": "skip",
+      "reason": "Folio has no pprof or Go debug endpoints"
+    },
+    {
+      "feature": "debug",
+      "scenario": "GET /foo/debug (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "health",
+      "scenario": "GET /health",
+      "status": "pass"
+    },
+    {
+      "feature": "health",
+      "scenario": "GET /health (No Logging)",
+      "status": "pass"
+    },
+    {
+      "feature": "health",
+      "scenario": "GET /health (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "health",
+      "scenario": "GET /health (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "health",
+      "scenario": "GET /foo/health (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "health",
+      "scenario": "HEAD /health",
+      "status": "pass"
+    },
+    {
+      "feature": "health",
+      "scenario": "HEAD /health (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "health",
+      "scenario": "HEAD /health (No Logging)",
+      "status": "pass"
+    },
+    {
+      "feature": "health",
+      "scenario": "HEAD /health (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "health",
+      "scenario": "HEAD /foo/health (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Single Document)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Many Documents)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Non-basic Latin Characters)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Protected)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Landscape)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Native Page Ranges - Single Document)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Native Page Ranges - Many Documents)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Bad Request)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Merge)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Merge & Split)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Split Intervals)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Split Pages)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Split Pages & Unify)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (PDF/A-1b & PDF/UA-1)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Metadata)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Flatten)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Encrypt - user password only)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Encrypt - both user and owner passwords)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Watermark - Text)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Stamp - Text)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Rotate 90)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Native Watermark - Text)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Native Watermark - Tiled)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Embeds)",
+      "status": "skip",
+      "reason": "Embed file check step not yet implemented"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Routes Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Download From)",
+      "status": "skip",
+      "reason": "downloadFrom with live static server requires integration environment"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /foo/forms/libreoffice/convert (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (stampSource=pdf without uploaded stamp file => 400)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (watermarkSource=pdf without uploaded watermark file => 400)",
+      "status": "pass"
+    },
+    {
+      "feature": "libreoffice_convert",
+      "scenario": "POST /forms/libreoffice/convert (Long Filename)",
+      "status": "pass"
+    },
+    {
+      "feature": "output_filename",
+      "scenario": "Default (Single Output File)",
+      "status": "pass"
+    },
+    {
+      "feature": "output_filename",
+      "scenario": "Default (Many Output Files)",
+      "status": "pass"
+    },
+    {
+      "feature": "output_filename",
+      "scenario": "Path As Filename",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/{write|read} (Single PDF & Bookmarks list)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/{write|read} (Single PDF & Bookmarks Map)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/{write|read} (Many PDFs & Bookmarks List)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/{write|read} (Many PDFs & Bookmarks Map)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/read (Empty List)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/write (Bad Request)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/read (Bad Request)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/write (Routes Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/read (Routes Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/write (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/read (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/write (Output Filename - Single PDF)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/write (Output Filename - Many PDFs)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/write (Download From)",
+      "status": "skip",
+      "reason": "downloadFrom with live static server requires integration environment"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/read (Download From)",
+      "status": "skip",
+      "reason": "downloadFrom with live static server requires integration environment"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/write (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/read (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/write (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /forms/pdfengines/bookmarks/read (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_bookmarks",
+      "scenario": "POST /foo/forms/pdfengines/bookmarks/{write|read} (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "pdfengines_convert",
+      "scenario": "POST /forms/pdfengines/convert (Single PDF/A-1b)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_convert",
+      "scenario": "POST /forms/pdfengines/convert (Single PDF/A-2b)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_convert",
+      "scenario": "POST /forms/pdfengines/convert (Single PDF/A-3b)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_convert",
+      "scenario": "POST /forms/pdfengines/convert (Single PDF/UA-1)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_convert",
+      "scenario": "POST /forms/pdfengines/convert (Single PDF/A-1b & PDF/UA-1)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_convert",
+      "scenario": "POST /forms/pdfengines/convert (Many PDFs)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_convert",
+      "scenario": "POST /forms/pdfengines/convert (Bad Request)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_convert",
+      "scenario": "POST /forms/pdfengines/convert (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_convert",
+      "scenario": "POST /forms/pdfengines/convert (Output Filename - Single PDF)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_convert",
+      "scenario": "POST /forms/pdfengines/convert (Output Filename - Many PDFs)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_convert",
+      "scenario": "POST /forms/pdfengines/convert (Download From)",
+      "status": "skip",
+      "reason": "downloadFrom with live static server requires integration environment"
+    },
+    {
+      "feature": "pdfengines_convert",
+      "scenario": "POST /forms/pdfengines/convert (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "pdfengines_convert",
+      "scenario": "POST /forms/pdfengines/convert (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_convert",
+      "scenario": "POST /foo/forms/pdfengines/convert (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "pdfengines_embed",
+      "scenario": "POST /forms/pdfengines/embed",
+      "status": "skip",
+      "reason": "Embed file check step not yet implemented"
+    },
+    {
+      "feature": "pdfengines_embed",
+      "scenario": "POST /forms/pdfengines/embed with metadata",
+      "status": "skip",
+      "reason": "Embed file check step not yet implemented"
+    },
+    {
+      "feature": "pdfengines_embed",
+      "scenario": "POST /forms/pdfengines/embed with (Download From)",
+      "status": "skip",
+      "reason": "downloadFrom with live static server requires integration environment"
+    },
+    {
+      "feature": "pdfengines_embed",
+      "scenario": "POST /forms/pdfengines/embed (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "pdfengines_embed",
+      "scenario": "POST /forms/pdfengines/embed (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_embed",
+      "scenario": "POST /foo/forms/pdfengines/embed (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "pdfengines_encrypt",
+      "scenario": "POST /forms/pdfengines/encrypt (default - user password only)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_encrypt",
+      "scenario": "POST /forms/pdfengines/encrypt (default - both user and owner passwords)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_encrypt",
+      "scenario": "POST /forms/pdfengines/encrypt (QPDF - user password only)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_encrypt",
+      "scenario": "POST /forms/pdfengines/encrypt (QPDF - both user and owner passwords)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_encrypt",
+      "scenario": "POST /forms/pdfengines/encrypt (PDFtk - user password only)",
+      "status": "skip",
+      "reason": "Folio uses lopdf/qpdf, not pdftk"
+    },
+    {
+      "feature": "pdfengines_encrypt",
+      "scenario": "POST /forms/pdfengines/encrypt (PDFtk - both user and owner passwords)",
+      "status": "skip",
+      "reason": "Folio uses lopdf/qpdf, not pdftk"
+    },
+    {
+      "feature": "pdfengines_encrypt",
+      "scenario": "POST /forms/pdfengines/encrypt (pdfcpu - user password only)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_encrypt",
+      "scenario": "POST /forms/pdfengines/encrypt (pdfcpu - both user and owner passwords)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_encrypt",
+      "scenario": "POST /forms/pdfengines/encrypt (Many PDFs)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_encrypt",
+      "scenario": "POST /forms/pdfengines/encrypt (Bad Request)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_encrypt",
+      "scenario": "POST /forms/pdfengines/encrypt (Routes Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_encrypt",
+      "scenario": "POST /forms/pdfengines/encrypt (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_encrypt",
+      "scenario": "POST /forms/pdfengines/encrypt (Download From)",
+      "status": "skip",
+      "reason": "downloadFrom with live static server requires integration environment"
+    },
+    {
+      "feature": "pdfengines_encrypt",
+      "scenario": "POST /forms/pdfengines/encrypt (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "pdfengines_encrypt",
+      "scenario": "POST /forms/pdfengines/encrypt (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_encrypt",
+      "scenario": "POST /foo/forms/pdfengines/encrypt (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "pdfengines_encrypt",
+      "scenario": "POST /forms/pdfengines/encrypt (Long Filename)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_flatten",
+      "scenario": "POST /forms/pdfengines/flatten (Single PDF)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_flatten",
+      "scenario": "POST /forms/pdfengines/flatten (Many PDFs)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_flatten",
+      "scenario": "POST /forms/pdfengines/flatten (Bad Request)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_flatten",
+      "scenario": "POST /forms/pdfengines/flatten (Routes Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_flatten",
+      "scenario": "POST /forms/pdfengines/flatten (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_flatten",
+      "scenario": "POST /forms/pdfengines/flatten (Output Filename - Single PDF)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_flatten",
+      "scenario": "POST /forms/pdfengines/flatten (Output Filename - Many PDFs)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_flatten",
+      "scenario": "POST /forms/pdfengines/flatten (Download From)",
+      "status": "skip",
+      "reason": "downloadFrom with live static server requires integration environment"
+    },
+    {
+      "feature": "pdfengines_flatten",
+      "scenario": "POST /forms/pdfengines/flatten (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "pdfengines_flatten",
+      "scenario": "POST /forms/pdfengines/flatten (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_flatten",
+      "scenario": "POST /foo/forms/pdfengines/flatten (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "pdfengines_flatten",
+      "scenario": "POST /forms/pdfengines/flatten (Long Filename)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (default)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (QPDF)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (PDFtk)",
+      "status": "skip",
+      "reason": "Folio uses lopdf/qpdf, not pdftk"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (Bad Request)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (PDF/A-1b & PDF/UA-1)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (Metadata)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (Bookmarks List)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (Auto-index Bookmarks)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (Flatten)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (Encrypt - user password only)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (Encrypt - both user and owner passwords)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (Watermark - Text)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (Stamp - Text)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (Rotate 90)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (Embeds)",
+      "status": "skip",
+      "reason": "Embed file check step not yet implemented"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (Routes Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (Download From)",
+      "status": "skip",
+      "reason": "downloadFrom with live static server requires integration environment"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /foo/forms/pdfengines/merge (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (PDF/A + Encrypt => 400)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (stampSource=pdf without uploaded stamp file => 400)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (watermarkSource=pdf without uploaded watermark file => 400)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_merge",
+      "scenario": "POST /forms/pdfengines/merge (Long Filename)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/{write|read} (Single PDF)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/{write|read} (Many PDFs)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/write (Bad Request)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/write (Reject Newline-Injected Pseudo-Tag)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/write (Reject Group-Prefixed Dangerous Tag)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/read (Bad Request)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/write (Routes Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/read (Routes Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/write (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/read (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/write (Output Filename - Single PDF)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/write (Output Filename - Many PDFs)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/write (Download From)",
+      "status": "skip",
+      "reason": "downloadFrom with live static server requires integration environment"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/read (Download From)",
+      "status": "skip",
+      "reason": "downloadFrom with live static server requires integration environment"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/write (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/read (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/write (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/read (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /foo/forms/pdfengines/metadata/{write|read} (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/read (Long Filename)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_metadata",
+      "scenario": "POST /forms/pdfengines/metadata/write (Long Filename)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_rotate",
+      "scenario": "POST /forms/pdfengines/rotate (90 - All Pages - pdfcpu)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_rotate",
+      "scenario": "POST /forms/pdfengines/rotate (180 - All Pages - pdfcpu)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_rotate",
+      "scenario": "POST /forms/pdfengines/rotate (270 - All Pages - pdfcpu)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_rotate",
+      "scenario": "POST /forms/pdfengines/rotate (90 - Specific Pages - pdfcpu)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_rotate",
+      "scenario": "POST /forms/pdfengines/rotate (90 - All Pages - pdftk)",
+      "status": "skip",
+      "reason": "Folio uses lopdf/qpdf, not pdftk"
+    },
+    {
+      "feature": "pdfengines_rotate",
+      "scenario": "POST /forms/pdfengines/rotate (Specific Pages - pdftk unsupported)",
+      "status": "skip",
+      "reason": "Folio uses lopdf/qpdf, not pdftk"
+    },
+    {
+      "feature": "pdfengines_rotate",
+      "scenario": "POST /forms/pdfengines/rotate (Bad Request - Invalid Angle)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_rotate",
+      "scenario": "POST /forms/pdfengines/rotate (Bad Request - Missing Angle)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_rotate",
+      "scenario": "POST /forms/pdfengines/rotate (Bad Request - No PDF)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_rotate",
+      "scenario": "POST /forms/pdfengines/rotate (Many PDFs)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_rotate",
+      "scenario": "POST /forms/pdfengines/rotate (Routes Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_rotate",
+      "scenario": "POST /forms/pdfengines/rotate (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_rotate",
+      "scenario": "POST /forms/pdfengines/rotate (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "pdfengines_rotate",
+      "scenario": "POST /forms/pdfengines/rotate (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_rotate",
+      "scenario": "POST /foo/forms/pdfengines/rotate (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "pdfengines_rotate",
+      "scenario": "POST /forms/pdfengines/rotate (Long Filename)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Intervals - Default)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Pages - Default)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Pages & Unify - Default)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Intervals - pdfcpu)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Pages & Unify - PDFtk)",
+      "status": "skip",
+      "reason": "Folio uses lopdf/qpdf, not pdftk"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Many PDFs - Lot of Pages)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Bad Request)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (PDF/A-1b & PDF/UA-1)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Metadata)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Flatten)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Encrypt - user password only)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Watermark - Text)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Stamp - Text)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Rotate 90)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Embeds)",
+      "status": "skip",
+      "reason": "Embed file check step not yet implemented"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Routes Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Output Filename - Single PDF)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Output Filename - Many PDFs)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Download From)",
+      "status": "skip",
+      "reason": "downloadFrom with live static server requires integration environment"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /foo/forms/pdfengines/split (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (PDF/A + Encrypt => 400)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (stampSource=pdf without uploaded stamp file => 400)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (watermarkSource=pdf without uploaded watermark file => 400)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_split",
+      "scenario": "POST /forms/pdfengines/split (Long Filename)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (Text - pdfcpu)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (Text with Pages - pdfcpu)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (Text with Options - pdfcpu)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (Image - pdfcpu)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (PDF - pdfcpu)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (PDF - pdftk)",
+      "status": "skip",
+      "reason": "Folio uses lopdf/qpdf, not pdftk"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (Text - pdftk unsupported)",
+      "status": "skip",
+      "reason": "Folio uses lopdf/qpdf, not pdftk"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (Image via Download From)",
+      "status": "skip",
+      "reason": "downloadFrom with live static server requires integration environment"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (PDF via Download From)",
+      "status": "skip",
+      "reason": "downloadFrom with live static server requires integration environment"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (Many PDFs)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (Bad Request - No Source)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (Bad Request - Invalid Source)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (Bad Request - Missing File for Image Source)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (Bad Request - Missing File for PDF Source)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (Bad Request - No PDF)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (Routes Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /forms/pdfengines/stamp (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_stamp",
+      "scenario": "POST /foo/forms/pdfengines/stamp (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (Text - pdfcpu)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (Text with Pages - pdfcpu)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (Text with Options - pdfcpu)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (Image - pdfcpu)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (PDF - pdfcpu)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (PDF - pdftk)",
+      "status": "skip",
+      "reason": "Folio uses lopdf/qpdf, not pdftk"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (Text - pdftk unsupported)",
+      "status": "skip",
+      "reason": "Folio uses lopdf/qpdf, not pdftk"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (Image via Download From)",
+      "status": "skip",
+      "reason": "downloadFrom with live static server requires integration environment"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (PDF via Download From)",
+      "status": "skip",
+      "reason": "downloadFrom with live static server requires integration environment"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (Many PDFs)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (Bad Request - No Source)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (Bad Request - Invalid Source)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (Bad Request - Missing File for Image Source)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (Bad Request - Missing File for PDF Source)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (Bad Request - No PDF)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (Routes Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (Webhook)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /forms/pdfengines/watermark (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "pdfengines_watermark",
+      "scenario": "POST /foo/forms/pdfengines/watermark (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "prometheus_metrics",
+      "scenario": "GET /prometheus/metrics (Enabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "prometheus_metrics",
+      "scenario": "GET /custom/metrics (Custom Metrics Path)",
+      "status": "pass"
+    },
+    {
+      "feature": "prometheus_metrics",
+      "scenario": "GET /prometheus/metrics (Custom Namespace)",
+      "status": "pass"
+    },
+    {
+      "feature": "prometheus_metrics",
+      "scenario": "GET /prometheus/metrics (Disabled)",
+      "status": "pass"
+    },
+    {
+      "feature": "prometheus_metrics",
+      "scenario": "GET /prometheus/metrics (No Logging)",
+      "status": "pass"
+    },
+    {
+      "feature": "prometheus_metrics",
+      "scenario": "GET /prometheus/metrics (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "prometheus_metrics",
+      "scenario": "GET /prometheus/metrics (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "prometheus_metrics",
+      "scenario": "GET /foo/prometheus/metrics (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "root",
+      "scenario": "GET /",
+      "status": "pass"
+    },
+    {
+      "feature": "root",
+      "scenario": "GET / (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "root",
+      "scenario": "GET / (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "root",
+      "scenario": "GET /foo/ (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "root",
+      "scenario": "GET /favicon.ico",
+      "status": "pass"
+    },
+    {
+      "feature": "root",
+      "scenario": "GET /favicon.ico (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "root",
+      "scenario": "GET /favicon.ico (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "root",
+      "scenario": "GET /foo/favicon.ico (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "version",
+      "scenario": "GET /version",
+      "status": "pass"
+    },
+    {
+      "feature": "version",
+      "scenario": "GET /version (Gotenberg Trace)",
+      "status": "pass"
+    },
+    {
+      "feature": "version",
+      "scenario": "GET /version (Basic Auth)",
+      "status": "pass"
+    },
+    {
+      "feature": "version",
+      "scenario": "GET /foo/version (Root Path)",
+      "status": "skip",
+      "reason": "Folio does not support configurable API root path prefix"
+    },
+    {
+      "feature": "webhook",
+      "scenario": "Default",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "webhook",
+      "scenario": "Extra HTTP Headers",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "webhook",
+      "scenario": "Synchronous",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "webhook",
+      "scenario": "Webhook Events URL (Success)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "webhook",
+      "scenario": "Webhook Events URL (Synchronous)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "webhook",
+      "scenario": "Webhook Events URL Only (Success)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    },
+    {
+      "feature": "webhook",
+      "scenario": "Webhook Events URL Only (Synchronous)",
+      "status": "skip",
+      "reason": "Folio uses synchronous response API; no push webhook support"
+    }
+  ]
+}

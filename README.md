@@ -115,8 +115,8 @@
 # Build and run
 cargo run -p server -- serve --port 3000
 
-# Or with Docker
-docker build -t folio:latest .
+# Or with Docker (full image — Chromium + LibreOffice)
+docker build --target folio -t folio:latest .
 docker run -p 3000:3000 folio:latest
 
 # Convert URL to PDF
@@ -361,9 +361,10 @@ const pdf = await engine.htmlToPdf('<h1>Hello</h1>');
 folio/
 ├── Cargo.toml                      # Workspace definition
 ├── README.md                       # This file
-├── Dockerfile                       # Multi-stage build with Chrome
+├── Dockerfile                      # Single file, 9 named --target variants (see Docker section)
+├── Dockerfile.test                 # Test environment (poppler, JRE, verapdf)
 ├── docker-compose.yml              # Development environment
-├── Makefile                        # Build/test automation
+├── Makefile                        # Build/test/docker automation
 ├── .env.example                    # Configuration template
 │
 ├── crates/
@@ -419,11 +420,43 @@ cargo test
 cargo run -p server -- serve --help
 ```
 
+### Docker Image Variants
+
+All variants are built from a single `Dockerfile` using named `--target` stages, following Gotenberg's pattern. Each platform-specific variant (Cloud Run, Lambda) is a thin layer on top of the base variant — just environment variables.
+
+| Target | Tag | Description |
+|--------|-----|-------------|
+| `folio` | `latest`, `vX.Y.Z` | Full: Chromium + LibreOffice |
+| `folio-chromium` | `latest-chromium` | Chromium only (~30% smaller) |
+| `folio-libreoffice` | `latest-libreoffice` | LibreOffice only (~40% smaller) |
+| `folio-cloudrun` | `latest-cloudrun` | Full + Google Cloud Run env vars |
+| `folio-cloudrun-chromium` | `latest-chromium-cloudrun` | Chromium + Cloud Run |
+| `folio-cloudrun-libreoffice` | `latest-libreoffice-cloudrun` | LibreOffice + Cloud Run |
+| `folio-lambda` | `latest-lambda` | Full + [Lambda Web Adapter](https://github.com/awslabs/aws-lambda-web-adapter) |
+| `folio-lambda-chromium` | `latest-chromium-lambda` | Chromium + Lambda |
+| `folio-lambda-libreoffice` | `latest-libreoffice-lambda` | LibreOffice + Lambda |
+
+```bash
+# Build a specific variant
+docker build --target folio-chromium -t myrepo/folio:chromium .
+
+# Build + push all 9 variants
+make docker-push-all DOCKER_REGISTRY=myrepo/folio VERSION=1.0.0
+
+# Run with Docker Compose (default: full image)
+docker compose up folio
+
+# Run Chromium-only profile
+docker compose --profile chromium up folio-chromium
+```
+
 ### Development Commands
 
 | Command | Description |
 |---------|-------------|
-| `make build` | Build Docker image |
+| `make docker-build` | Build full Docker image |
+| `make docker-build-all` | Build all 9 variants |
+| `make docker-push-all` | Build and push all variants |
 | `make run` | Start Folio via Docker Compose |
 | `make test-unit` | Run unit tests |
 | `make test-integration` | Run integration tests (requires Chrome) |

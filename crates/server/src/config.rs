@@ -164,6 +164,29 @@ pub struct ServerArgs {
     /// HTTP Basic Auth password (required when username is set).
     #[arg(long, value_name = "PASS", env = "API_BASIC_AUTH_PASSWORD")]
     pub api_basic_auth_password: Option<String>,
+
+    /// Comma-separated list of allowed URL regex patterns for downloadFrom
+    /// (empty = allow all).
+    #[arg(long, value_name = "PATTERN", num_args = 0..)]
+    pub api_download_from_allow_list: Vec<String>,
+
+    /// Comma-separated list of denied URL regex patterns for downloadFrom.
+    #[arg(long, value_name = "PATTERN", num_args = 0..)]
+    pub api_download_from_deny_list: Vec<String>,
+
+    /// Maximum number of download retries per URL for downloadFrom (default 3).
+    #[arg(long, value_name = "N", env = "API_DOWNLOAD_FROM_MAX_RETRY")]
+    pub api_download_from_max_retry: Option<u32>,
+
+    /// Disable the downloadFrom multipart field entirely.
+    #[arg(long, env = "API_DISABLE_DOWNLOAD_FROM")]
+    pub api_disable_download_from: bool,
+
+    /// Override the request-correlation header name (default: `x-request-id`).
+    /// Must be a valid HTTP header name. When set, Folio reads this header from
+    /// incoming requests and propagates it to responses and trace spans.
+    #[arg(long, value_name = "HEADER", env = "API_CORRELATION_ID_HEADER")]
+    pub api_correlation_id_header: Option<String>,
 }
 
 /// Log output formats supported by the server.
@@ -260,6 +283,16 @@ pub struct ServerConfig {
     pub api_basic_auth_username: Option<String>,
     /// HTTP Basic Auth password.
     pub api_basic_auth_password: Option<String>,
+    /// Allowed URL regex patterns for downloadFrom (empty = allow all).
+    pub api_download_from_allow_list: Vec<String>,
+    /// Denied URL regex patterns for downloadFrom.
+    pub api_download_from_deny_list: Vec<String>,
+    /// Maximum download retries per URL.
+    pub api_download_from_max_retry: u32,
+    /// Whether downloadFrom is disabled.
+    pub api_disable_download_from: bool,
+    /// Request-correlation header name.
+    pub api_correlation_id_header: String,
 }
 
 /// Errors produced by [`ServerConfig::resolve`].
@@ -448,6 +481,46 @@ impl ServerConfig {
         let api_basic_auth_password = args.api_basic_auth_password.clone()
             .or_else(|| env.get("API_BASIC_AUTH_PASSWORD").cloned());
 
+        let api_download_from_allow_list = if !args.api_download_from_allow_list.is_empty() {
+            args.api_download_from_allow_list.clone()
+        } else {
+            env.get("API_DOWNLOAD_FROM_ALLOW_LIST")
+                .map(|v| v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
+                .unwrap_or_default()
+        };
+
+        let api_download_from_deny_list = if !args.api_download_from_deny_list.is_empty() {
+            args.api_download_from_deny_list.clone()
+        } else {
+            env.get("API_DOWNLOAD_FROM_DENY_LIST")
+                .map(|v| v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
+                .unwrap_or_default()
+        };
+
+        let api_download_from_max_retry = match args.api_download_from_max_retry {
+            Some(n) => n,
+            None => env
+                .get("API_DOWNLOAD_FROM_MAX_RETRY")
+                .and_then(|v| v.parse::<u32>().ok())
+                .unwrap_or(3),
+        };
+
+        let api_disable_download_from = args.api_disable_download_from
+            || env.get("API_DISABLE_DOWNLOAD_FROM").map(|v| is_truthy(v)).unwrap_or(false);
+
+        let api_correlation_id_header = args.api_correlation_id_header
+            .clone()
+            .or_else(|| env.get("API_CORRELATION_ID_HEADER").cloned())
+            .unwrap_or_else(|| "x-request-id".to_string());
+
+        // Validate the header name early so the server refuses to start on
+        // invalid config rather than panicking at request time.
+        axum::http::HeaderName::from_bytes(api_correlation_id_header.as_bytes())
+            .map_err(|_| ConfigError::Parse {
+                field: "api_correlation_id_header",
+                message: format!("`{}` is not a valid HTTP header name", api_correlation_id_header),
+            })?;
+
         Ok(Self {
             host,
             port,
@@ -479,6 +552,11 @@ impl ServerConfig {
             api_tls_key_file,
             api_basic_auth_username,
             api_basic_auth_password,
+            api_download_from_allow_list,
+            api_download_from_deny_list,
+            api_download_from_max_retry,
+            api_disable_download_from,
+            api_correlation_id_header,
         })
     }
 
@@ -726,6 +804,35 @@ mod tests {
     }
 
     #[test]
+    fn download_from_defaults() {
+        let args = ServerArgs::default();
+        let cfg = ServerConfig::resolve(&args, &env(&[])).unwrap();
+        assert!(cfg.api_download_from_allow_list.is_empty());
+        assert!(cfg.api_download_from_deny_list.is_empty());
+        assert_eq!(cfg.api_download_from_max_retry, 3);
+        assert!(!cfg.api_disable_download_from);
+    }
+
+    #[test]
+    fn download_from_from_env() {
+        let args = ServerArgs::default();
+        let cfg = ServerConfig::resolve(
+            &args,
+            &env(&[
+                ("API_DOWNLOAD_FROM_ALLOW_LIST", "https://example\\.com,https://cdn\\."),
+                ("API_DOWNLOAD_FROM_DENY_LIST", "http://"),
+                ("API_DOWNLOAD_FROM_MAX_RETRY", "5"),
+                ("API_DISABLE_DOWNLOAD_FROM", "true"),
+            ]),
+        )
+        .unwrap();
+        assert_eq!(cfg.api_download_from_allow_list, vec!["https://example\\.com", "https://cdn\\."]);
+        assert_eq!(cfg.api_download_from_deny_list, vec!["http://"]);
+        assert_eq!(cfg.api_download_from_max_retry, 5);
+        assert!(cfg.api_disable_download_from);
+    }
+
+    #[test]
     fn api_server_flags_cli_beats_env() {
         let args = ServerArgs {
             api_disable_health_route_telemetry: true,
@@ -745,5 +852,35 @@ mod tests {
         assert!(cfg.api_disable_health_route_telemetry);
         assert!(cfg.api_enable_debug_route);
         assert_eq!(cfg.api_basic_auth_username, Some("superuser".to_string()));
+    }
+
+    #[test]
+    fn correlation_id_header_defaults_to_x_request_id() {
+        let args = ServerArgs::default();
+        let cfg = ServerConfig::resolve(&args, &env(&[])).unwrap();
+        assert_eq!(cfg.api_correlation_id_header, "x-request-id");
+    }
+
+    #[test]
+    fn correlation_id_header_custom_value() {
+        let args = ServerArgs::default();
+        let cfg = ServerConfig::resolve(
+            &args,
+            &env(&[("API_CORRELATION_ID_HEADER", "x-trace-id")]),
+        )
+        .unwrap();
+        assert_eq!(cfg.api_correlation_id_header, "x-trace-id");
+    }
+
+    #[test]
+    fn correlation_id_header_invalid_value_rejected() {
+        let args = ServerArgs::default();
+        let err = ServerConfig::resolve(
+            &args,
+            &env(&[("API_CORRELATION_ID_HEADER", "has spaces bad")]),
+        )
+        .unwrap_err();
+        let ConfigError::Parse { field, .. } = err;
+        assert_eq!(field, "api_correlation_id_header");
     }
 }

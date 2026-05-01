@@ -20,8 +20,9 @@ pub use bookmarks::{Bookmark, read_bookmarks, write_bookmarks, flatten_bookmarks
 pub use encrypt::{EncryptionAlgorithm, Permissions, encrypt_pdf, decrypt_pdf, is_encrypted, qpdf_available as encrypt_qpdf_available};
 pub use pdfa::{PdfAProfile, convert_to_pdfa, ghostscript_available, qpdf_available};
 pub use pdfops::{
-    Metadata, Position, SplitMode, WatermarkKind, WatermarkOptions, flatten, merge, read_metadata,
-    rotate, split, watermark, write_metadata,
+    Metadata, OptimiseBackend, OptimisePreset, OptimiseResult, Position, SplitMode, WatermarkKind,
+    WatermarkOptions, flatten, merge, optimise_pdf, read_metadata, rotate, split, watermark,
+    write_metadata,
 };
 pub use types::{
     EngineError, EngineResult, Margins, MediaType, PageRange, PageRanges, PaperSize,

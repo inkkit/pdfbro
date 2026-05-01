@@ -15,33 +15,60 @@ use crate::support::world::FolioWorld;
 
 /// Step: When I make a "GET" request to "/health"
 pub async fn make_request(world: &mut FolioWorld, method: String, endpoint: String) {
+    make_request_with_request_headers(world, method, endpoint, &[]).await;
+}
+
+/// Step: When I make a "GET" request to "/health" with the following header(s):
+pub async fn make_request_with_headers(
+    world: &mut FolioWorld,
+    method: String,
+    endpoint: String,
+    table: &cucumber::gherkin::Table,
+) {
+    let extra: Vec<(String, String)> = table
+        .rows
+        .iter()
+        .filter(|row| row.len() >= 2)
+        .map(|row| (row[0].clone(), row[1].clone()))
+        .collect();
+    make_request_with_request_headers(world, method, endpoint, &extra).await;
+}
+
+async fn make_request_with_request_headers(
+    world: &mut FolioWorld,
+    method: String,
+    endpoint: String,
+    extra_headers: &[(String, String)],
+) {
     let url = format!("{}{}", world.base_url.as_ref().unwrap(), endpoint);
 
-    let response = match method.as_str() {
-        "GET" => world.client.get(&url).send().await,
-        "POST" => world.client.post(&url).send().await,
-        "PUT" => world.client.put(&url).send().await,
-        "DELETE" => world.client.delete(&url).send().await,
+    let mut req = match method.as_str() {
+        "GET" => world.client.get(&url),
+        "POST" => world.client.post(&url),
+        "PUT" => world.client.put(&url),
+        "DELETE" => world.client.delete(&url),
+        "HEAD" => world.client.head(&url),
         _ => panic!("Unsupported HTTP method: {}", method),
     };
 
-    let response = response.expect("Failed to make HTTP request");
+    for (name, value) in extra_headers {
+        req = req.header(name.as_str(), value.as_str());
+    }
+
+    let response = req.send().await.expect("Failed to make HTTP request");
     let status = response.status().as_u16();
 
-    // Collect headers
     let mut headers = std::collections::HashMap::new();
     for (name, value) in response.headers() {
         headers.insert(name.as_str().to_string(), value.to_str().unwrap_or("").to_string());
     }
 
-    // Read body - need to take ownership
     let body = response
         .bytes()
         .await
         .expect("Failed to read response body")
         .to_vec();
 
-    // Store body, status, and headers
     world.body = Some(body);
     world.status_code = Some(status);
     world.response_headers = Some(headers);
@@ -128,9 +155,53 @@ pub async fn make_request_with_form(
         .to_vec();
 
     // Store body, status, and headers
-    world.body = Some(body);
+    world.body = Some(body.clone());
     world.status_code = Some(status);
-    world.response_headers = Some(resp_headers);
+    world.response_headers = Some(resp_headers.clone());
+
+    // Teststore: save successful PDF/ZIP responses so subsequent steps can reference them
+    if status == 200 {
+        let content_type = resp_headers.get("content-type").cloned().unwrap_or_default();
+        let content_disp = resp_headers.get("content-disposition").cloned().unwrap_or_default();
+        let filename = extract_filename_from_disposition(&content_disp);
+        let teststore = std::path::Path::new("tests/bdd/testdata/teststore");
+        let _ = std::fs::create_dir_all(teststore);
+
+        if content_type.starts_with("application/pdf") {
+            if !filename.is_empty() {
+                let _ = std::fs::write(teststore.join(&filename), &body);
+            }
+        } else if content_type.starts_with("application/zip") {
+            if !filename.is_empty() {
+                let _ = std::fs::write(teststore.join(&filename), &body);
+            }
+            // Also extract zip contents into teststore
+            if let Ok(mut archive) = zip::ZipArchive::new(std::io::Cursor::new(&body)) {
+                for i in 0..archive.len() {
+                    if let Ok(mut entry) = archive.by_index(i) {
+                        let entry_name = entry.name().to_string();
+                        if entry_name.ends_with(".pdf") {
+                            let mut contents = Vec::new();
+                            use std::io::Read;
+                            let _ = entry.read_to_end(&mut contents);
+                            let _ = std::fs::write(teststore.join(&entry_name), &contents);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn extract_filename_from_disposition(disposition: &str) -> String {
+    // Parse: attachment; filename="foo.pdf"
+    for part in disposition.split(';') {
+        let part = part.trim();
+        if let Some(rest) = part.strip_prefix("filename=") {
+            return rest.trim_matches('"').to_string();
+        }
+    }
+    String::new()
 }
 
 /// Build multipart form from Gherkin table, also extracting headers.
@@ -150,20 +221,26 @@ async fn build_form_and_headers_from_table(
 
             match field_type.as_str() {
                 "file" => {
-                    // Read file from testdata directory
-                    let file_path = format!(
-                        "tests/bdd/testdata/{}",
-                        field_value
-                    );
+                    // Strip optional "testdata/" prefix (Gotenberg-style paths)
+                    let relative = field_value
+                        .strip_prefix("testdata/")
+                        .unwrap_or(field_value);
+                    let file_path = format!("tests/bdd/testdata/{}", relative);
                     let content = tokio::fs::read(&file_path)
                         .await
-                        .expect(&format!("Failed to read file: {}", file_path));
+                        .unwrap_or_else(|e| panic!("Failed to read file {file_path}: {e}"));
 
-                    // Guess mime type from extension
-                    let mime = guess_mime_type(field_value);
+                    // Use basename as the multipart filename
+                    let file_name = std::path::Path::new(relative)
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or(relative)
+                        .to_string();
+
+                    let mime = guess_mime_type(&file_name);
 
                     let part = reqwest::multipart::Part::bytes(content)
-                        .file_name(field_value.clone())
+                        .file_name(file_name)
                         .mime_str(&mime)
                         .unwrap();
 
@@ -333,4 +410,32 @@ pub async fn check_all_status_codes(world: &mut FolioWorld, expected: u16) {
     for (i, (status, _)) in responses.iter().enumerate() {
         assert_eq!(*status, expected, "Response {} expected status {}, got {}", i, expected, status);
     }
+}
+
+/// Step: When I make a "GET" request to "/health" with basic auth "user":"pass"
+pub async fn make_request_with_basic_auth(
+    world: &mut FolioWorld,
+    method: String,
+    endpoint: String,
+    username: String,
+    password: String,
+) {
+    let url = format!("{}{}", world.base_url.as_ref().unwrap(), endpoint);
+    let response = world
+        .client
+        .request(reqwest::Method::from_bytes(method.as_bytes()).unwrap(), &url)
+        .basic_auth(username, Some(password))
+        .send()
+        .await
+        .expect("Failed to make HTTP request");
+
+    let status = response.status().as_u16();
+    let mut headers = std::collections::HashMap::new();
+    for (name, value) in response.headers() {
+        headers.insert(name.as_str().to_string(), value.to_str().unwrap_or("").to_string());
+    }
+    let body = response.bytes().await.expect("Failed to read response body").to_vec();
+    world.body = Some(body);
+    world.status_code = Some(status);
+    world.response_headers = Some(headers);
 }

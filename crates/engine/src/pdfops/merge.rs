@@ -7,7 +7,7 @@
 //! `/Outlines` from the first input is preserved; `/AcroForm` and `/Names`
 //! are dropped to avoid name collisions (per spec 13).
 
-use lopdf::{Dictionary, Document, Object, ObjectId, dictionary};
+use lopdf::{Document, Object, ObjectId, dictionary};
 
 use crate::types::{EngineError, EngineResult};
 
@@ -47,8 +47,8 @@ pub fn merge(pdfs: &[&[u8]]) -> EngineResult<Vec<u8>> {
 
     // Multi-input path.
     let mut merged = Document::with_version("1.7");
-    // Store page objects (not IDs) to rebuild Pages tree after renumbering.
-    let mut page_objects_in_order: Vec<Dictionary> = Vec::new();
+    // Track page object IDs (after per-doc renumbering) to build Pages tree.
+    let mut page_ids_in_order: Vec<ObjectId> = Vec::new();
     let mut max_id: u32 = 1;
     let mut outlines_from_first: Option<ObjectId> = None;
 
@@ -58,13 +58,10 @@ pub fn merge(pdfs: &[&[u8]]) -> EngineResult<Vec<u8>> {
         doc.renumber_objects_with(max_id);
         max_id = doc.max_id + 1;
 
-        // Collect this doc's page objects in page order (clone the dictionaries).
-        let page_ids: Vec<ObjectId> = doc.get_pages().into_values().collect();
-        for page_id in page_ids {
-            if let Ok(Object::Dictionary(dict)) = doc.get_object(page_id) {
-                page_objects_in_order.push(dict.clone());
-            }
-        }
+        // Collect this doc's page IDs in page order AFTER renumbering so
+        // the IDs reflect the shifted range.
+        let pages: Vec<ObjectId> = doc.get_pages().into_values().collect();
+        page_ids_in_order.extend(pages);
 
         // On the first input only, remember the /Outlines id so we can
         // wire it into the merged /Catalog. Subsequent inputs drop theirs.
@@ -73,8 +70,8 @@ pub fn merge(pdfs: &[&[u8]]) -> EngineResult<Vec<u8>> {
         }
 
         // Copy every non-Catalog, non-root-Pages object into the merged
-        // document. The fresh /Pages tree and /Catalog are built AFTER
-        // renumbering to ensure references are valid.
+        // document (including individual Page objects; we'll set /Parent
+        // once we know the new /Pages object ID below).
         for (id, obj) in doc.objects {
             if is_catalog_or_pages(&obj) {
                 continue;
@@ -83,19 +80,23 @@ pub fn merge(pdfs: &[&[u8]]) -> EngineResult<Vec<u8>> {
         }
     }
 
-    // Compact object IDs BEFORE building Pages tree.
-    // This ensures all references are valid and sequential.
-    merged.renumber_objects();
+    // Sync merged.max_id to the highest inserted ID so that
+    // new_object_id / add_object allocate IDs beyond the used range.
+    merged.max_id = max_id - 1;
 
-    // Build a fresh /Pages tree AFTER renumbering with correct references.
+    // Build a fresh /Pages tree.  The page objects already live in
+    // merged.objects with correct internal references (set during each
+    // doc's renumber_objects_with); we only need to (re)set their /Parent.
     let pages_id = merged.new_object_id();
-    let mut kids: Vec<Object> = Vec::with_capacity(page_objects_in_order.len());
+    let mut kids: Vec<Object> = Vec::with_capacity(page_ids_in_order.len());
 
-    for mut page_dict in page_objects_in_order {
-        // Insert the page object and get its new (renumbered) ID.
-        page_dict.set("Parent", Object::Reference(pages_id));
-        let page_id = merged.add_object(Object::Dictionary(page_dict));
-        kids.push(Object::Reference(page_id));
+    for page_id in &page_ids_in_order {
+        if let Some(obj) = merged.objects.get_mut(page_id) {
+            if let Object::Dictionary(dict) = obj {
+                dict.set("Parent", Object::Reference(pages_id));
+            }
+        }
+        kids.push(Object::Reference(*page_id));
     }
 
     let page_count = kids.len() as u32;

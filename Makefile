@@ -113,112 +113,144 @@ export
 
 # =============================================================================
 # Docker Multi-Variant Build & Push
+#
+# All 9 variants live in a single Dockerfile as named --target stages.
+#
+#   Target name               Tag suffix        Description
+#   ─────────────────────     ──────────────    ──────────────────────────────
+#   folio                     (none)            Full: Chromium + LibreOffice
+#   folio-chromium            -chromium         Chromium only (~30% smaller)
+#   folio-libreoffice         -libreoffice      LibreOffice only (~40% smaller)
+#   folio-cloudrun            -cloudrun         Full + Cloud Run env vars
+#   folio-cloudrun-chromium   -chromium-cloudrun  Chromium + Cloud Run
+#   folio-cloudrun-libreoffice -libreoffice-cloudrun LibreOffice + Cloud Run
+#   folio-lambda              -lambda           Full + Lambda Web Adapter
+#   folio-lambda-chromium     -chromium-lambda  Chromium + Lambda Web Adapter
+#   folio-lambda-libreoffice  -libreoffice-lambda LibreOffice + Lambda Web Adapter
+#
+# Override registry:   make docker-build-all DOCKER_REGISTRY=myrepo/folio
 # =============================================================================
 
-# Docker registry URL (override: make docker-build-all DOCKER_REGISTRY=deesh2025/no-name)
 DOCKER_REGISTRY ?= deesh2025/no-name
 VERSION ?= 0.1.0
 MAJOR_VERSION ?= 8
 
-# All Docker variants
-VARIANTS = standard chromium libreoffice cloudrun cloudrun.chromium cloudrun.libreoffice lambda lambda.chromium lambda.libreoffice
+# Internal helper — build a target and tag it.
+# $(1) = Dockerfile target name, $(2) = tag suffix (e.g. "-chromium", or "" for full)
+define docker_build
+	docker build --target $(1) \
+	  -t $(DOCKER_REGISTRY):latest$(2) \
+	  -t $(DOCKER_REGISTRY):$(MAJOR_VERSION)$(2) \
+	  .
+endef
 
-.PHONY: docker-build-all
-docker-build-all: $(VARIANTS:%=docker-build-%) ## Build all Docker variants sequentially
+# ---- Build targets ----------------------------------------------------------
 
-.PHONY: docker-push-all
-docker-push-all: docker-build-all $(VARIANTS:%=docker-push-%) ## Build and push all variants
-
-.PHONY: docker-build-standard
-docker-build-standard: ## Build standard (full) variant
-	docker build -t $(DOCKER_REGISTRY):latest -t $(DOCKER_REGISTRY):$(MAJOR_VERSION) -t $(DOCKER_REGISTRY):v$(VERSION) -f Dockerfile .
+.PHONY: docker-build
+docker-build: ## Build full image (Chromium + LibreOffice)
+	$(call docker_build,folio,)
+	docker tag $(DOCKER_REGISTRY):latest $(DOCKER_REGISTRY):v$(VERSION)
 
 .PHONY: docker-build-chromium
-docker-build-chromium: ## Build chromium-only variant (~30% smaller)
-	docker build -t $(DOCKER_REGISTRY):latest-chromium -t $(DOCKER_REGISTRY):$(MAJOR_VERSION)-chromium -f Dockerfile.chromium .
+docker-build-chromium: ## Build Chromium-only image
+	$(call docker_build,folio-chromium,-chromium)
 
 .PHONY: docker-build-libreoffice
-docker-build-libreoffice: ## Build libreoffice-only variant (~38% smaller)
-	docker build -t $(DOCKER_REGISTRY):latest-libreoffice -t $(DOCKER_REGISTRY):$(MAJOR_VERSION)-libreoffice -f Dockerfile.libreoffice .
+docker-build-libreoffice: ## Build LibreOffice-only image
+	$(call docker_build,folio-libreoffice,-libreoffice)
 
 .PHONY: docker-build-cloudrun
-docker-build-cloudrun: ## Build Cloud Run optimized (full)
-	docker build -t $(DOCKER_REGISTRY):latest-cloudrun -t $(DOCKER_REGISTRY):$(MAJOR_VERSION)-cloudrun -f Dockerfile.cloudrun .
+docker-build-cloudrun: ## Build Cloud Run full image
+	$(call docker_build,folio-cloudrun,-cloudrun)
 
-.PHONY: docker-build-cloudrun.chromium
-docker-build-cloudrun.chromium: ## Build Cloud Run chromium-only
-	docker build -t $(DOCKER_REGISTRY):latest-chromium-cloudrun -t $(DOCKER_REGISTRY):$(MAJOR_VERSION)-chromium-cloudrun -f Dockerfile.cloudrun.chromium .
+.PHONY: docker-build-cloudrun-chromium
+docker-build-cloudrun-chromium: ## Build Cloud Run Chromium-only image
+	$(call docker_build,folio-cloudrun-chromium,-chromium-cloudrun)
 
-.PHONY: docker-build-cloudrun.libreoffice
-docker-build-cloudrun.libreoffice: ## Build Cloud Run libreoffice-only
-	docker build -t $(DOCKER_REGISTRY):latest-libreoffice-cloudrun -t $(DOCKER_REGISTRY):$(MAJOR_VERSION)-libreoffice-cloudrun -f Dockerfile.cloudrun.libreoffice .
+.PHONY: docker-build-cloudrun-libreoffice
+docker-build-cloudrun-libreoffice: ## Build Cloud Run LibreOffice-only image
+	$(call docker_build,folio-cloudrun-libreoffice,-libreoffice-cloudrun)
 
 .PHONY: docker-build-lambda
-docker-build-lambda: ## Build AWS Lambda optimized (full)
-	docker build -t $(DOCKER_REGISTRY):latest-aws-lambda -t $(DOCKER_REGISTRY):$(MAJOR_VERSION)-aws-lambda -f Dockerfile.lambda .
+docker-build-lambda: ## Build AWS Lambda full image (Lambda Web Adapter)
+	$(call docker_build,folio-lambda,-lambda)
 
-.PHONY: docker-build-lambda.chromium
-docker-build-lambda.chromium: ## Build AWS Lambda chromium-only
-	docker build -t $(DOCKER_REGISTRY):latest-chromium-aws-lambda -t $(DOCKER_REGISTRY):$(MAJOR_VERSION)-chromium-aws-lambda -f Dockerfile.lambda.chromium .
+.PHONY: docker-build-lambda-chromium
+docker-build-lambda-chromium: ## Build AWS Lambda Chromium-only image
+	$(call docker_build,folio-lambda-chromium,-chromium-lambda)
 
-.PHONY: docker-build-lambda.libreoffice
-docker-build-lambda.libreoffice: ## Build AWS Lambda libreoffice-only
-	docker build -t $(DOCKER_REGISTRY):latest-libreoffice-aws-lambda -t $(DOCKER_REGISTRY):$(MAJOR_VERSION)-libreoffice-aws-lambda -f Dockerfile.lambda.libreoffice .
+.PHONY: docker-build-lambda-libreoffice
+docker-build-lambda-libreoffice: ## Build AWS Lambda LibreOffice-only image
+	$(call docker_build,folio-lambda-libreoffice,-libreoffice-lambda)
 
-# Push targets (sequential to avoid rate limiting)
-.PHONY: docker-push-standard
-docker-push-standard: ## Push standard variant
+.PHONY: docker-build-all
+docker-build-all: ## Build all 9 variants sequentially
+docker-build-all: docker-build docker-build-chromium docker-build-libreoffice \
+                  docker-build-cloudrun docker-build-cloudrun-chromium docker-build-cloudrun-libreoffice \
+                  docker-build-lambda docker-build-lambda-chromium docker-build-lambda-libreoffice
+
+# ---- Push targets (depend on their build counterpart) -----------------------
+
+.PHONY: docker-push
+docker-push: docker-build ## Push full image
 	docker push $(DOCKER_REGISTRY):latest
 	docker push $(DOCKER_REGISTRY):$(MAJOR_VERSION)
 	docker push $(DOCKER_REGISTRY):v$(VERSION)
 
 .PHONY: docker-push-chromium
-docker-push-chromium: ## Push chromium-only variant
+docker-push-chromium: docker-build-chromium ## Push Chromium-only image
 	docker push $(DOCKER_REGISTRY):latest-chromium
 	docker push $(DOCKER_REGISTRY):$(MAJOR_VERSION)-chromium
 
 .PHONY: docker-push-libreoffice
-docker-push-libreoffice: ## Push libreoffice-only variant
+docker-push-libreoffice: docker-build-libreoffice ## Push LibreOffice-only image
 	docker push $(DOCKER_REGISTRY):latest-libreoffice
 	docker push $(DOCKER_REGISTRY):$(MAJOR_VERSION)-libreoffice
 
 .PHONY: docker-push-cloudrun
-docker-push-cloudrun: ## Push Cloud Run full variant
+docker-push-cloudrun: docker-build-cloudrun ## Push Cloud Run full image
 	docker push $(DOCKER_REGISTRY):latest-cloudrun
 	docker push $(DOCKER_REGISTRY):$(MAJOR_VERSION)-cloudrun
 
-.PHONY: docker-push-cloudrun.chromium
-docker-push-cloudrun.chromium: ## Push Cloud Run chromium variant
+.PHONY: docker-push-cloudrun-chromium
+docker-push-cloudrun-chromium: docker-build-cloudrun-chromium ## Push Cloud Run Chromium image
 	docker push $(DOCKER_REGISTRY):latest-chromium-cloudrun
 	docker push $(DOCKER_REGISTRY):$(MAJOR_VERSION)-chromium-cloudrun
 
-.PHONY: docker-push-cloudrun.libreoffice
-docker-push-cloudrun.libreoffice: ## Push Cloud Run libreoffice variant
+.PHONY: docker-push-cloudrun-libreoffice
+docker-push-cloudrun-libreoffice: docker-build-cloudrun-libreoffice ## Push Cloud Run LibreOffice image
 	docker push $(DOCKER_REGISTRY):latest-libreoffice-cloudrun
 	docker push $(DOCKER_REGISTRY):$(MAJOR_VERSION)-libreoffice-cloudrun
 
 .PHONY: docker-push-lambda
-docker-push-lambda: ## Push AWS Lambda full variant
-	docker push $(DOCKER_REGISTRY):latest-aws-lambda
-	docker push $(DOCKER_REGISTRY):$(MAJOR_VERSION)-aws-lambda
+docker-push-lambda: docker-build-lambda ## Push Lambda full image
+	docker push $(DOCKER_REGISTRY):latest-lambda
+	docker push $(DOCKER_REGISTRY):$(MAJOR_VERSION)-lambda
 
-.PHONY: docker-push-lambda.chromium
-docker-push-lambda.chromium: ## Push AWS Lambda chromium variant
-	docker push $(DOCKER_REGISTRY):latest-chromium-aws-lambda
-	docker push $(DOCKER_REGISTRY):$(MAJOR_VERSION)-chromium-aws-lambda
+.PHONY: docker-push-lambda-chromium
+docker-push-lambda-chromium: docker-build-lambda-chromium ## Push Lambda Chromium image
+	docker push $(DOCKER_REGISTRY):latest-chromium-lambda
+	docker push $(DOCKER_REGISTRY):$(MAJOR_VERSION)-chromium-lambda
 
-.PHONY: docker-push-lambda.libreoffice
-docker-push-lambda.libreoffice: ## Push AWS Lambda libreoffice variant
-	docker push $(DOCKER_REGISTRY):latest-libreoffice-aws-lambda
-	docker push $(DOCKER_REGISTRY):$(MAJOR_VERSION)-libreoffice-aws-lambda
+.PHONY: docker-push-lambda-libreoffice
+docker-push-lambda-libreoffice: docker-build-lambda-libreoffice ## Push Lambda LibreOffice image
+	docker push $(DOCKER_REGISTRY):latest-libreoffice-lambda
+	docker push $(DOCKER_REGISTRY):$(MAJOR_VERSION)-libreoffice-lambda
 
-# Quick helpers
+.PHONY: docker-push-all
+docker-push-all: ## Build and push all 9 variants
+docker-push-all: docker-push docker-push-chromium docker-push-libreoffice \
+                 docker-push-cloudrun docker-push-cloudrun-chromium docker-push-cloudrun-libreoffice \
+                 docker-push-lambda docker-push-lambda-chromium docker-push-lambda-libreoffice
+
+# ---- Utility ----------------------------------------------------------------
+
 .PHONY: docker-login
 docker-login: ## Login to Docker Hub
-	docker login -u $(DOCKER_REGISTRY)
+	docker login
 
 .PHONY: docker-list-tags
-docker-list-tags: ## List all local Folio images
+docker-list-tags: ## List all local Folio images and sizes
 	docker images $(DOCKER_REGISTRY) --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}"
 
 .PHONY: docker-clean

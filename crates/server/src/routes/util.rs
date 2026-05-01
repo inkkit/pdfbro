@@ -8,6 +8,18 @@ use axum::response::{IntoResponse, Response};
 
 use crate::error::{ApiError, ApiResult};
 
+/// Extract `Gotenberg-Output-Filename` from HTTP request headers.
+/// Strips any trailing `.pdf` and re-appends it so callers always get a `.pdf` name.
+pub fn output_filename(headers: &HeaderMap, default: &str) -> String {
+    let raw = headers
+        .get("Gotenberg-Output-Filename")
+        .and_then(|v| v.to_str().ok());
+    match raw {
+        Some(s) => format!("{}.pdf", s.trim_end_matches(".pdf")),
+        None => format!("{}.pdf", default.trim_end_matches(".pdf")),
+    }
+}
+
 /// Build a `200 OK` response carrying a single PDF.
 pub fn pdf_response(bytes: Vec<u8>, filename: &str) -> Response {
     binary_response(bytes, "application/pdf", filename)

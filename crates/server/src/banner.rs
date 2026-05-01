@@ -200,6 +200,11 @@ mod tests {
             api_tls_key_file: None,
             api_basic_auth_username: None,
             api_basic_auth_password: None,
+            api_download_from_allow_list: vec![],
+            api_download_from_deny_list: vec![],
+            api_download_from_max_retry: 3,
+            api_disable_download_from: false,
+            api_correlation_id_header: "x-request-id".to_string(),
         }
     }
 
