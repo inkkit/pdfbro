@@ -1,154 +1,150 @@
-# Folio
+<p align="center">
+  <img src="./docs/assets/folio-logo.svg" alt="Folio" width="160"/>
+</p>
+
+<h1 align="center">Folio</h1>
 
 <p align="center">
-  <img src="./docs/assets/folio-logo.svg" alt="Folio Logo" width="200"/>
+  <em>A Rust-native, Gotenberg-compatible PDF service — with a live operator console.</em>
 </p>
 
 <p align="center">
-  <a href="https://github.com/__deesh_reddy__/folio/actions">
-    <img src="https://img.shields.io/github/actions/workflow/status/__deesh_reddy__/folio/ci.yml?branch=main&style=flat-square" alt="CI Status"/>
-  </a>
-  <a href="https://crates.io/crates/folio">
-    <img src="https://img.shields.io/crates/v/folio?style=flat-square" alt="Crates.io"/>
-  </a>
-  <img src="https://img.shields.io/badge/rust-1.75%2B-orange?style=flat-square" alt="Rust Version"/>
-  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"/>
-  <a href="https://github.com/__deesh_reddy__/folio/releases">
-    <img src="https://img.shields.io/github/v/release/__deesh_reddy__/folio?style=flat-square" alt="Release"/>
-  </a>
-</p>
-
-<p align="center">
-  <strong>A modern, Rust-native PDF generation engine</strong><br/>
-  True browser-grade fidelity • Gotenberg-compatible API • Memory safe
+  <img src="https://img.shields.io/badge/rust-1.75%2B-orange?style=flat-square" alt="Rust 1.75+"/>
+  <img src="https://img.shields.io/badge/gotenberg_parity-~85%25-blue?style=flat-square" alt="Gotenberg parity ~85%"/>
+  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT"/>
 </p>
 
 ---
 
-## 📖 Table of Contents
+Folio converts **HTML, URLs, Markdown, and Office documents** into PDFs using
+real Chrome under the hood. It speaks the same HTTP API as
+[Gotenberg](https://github.com/gotenberg/gotenberg), so most existing
+clients can point at Folio with only a base-URL change.
 
-- [What is Folio?](#what-is-folio)
-- [Why Folio?](#why-folio)
-- [Quick Start](#quick-start)
-- [Usage Modes](#usage-modes)
-- [Features](#features)
-- [Documentation](#documentation)
-- [Project Structure](#project-structure)
-- [Development](#development)
-- [Testing](#testing)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [License](#license)
+Unlike Gotenberg, Folio also runs as a **Rust library, a CLI, and a single
+binary** — and ships with a live operator console at `/_/` so you can see
+what your PDF service is actually doing without wiring up Grafana first.
+
+> **Status:** active. Core conversions and PDF ops are production-ready.
+> Webhook callback delivery, batch ZIP output, and a few advanced Chromium
+> options are still in progress — see the [feature comparison](./comparison.md).
 
 ---
 
-## What is Folio?
+## Why Folio
 
-**Folio** (from Latin *folium*, meaning "leaf" or "sheet of paper") is a high-performance PDF generation engine built in Rust. It converts HTML, URLs, Markdown, and Office documents to PDF with **true browser-grade fidelity** by leveraging Chrome's rendering engine via the Chrome DevTools Protocol (CDP).
+- **Gotenberg-compatible.** Same routes (`/forms/chromium/*`,
+  `/forms/libreoffice/convert`, `/forms/pdfengines/*`), same multipart
+  contract. Drop-in for ~85% of workloads.
+- **Memory-safe.** Rust core; no GC pauses, no parser-level CVEs from
+  malformed inputs.
+- **Four ways to run it.** HTTP server, CLI, Rust library, Docker — pick
+  whichever fits your shape. The library is the source of truth; the
+  server and CLI are thin wrappers.
+- **Observability-first.** Prometheus metrics, OpenTelemetry traces, and
+  a built-in Svelte SPA at `/_/` showing live RPS, p95 latency,
+  per-engine health, concurrency, and active batches over SSE.
+- **Slim deployment targets.** Multi-stage Dockerfile produces full,
+  Chromium-only, LibreOffice-only, Cloud Run, and Lambda images.
 
-> Like a printer's folio marks the beginning of a new page, Folio marks a new chapter in document conversion technology.
-
-### Key Highlights
-
-- **True Browser Fidelity**: Renders using real Chrome/Chromium — full CSS3, JavaScript, Web Fonts support
-- **Gotenberg-Compatible**: Drop-in replacement for existing Gotenberg deployments
-- **Memory Safe**: Rust's compile-time guarantees prevent entire classes of bugs
-- **Multiple Interfaces**: HTTP API, CLI, Rust library, and language bindings (Python/Node.js)
-- **Self-Contained**: Library mode requires no external HTTP services
-
----
-
-## Why Folio?
-
-### Comparison Table
-
-| Feature | **Folio** | Gotenberg | WeasyPrint | wkhtmltopdf |
-|---------|------------|-----------|-------------|-------------|
-| **Language** | Rust 🦀 | Go | Python | C++ |
-| **Rendering** | Chrome (CDP) | Chrome | Custom engine | QtWebKit (2012) |
-| **Modern CSS** | ✅ Full | ✅ Full | ⚠️ Limited | ❌ Legacy |
-| **JavaScript** | ✅ Full V8 | ✅ Full | ❌ None | ⚠️ ES3 |
-| **Usage Modes** | 4 (Server/CLI/Lib/Bindings) | Server only | Library only | CLI only |
-| **Memory Safety** | ✅ Compile-time | GC | Runtime | Manual |
-| **Gotenberg API** | ✅ Compatible | ✅ Native | ❌ | ❌ |
-| **Screenshots** | ✅ Done | ✅ | ❌ | ❌ |
-| **Structured Logging** | ✅ Full (tracing) | ✅ (slog) | ❌ | ❌ |
-| **Prometheus Metrics** | ✅ `/prometheus/metrics` | ✅ | ❌ | ❌ |
-| **OpenTelemetry** | ✅ OTLP HTTP | ✅ | ❌ | ❌ |
-| **Process Supervision** | 🚧 In Progress | ✅ | ❌ | ❌ |
-
-### Architecture Pattern
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    USAGE MODES                              │
-│  Server    CLI    Rust Lib    Python    Node.js            │
-│     │        │         │          │         │               │
-│     └────────┴─────────┴──────────┴─────────┘               │
-│                       │                                       │
-│            ┌──────────┴──────────┐                          │
-│            │      engine          │  ← Single source         │
-│            │  • ChromiumEngine     │    of truth              │
-│            │  • LibreOfficeEngine  │                          │
-│            │  • PdfOperations      │                          │
-│            └──────────┬────────────┘                          │
-│                       │                                       │
-│            ┌──────────┴──────────┐                          │
-│            │   Chrome (CDP)       │                          │
-│            └──────────────────────┘                          │
-└─────────────────────────────────────────────────────────────┘
-```
+For the honest comparison against Gotenberg (what's parity, what's behind,
+what's ahead) read [`comparison.md`](./comparison.md).
 
 ---
 
-## Quick Start
-
-### Prerequisites
-
-- **Rust** 1.75+ ([install](https://rustup.rs/))
-- **Chrome/Chromium** (auto-detected) or set `CHROME_PATH`
-- **LibreOffice** (optional, for Office document conversion)
-
-### Option 1: HTTP Server (Gotenberg-Compatible)
+## 60-second quickstart
 
 ```bash
-# Build and run
-cargo run -p server -- serve --port 3000
+# Run the server (Docker, full image)
+docker run --rm -p 3000:3000 ghcr.io/__deesh_reddy__/folio:latest
 
-# Or with Docker (full image — Chromium + LibreOffice)
-docker build --target folio -t folio:latest .
-docker run -p 3000:3000 folio:latest
-
-# Convert URL to PDF
+# Convert a URL to PDF
 curl -X POST http://localhost:3000/forms/chromium/convert/url \
   -F "url=https://example.com" \
   -F "landscape=true" \
-  -o output.pdf
+  -o out.pdf
+
+# Open the operator console
+open http://localhost:3000/_/
 ```
 
-### Option 2: CLI
+That's it. Same multipart contract for HTML, Markdown, Office, merge,
+split, watermark, etc.
+
+---
+
+## Install
+
+| Surface          | Command                                                       |
+|------------------|---------------------------------------------------------------|
+| Docker (full)    | `docker pull ghcr.io/__deesh_reddy__/folio:latest`            |
+| Docker (slim)    | `docker pull ghcr.io/__deesh_reddy__/folio:latest-chromium`   |
+| CLI (cargo)      | `cargo install --path crates/cli` → `folio --help`            |
+| Server (cargo)   | `cargo run -p server -- serve --port 3000`                    |
+| Library          | `folio-engine = { path = "crates/engine" }` in `Cargo.toml`   |
+
+**Prerequisites for non-Docker installs:** Rust 1.75+, Chrome/Chromium
+(auto-detected, or set `CHROME_PATH`), and optionally LibreOffice for
+Office conversion.
+
+---
+
+## HTTP API at a glance
+
+All routes are `POST` and accept multipart/form-data unless noted.
+
+### Chromium (HTML / URL / Markdown → PDF or screenshot)
+```
+/forms/chromium/convert/{html,url,markdown}
+/forms/chromium/screenshot/{html,url,markdown}
+```
+
+### LibreOffice (100+ Office formats → PDF)
+```
+/forms/libreoffice/convert
+```
+
+### PDF operations
+```
+/forms/pdfengines/{merge,split,flatten,rotate,watermark,convert,encrypt}
+/forms/pdfengines/metadata/{read,write}
+/forms/pdfengines/bookmarks/{read,write}
+```
+
+### Operational
+```
+GET  /health                 → JSON health + per-engine status
+GET  /version                → plain text
+GET  /prometheus/metrics     → Prometheus text format
+GET  /_/                     → operator console (SPA)
+GET  /_/sse                  → Server-Sent Events stream
+```
+
+For the gap analysis vs Gotenberg, see [`comparison.md`](./comparison.md).
+
+---
+
+## CLI
 
 ```bash
-# Install
-cargo install --path crates/cli
+folio convert --html  index.html         --output out.pdf
+folio convert --url   https://example.com --output out.pdf
+folio convert --markdown README.md       --output out.pdf
+folio convert --office report.docx       --output out.pdf
 
-# Convert HTML to PDF
-folio convert --html index.html --output out.pdf
-
-# Convert URL to PDF
-folio convert --url https://example.com --output out.pdf
-
-# Batch conversion
-folio batch --input-dir ./docs/ --output-dir ./pdfs/
+folio merge   a.pdf b.pdf c.pdf --output combined.pdf
+folio split   input.pdf --mode uniform --span 1 --output-dir ./pages/
+folio flatten input.pdf                  --output flat.pdf
+folio rotate  input.pdf --angle 90       --output rotated.pdf
+folio metadata read  input.pdf
+folio metadata write input.pdf '{"Title":"Q2 Review"}'
 ```
 
-### Option 3: Rust Library
+Shell completions: `folio completion zsh > ~/.zfunc/_folio`.
 
-```toml
-# Cargo.toml
-[dependencies]
-folio-engine = { path = "crates/engine" }
-```
+---
+
+## Library
 
 ```rust
 use engine::ChromiumEngine;
@@ -156,459 +152,167 @@ use engine::ChromiumEngine;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let engine = ChromiumEngine::launch().await?;
-    let pdf = engine.html_to_pdf("<h1>Hello World</h1>", None, &Default::default(), &Default::default()).await?;
-    std::fs::write("output.pdf", pdf)?;
+    let pdf = engine
+        .html_to_pdf("<h1>Hello</h1>", None, &Default::default(), &Default::default())
+        .await?;
+    std::fs::write("out.pdf", pdf)?;
     Ok(())
 }
 ```
 
-### Option 4: Docker Compose (Development)
+The engine crate has zero dependency on `axum` or `tower` — it's the same
+code path the server uses, just without an HTTP layer in front.
+
+---
+
+## Operator console
+
+`GET /_/` serves a Svelte SPA driven by Server-Sent Events. In one screen:
+
+- **Ticker:** RPS, p95 latency, error %, in-flight count
+- **Routes table:** per-endpoint p50 / p95 / p99, error %, load %
+- **Engines:** Chromium / LibreOffice up-down + restart count
+- **Concurrency grid:** active vs cap, with warn/crit thresholds
+- **Throughput strip:** 30-min RPS + p95 trend with SLA overlay
+- **Resources:** CPU % and memory MB
+- **Batches:** progress + per-item state for active batches
+- **Logs:** last 20 requests, last 10 errors
+
+This is the cleanest lead Folio has over Gotenberg today; it's where the
+last 30 commits have lived. If you've ever bolted Grafana onto Gotenberg
+just to see whether it's healthy — this replaces that step.
+
+---
+
+## Configuration
+
+Common flags (every flag is also `FOLIO_*` env-overridable):
 
 ```bash
-# Copy example environment file
-cp .env.example .env
+folio-server serve \
+  --host 0.0.0.0 --port 3000 \
+  --concurrency 8 \
+  --max-body-bytes 52428800 \      # 50 MiB
+  --request-timeout 120s \
+  --chrome /usr/bin/google-chrome --no-sandbox \
+  --soffice /usr/bin/soffice \
+  --log-level info --log-format json \
+  --api-basic-auth-username admin --api-basic-auth-password secret \
+  --otel-enabled --otel-endpoint http://localhost:4318/v1/traces
+```
 
-# Start Folio with all dependencies
-make run
+Run `folio-server serve --help` for the full flag reference.
 
-# Run tests
-make test-integration
+**TLS is intentionally not handled in-process.** Put nginx, Caddy, or
+envoy in front. Cert rotation, OCSP stapling, and ALPN are not things
+Folio is positioned to do better than they do.
 
-# Stop
-make stop
+---
+
+## Docker variants
+
+Single `Dockerfile`, multiple `--target` stages — pick the smallest one
+that does what you need.
+
+| Target                       | Contains             | Use case             |
+|------------------------------|----------------------|----------------------|
+| `folio`                      | Chromium + LO        | Default              |
+| `folio-chromium`             | Chromium             | HTML/URL/Markdown only (~30% smaller) |
+| `folio-libreoffice`          | LO                   | Office docs only (~40% smaller) |
+| `folio-cloudrun`             | Full + Cloud Run env | Google Cloud Run     |
+| `folio-lambda`               | Full + Lambda Web Adapter | AWS Lambda      |
+| `folio-{cloudrun,lambda}-{chromium,libreoffice}` | Slim + platform | Mix-and-match |
+
+```bash
+docker build --target folio-chromium -t folio:chromium .
+make docker-push-all DOCKER_REGISTRY=ghcr.io/me VERSION=1.0.0
 ```
 
 ---
 
-## Usage Modes
+## Where things stand
 
-### 1. Server Mode (HTTP API)
+A short, honest scorecard. The full version is [`comparison.md`](./comparison.md).
 
-Gotenberg-compatible REST API for document conversion:
+**Ready to use:**
+HTML/URL/Markdown→PDF · Office→PDF · screenshots · merge · split · flatten ·
+rotate · watermark · metadata · bookmarks · encrypt · PDF/A & PDF/UA ·
+Basic Auth · Prometheus · OpenTelemetry · operator console · CLI · Rust
+library · multi-target Docker.
 
-| Endpoint | Method | Input | Output |
-|----------|--------|-------|--------|
-| `/forms/chromium/convert/html` | POST | HTML file | PDF |
-| `/forms/chromium/convert/url` | POST | URL | PDF |
-| `/forms/chromium/convert/markdown` | POST | Markdown | PDF |
-| `/forms/chromium/screenshot/html` | POST | HTML | PNG/JPEG/WebP |
-| `/forms/libreoffice/convert` | POST | Office docs | PDF |
-| `/forms/pdfengines/merge` | POST | PDFs | Merged PDF |
-| `/forms/pdfengines/split` | POST | PDF | Split PDFs |
-| `/health` | GET | - | Health status |
+**In progress:**
+Webhook callback delivery (scaffold ready, delivery TODO) ·
+batch API ZIP/merge output (endpoints + worker exist) ·
+advanced Chromium wait/fail conditions (`waitForSelector`, `failOn*`) ·
+long tail of LibreOffice export filters · `embed` and full `stamp` routes.
 
-See [API Documentation](./docs/gotenberg-spec.md) for full details.
+**Deliberate gaps:**
+TLS in-process (use a reverse proxy) · OAuth/JWT/RBAC (use a reverse
+proxy) · workflow/DAG engine on top of batch (out of scope).
 
-### 2. CLI Mode
-
-Command-line interface for batch operations and scripting:
-
-```bash
-# Convert various formats
-folio convert --html file.html --output out.pdf
-folio convert --url https://example.com --output out.pdf
-folio convert --markdown README.md --output readme.pdf
-
-# PDF operations
-folio merge --output combined.pdf file1.pdf file2.pdf
-folio split input.pdf --output-dir ./split/
-folio flatten input.pdf --output flat.pdf
-folio metadata read input.pdf
-```
-
-### 3. Library Mode (Rust)
-
-Use Folio as a Rust library in your applications:
-
-```rust
-// HTML to PDF
-let engine = ChromiumEngine::launch().await?;
-let pdf = engine.html_to_pdf(html, None, &opts, &ctx).await?;
-
-// URL to PDF
-let pdf = engine.url_to_pdf("https://example.com", &opts, &ctx).await?;
-
-// Markdown to PDF
-let pdf = engine.markdown_to_pdf(markdown, &opts, &ctx).await?;
-```
-
-### 4. Language Bindings
-
-**Python** ([Planned]):
-```python
-import folio
-
-engine = folio.ChromiumEngine()
-pdf = engine.html_to_pdf("<h1>Hello</h1>")
-```
-
-**Node.js** ([Planned]):
-```javascript
-const folio = require('folio');
-const engine = new folio.ChromiumEngine();
-const pdf = await engine.htmlToPdf('<h1>Hello</h1>');
-```
-
----
-
-## Features
-
-### ✅ Implemented
-
-- **HTML/URL to PDF**: Full Chrome rendering with print CSS support
-- **Markdown to PDF**: GitHub Flavored Markdown with syntax highlighting
-- **Office Documents**: Convert 100+ formats via LibreOffice (DOC, DOCX, PPT, XLS, ODT, etc.)
-- **PDF Operations**: Merge, split, flatten, rotate, watermark
-- **PDF Metadata**: Read/write PDF metadata
-- **Gotenberg Compatibility**: Drop-in API replacement
-- **Health Checks**: `/health` endpoint with engine status
-- **Concurrent Rendering**: Thread-safe browser instance sharing
-- **Screenshots**: URL/HTML/Markdown to PNG/JPEG/WebP
-- **BDD Testing**: Port Gotenberg's Gherkin scenarios to Rust
-- **Webhook System**: Async job dispatch with retry, full engine integration (spec 15)
-- **Structured Logging**: Context-aware logs with request_id, engine type, duration (text/JSON formats)
-- **Prometheus Metrics**: `/prometheus/metrics` endpoint with conversion, queue, and engine metrics
-
-### 🚧 In Progress / Partially Done
-
-- **Advanced Wait Conditions**: `skipNetworkIdleEvent`, `failOnResourceLoadingFailed`, etc. (spec 36)
-- **Advanced LibreOffice Fields**: 30+ missing export options (spec 37)
-- **Full CLI Flag Parity**: Many Gotenberg flags still missing (spec 39)
-- **Actionable Errors**: Structured error responses, room for enhancement (spec 44)
-- **BDD Test Suite**: Framework exists, scenario coverage incomplete (spec 50)
-- **Batch API**: CLI batch works; server-side bulk endpoint pending (spec 50-batch)
-- **Health Dashboard**: JSON `/health` works; visual HTML dashboard pending (spec 51)
-
-### ❌ Not Started (Spec-Only)
-
-- **Python / Node.js Bindings**: Empty placeholders only (specs 40, 41)
-- **Multi-Backend PDF Engines**: qpdf, pdfcpu, pdftk backends (spec 38)
-- **Special Features**: TLS, auth, cloud-run, remote URL download (spec 40-special)
-- **Smart PDF Optimiser**: Automatic bloat detection & compression (spec 42)
-- **Font Doctor**: Font rendering diagnostics (spec 43)
-- **Live Preview**: HTML→image debug preview (spec 45)
-- **PDF Size Estimator**: Pre-flight size prediction (spec 46)
-- **One-Command Install**: `curl | bash` installer (spec 47)
-- **Interactive Docs**: Built-in `/docs` API explorer (spec 48)
-- **Template Library**: Pre-built document templates (spec 49)
-
-> **Note:** This README is a high-level overview. For a ground-truth audit of what is actually built vs. spec claims, see [`docs/implementation-status.md`](./docs/implementation-status.md). The `20-missing-features-roadmap.md` spec is currently stale and should not be relied upon for current status.
+**Empty placeholders (will be removed if not built):**
+Python bindings (`crates/py/`), Node bindings (`crates/js/`).
 
 ---
 
 ## Documentation
 
-### Core Documentation
+- [`comparison.md`](./comparison.md) — in-depth audit vs Gotenberg
+- [`docs/markdown-plus.md`](./docs/markdown-plus.md) — proposed
+  enhanced Markdown route (front-matter, math, mermaid, themes)
 
-| Document | Description |
-|----------|-------------|
-| [Technical Specification](./docs/proposal.md) | Full architecture and design |
-| [Gotenberg API Spec](./docs/gotenberg-spec.md) | API compatibility details |
-| [Gap Analysis](./docs/gap-analysis.md) | Research findings |
-
-### Specs (Implementation Guides)
-
-| Spec | Description | Status |
-|------|-------------|--------|
-| [00-overview](./docs/specs/00-overview.md) | Spec system overview & conventions | 📋 Reference |
-| [10-engine-types](./docs/specs/10-engine-types.md) | Core types, errors, options | ✅ Done |
-| [11-engine-chromium](./docs/specs/11-engine-chromium.md) | Chromium engine (HTML/URL/Markdown→PDF + screenshots) | ✅ Done |
-| [12-engine-libreoffice](./docs/specs/12-engine-libreoffice.md) | LibreOffice engine (Office→PDF) | ✅ Done |
-| [13-engine-pdfops](./docs/specs/13-engine-pdfops.md) | PDF operations (merge, split, flatten, metadata, watermark, rotate) | ✅ Done |
-| [14-engine-pdfa](./docs/specs/14-engine-pdfa.md) | PDF/A & PDF/UA conformance conversion | ✅ Done |
-| [15-webhook](./docs/specs/15-webhook.md) | Async webhook callback system | 🚧 Partially Done |
-| [16-bookmarks](./docs/specs/16-bookmarks.md) | PDF bookmarks/outline read & write | ✅ Done |
-| [17-watermark](./docs/specs/17-watermark.md) | PDF watermark & stamp overlay | ✅ Done *(via spec 13)* |
-| [18-screenshot](./docs/specs/18-screenshot.md) | Chromium screenshot API (PNG/JPEG/WebP) | ✅ Done *(via spec 11)* |
-| [19-encrypt](./docs/specs/19-encrypt.md) | PDF encryption & password protection | ✅ Done |
-| [20-cli](./docs/specs/20-cli.md) | Command-line interface (`folio` binary) | ✅ Done |
-| [20-bdd-testing](./docs/specs/20-bdd-testing.md) | BDD test strategy | 🚧 Partially Done |
-| [20-missing-features-roadmap](./docs/specs/20-missing-features-roadmap.md) | Feature parity roadmap vs Gotenberg | 📋 Reference |
-| [30-server](./docs/specs/30-server.md) | HTTP server (Gotenberg-compatible API) | ✅ Done |
-| [36-chromium-wait-conditions](./docs/specs/36-chromium-wait-conditions.md) | Advanced wait conditions & options | 🚧 Partially Done |
-| [37-libreoffice-advanced](./docs/specs/37-libreoffice-advanced.md) | Advanced LibreOffice form fields | 🚧 Partially Done |
-| [38-pdfengines-backends](./docs/specs/38-pdfengines-backends.md) | Multi-backend support (qpdf, pdfcpu, pdftk) | ❌ Not Done |
-| [39-config-flags](./docs/specs/39-config-flags.md) | Full Gotenberg CLI flag parity | 🚧 Partially Done |
-| [40-bindings-py](./docs/specs/40-bindings-py.md) | Python bindings (`py` crate) | ❌ Not Done *(placeholder)* |
-| [40-special-features](./docs/specs/40-special-features.md) | TLS, auth, cloud-run, remote URL download | ❌ Not Done |
-| [41-bindings-js](./docs/specs/41-bindings-js.md) | Node.js bindings (`js` crate) | ❌ Not Done *(placeholder)* |
-| [41-github-issues-analysis](./docs/specs/41-github-issues-analysis.md) | User pain-point research from GitHub issues | 📋 Research |
-| [42-smart-pdf-optimiser](./docs/specs/42-smart-pdf-optimiser.md) | Automatic PDF size optimisation | ❌ Not Done |
-| [43-font-doctor](./docs/specs/43-font-doctor.md) | Font rendering diagnostics & fixes | ❌ Not Done |
-| [44-crystal-clear-errors](./docs/specs/44-crystal-clear-errors.md) | Actionable error messages (replace generic 500s) | 🚧 Partially Done |
-| [45-live-preview-mode](./docs/specs/45-live-preview-mode.md) | Live HTML→image preview for debugging | ❌ Not Done |
-| [46-pdf-size-estimator](./docs/specs/46-pdf-size-estimator.md) | Pre-flight PDF size prediction | ❌ Not Done |
-| [47-one-command-install](./docs/specs/47-one-command-install.md) | Frictionless install (`curl | bash`) | ❌ Not Done |
-| [48-interactive-docs](./docs/specs/48-interactive-docs.md) | Built-in API explorer at `/docs` | ❌ Not Done |
-| [49-template-library](./docs/specs/49-template-library.md) | Pre-built document templates | ❌ Not Done |
-| [50-batch-api](./docs/specs/50-batch-api.md) | Bulk conversion API (100+ docs in one request) | 🚧 Partially Done *(CLI batch only)* |
-| [50-testing-bdd](./docs/specs/50-testing-bdd.md) | BDD integration test suite (Gherkin→Rust) | 🚧 Partially Done |
-| [51-health-dashboard](./docs/specs/51-health-dashboard.md) | Visual health dashboard beyond JSON `/health` | 🚧 Partially Done |
-
-**Legend:** `✅ Done` = fully implemented & tested. `🚧 Partially Done` = core working, gaps remain. `❌ Not Done` = spec only, no code. `📋 Reference` = meta-doc or research, no code expected.
-
-### API Reference
-
-- **Chromium Routes**: `/forms/chromium/*` (convert HTML/URL/Markdown, screenshots)
-- **LibreOffice Routes**: `/forms/libreoffice/*` (convert Office docs)
-- **PDF Engine Routes**: `/forms/pdfengines/*` (merge, split, flatten, etc.)
-
----
-
-## Project Structure
-
-```
-folio/
-├── Cargo.toml                      # Workspace definition
-├── README.md                       # This file
-├── Dockerfile                      # Single file, 9 named --target variants (see Docker section)
-├── Dockerfile.test                 # Test environment (poppler, JRE, verapdf)
-├── docker-compose.yml              # Development environment
-├── Makefile                        # Build/test/docker automation
-├── .env.example                    # Configuration template
-│
-├── crates/
-│   ├── engine/                    # Core PDF generation engine
-│   │   ├── src/
-│   │   │   ├── chromium/          # Chrome/Chromium integration
-│   │   │   │   ├── launch.rs     # Browser discovery & launch
-│   │   │   │   ├── render.rs     # HTML/URL → PDF
-│   │   │   │   └── screenshot.rs # Screenshots (✅)
-│   │   │   ├── libreoffice/       # LibreOffice integration
-│   │   │   └── pdfops/           # PDF manipulation
-│   │   └── Cargo.toml
-│   │
-│   ├── server/                    # HTTP server (Gotenberg-compatible)
-│   │   ├── src/
-│   │   │   ├── routes/            # API route handlers
-│   │   │   └── app.rs            # Router configuration
-│   │   └── tests/                # Integration tests
-│   │
-│   ├── cli/                       # Command-line interface
-│   │   └── src/commands/         # CLI subcommands
-│   │
-│
-├── docs/
-│   ├── proposal.md                 # Technical specification
-│   ├── gotenberg-spec.md         # Gotenberg API analysis
-│   ├── gap-analysis.md           # Research findings
-│   ├── assets/                    # Images, logos
-│   └── specs/                    # Implementation specs (32 files, see table above)
-│
-└── crates/*/tests/                # Crate-local tests (unit + integration)
-    └── server/tests/bdd/            # BDD integration tests
-```
+> **Note on specs.** The previous 32-file `docs/specs/` tree has been
+> archived to [`docs/specs-archive-2026-05-01.zip`](./docs/specs-archive-2026-05-01.zip).
+> Fresh, better-organised contributor-facing specs are being written and
+> will reappear under `docs/` shortly.
 
 ---
 
 ## Development
 
-### Building from Source
-
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/folio.git
-cd folio
+git clone https://github.com/__deesh_reddy__/folio.git && cd folio
 
-# Build all crates
-cargo build --release
-
-# Run tests
-cargo test
-
-# Run with specific features
-cargo run -p server -- serve --help
+cargo build --release        # build everything
+cargo test                   # unit + integration (skips gracefully if Chrome missing)
+make check                   # fmt + clippy + unit tests (run before PRs)
+make run                     # docker-compose up, full image
+make test-integration        # BDD scenarios in Docker
 ```
 
-### Docker Image Variants
+| Command                 | What it does                          |
+|-------------------------|---------------------------------------|
+| `make docker-build`     | Build full image                      |
+| `make docker-build-all` | Build all 9 image variants            |
+| `make test-unit`        | `cargo test --lib`                    |
+| `make test-integration` | BDD + e2e in container                |
+| `make fmt` / `make lint`| `cargo fmt` / `cargo clippy`          |
 
-All variants are built from a single `Dockerfile` using named `--target` stages, following Gotenberg's pattern. Each platform-specific variant (Cloud Run, Lambda) is a thin layer on top of the base variant — just environment variables.
-
-| Target | Tag | Description |
-|--------|-----|-------------|
-| `folio` | `latest`, `vX.Y.Z` | Full: Chromium + LibreOffice |
-| `folio-chromium` | `latest-chromium` | Chromium only (~30% smaller) |
-| `folio-libreoffice` | `latest-libreoffice` | LibreOffice only (~40% smaller) |
-| `folio-cloudrun` | `latest-cloudrun` | Full + Google Cloud Run env vars |
-| `folio-cloudrun-chromium` | `latest-chromium-cloudrun` | Chromium + Cloud Run |
-| `folio-cloudrun-libreoffice` | `latest-libreoffice-cloudrun` | LibreOffice + Cloud Run |
-| `folio-lambda` | `latest-lambda` | Full + [Lambda Web Adapter](https://github.com/awslabs/aws-lambda-web-adapter) |
-| `folio-lambda-chromium` | `latest-chromium-lambda` | Chromium + Lambda |
-| `folio-lambda-libreoffice` | `latest-libreoffice-lambda` | LibreOffice + Lambda |
-
-```bash
-# Build a specific variant
-docker build --target folio-chromium -t myrepo/folio:chromium .
-
-# Build + push all 9 variants
-make docker-push-all DOCKER_REGISTRY=myrepo/folio VERSION=1.0.0
-
-# Run with Docker Compose (default: full image)
-docker compose up folio
-
-# Run Chromium-only profile
-docker compose --profile chromium up folio-chromium
-```
-
-### Development Commands
-
-| Command | Description |
-|---------|-------------|
-| `make docker-build` | Build full Docker image |
-| `make docker-build-all` | Build all 9 variants |
-| `make docker-push-all` | Build and push all variants |
-| `make run` | Start Folio via Docker Compose |
-| `make test-unit` | Run unit tests |
-| `make test-integration` | Run integration tests (requires Chrome) |
-| `make fmt` | Format code |
-| `make lint` | Lint with Clippy |
-| `make check` | Run format + lint + unit tests |
-| `make clean` | Clean build artifacts |
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `CHROME_PATH` | Path to Chrome/Chromium executable | Auto-detected |
-| `LIBREOFFICE_PATH` | Path to LibreOffice (soffice) | Auto-detected |
-| `RUST_LOG` | Log level (trace, debug, info, warn, error) | `info` |
-| `FOLIO_PORT` | Server port | `3000` |
-| `FOLIO_CONCURRENCY` | Max concurrent renders | CPU count |
-| `FOLIO_OTEL_ENABLED` | Enable OpenTelemetry trace export | `false` |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP HTTP trace endpoint | `http://localhost:4318/v1/traces` |
-
----
-
-## Testing
-
-### Test Structure
-
-```
-tests/
-├── unit/              # Unit tests (cargo test --lib)
-├── integration/       # BDD integration tests (🚧)
-│   ├── scenarios/     # Test scenarios (ported from Gotenberg)
-│   ├── common/       # Test helpers
-│   └── testdata/     # Test fixtures
-└── e2e/              # End-to-end tests
-```
-
-### Running Tests
-
-```bash
-# Unit tests (no Chrome required)
-cargo test --lib
-
-# Integration tests (skip gracefully if deps missing)
-cargo test -p server --test bdd
-
-# E2E tests (skip gracefully if deps missing)
-cargo test -p server --test e2e
-
-# All tests (skip gracefully if deps missing)
-cargo test -- --test-threads=1
-
-# All tests with Docker
-make docker-test
-```
-
-### Test Coverage
-
-We're porting Gotenberg's comprehensive BDD test suite:
-
-- ✅ Unit tests: 50+ test cases
-- 🚧 Integration tests: BDD framework with 25+ feature files (scenario pass rate unverified)
-- ✅ E2E tests: Server + CLI smoke tests
-
-See [BDD Testing Spec](./docs/specs/50-testing-bdd.md) for details.
-
----
-
-## Roadmap
-
-### Phase 1: Core Features ✅
-- [x] HTML/URL/Markdown → PDF (Chromium) — spec 11
-- [x] Office documents → PDF (LibreOffice) — spec 12
-- [x] PDF operations (merge, split, flatten, rotate, watermark) — spec 13
-- [x] PDF metadata read/write — spec 13
-- [x] Gotenberg-compatible API — spec 30
-- [x] Screenshots (HTML/URL/Markdown → PNG/JPEG/WebP) — spec 11 / 18
-- [x] Structured Logging (tracing with text/JSON formats)
-- [x] Prometheus Metrics (`/prometheus/metrics` endpoint)
-- [x] OpenTelemetry Traces (OTLP HTTP exporter)
-- [x] CLI (`folio` binary) — spec 20
-
-### Phase 2: Advanced Engine Features 🚧
-- [x] PDF/A & PDF/UA conformance conversion — spec 14
-- [x] PDF bookmarks read/write — spec 16
-- [x] PDF encryption & password protection — spec 19
-- [ ] Advanced Chromium wait conditions — spec 36
-- [ ] Advanced LibreOffice form fields — spec 37
-- [ ] Multi-backend PDF engines (qpdf, pdfcpu, pdftk) — spec 38
-
-### Phase 3: Server & Infrastructure 🚧
-- [ ] Webhook system with retry — spec 15
-- [ ] Full CLI flag parity with Gotenberg — spec 39
-- [ ] Batch API (server-side bulk conversion) — spec 50-batch
-- [ ] Actionable error messages — spec 44
-- [ ] Visual health dashboard — spec 51
-
-### Phase 4: Bindings & Ecosystem ❌
-- [ ] Python bindings (`py` crate) — spec 40
-- [ ] Node.js bindings (`js` crate) — spec 41
-- [ ] TLS, auth, cloud-run, remote URL download — spec 40-special
-
-### Phase 5: Unique Folio Features ❌
-- [ ] Smart PDF optimiser — spec 42
-- [ ] Font doctor / diagnostics — spec 43
-- [ ] Live preview mode — spec 45
-- [ ] PDF size estimator — spec 46
-- [ ] One-command install (`curl | bash`) — spec 47
-- [ ] Interactive API docs (`/docs`) — spec 48
-- [ ] Template library — spec 49
-
-See [Full Roadmap](./docs/specs/20-missing-features-roadmap.md) and detailed specs in [docs/specs/](./docs/specs/) for planning.
+**Useful env vars:** `CHROME_PATH`, `LIBREOFFICE_PATH`, `RUST_LOG`,
+`FOLIO_PORT`, `FOLIO_CONCURRENCY`, `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
 ---
 
 ## Contributing
 
-Contributions are welcome! Please read our [contributing guidelines](./CONTRIBUTING.md) before submitting a PR.
+PRs welcome. Three things that make a PR easy to land:
 
-### Quick Contribution Guide
+1. `make check` passes locally.
+2. Conventional Commits style (`feat:`, `fix:`, `docs:`, `chore:`).
+3. One feature or fix per PR — split mixed work.
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Workflow
-
-- Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages
-- Ensure `make check` passes before submitting PR
-- Add tests for new functionality
-- Update documentation as needed
-- Keep PRs focused on a single feature/fix
+For larger changes, open an issue first so we can agree on the shape
+before code.
 
 ---
 
-## Acknowledgments
+## Acknowledgements
 
-- **[Gotenberg](https://github.com/gotenberg/gotenberg)** - The original PDF generation API that inspired this project
-- **[chromiumoxide](https://github.com/mattsse/chromiumoxide)** - Chrome DevTools Protocol client for Rust
-- **[lopdf](https://github.com/Hopding/lopdf)** - Pure Rust PDF manipulation library
-- **[Axum](https://github.com/tokio-rs/axum)** - Ergonomic HTTP server framework
-
----
+- [Gotenberg](https://github.com/gotenberg/gotenberg) — the API contract Folio implements
+- [chromiumoxide](https://github.com/mattsse/chromiumoxide) — Chrome DevTools Protocol client
+- [lopdf](https://github.com/J-F-Liu/lopdf) — pure-Rust PDF manipulation
+- [axum](https://github.com/tokio-rs/axum) — HTTP server
 
 ## License
 
-Folio is licensed under the MIT License - see [LICENSE](LICENSE) for details.
-
----
-
-<p align="center">
-  <strong>Built with ❤️ in Rust 🦀</strong><br/>
-  <em>Folio: A new page in PDF generation.</em>
-</p>
+MIT. See [LICENSE](./LICENSE).
