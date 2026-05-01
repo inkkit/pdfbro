@@ -1,9 +1,7 @@
 @health
 Feature: /health
 
-  @skip
   Scenario: GET /health
-    # Reason: requires both Chromium and LibreOffice to be running
     Given I have a Folio container with the following environment variable(s):
       | API_DISABLE_HEALTH_CHECK_ROUTE_TELEMETRY | false |
     When I make a "GET" request to "/health"

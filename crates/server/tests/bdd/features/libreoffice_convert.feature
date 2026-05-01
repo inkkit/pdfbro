@@ -2,7 +2,6 @@
 @libreoffice-convert
 Feature: /forms/libreoffice/convert
 
-  @skip
   Scenario: POST /forms/libreoffice/convert (Single Document)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
@@ -19,7 +18,6 @@ Feature: /forms/libreoffice/convert
       Page 1
       """
 
-  @skip
   Scenario: POST /forms/libreoffice/convert (Many Documents)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
@@ -44,7 +42,6 @@ Feature: /forms/libreoffice/convert
       Page 2
       """
 
-  @skip
   Scenario: POST /forms/libreoffice/convert (Non-basic Latin Characters)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
@@ -94,7 +91,6 @@ Feature: /forms/libreoffice/convert
       | foo.pdf |
     Then the "foo.pdf" PDF should be set to landscape orientation
 
-  @skip
   Scenario: POST /forms/libreoffice/convert (Native Page Ranges - Single Document)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
@@ -116,7 +112,6 @@ Feature: /forms/libreoffice/convert
       Page 3
       """
 
-  @skip
   Scenario: POST /forms/libreoffice/convert (Native Page Ranges - Many Documents)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
@@ -156,7 +151,6 @@ Feature: /forms/libreoffice/convert
       Invalid form data: form field 'merge' is invalid (got 'foo', resulting to strconv.ParseBool: parsing "foo": invalid syntax)
       """
 
-  @skip
   @merge
   Scenario: POST /forms/libreoffice/convert (Merge)
     Given I have a default Folio container
@@ -256,7 +250,6 @@ Feature: /forms/libreoffice/convert
       | pages_3.docx.pdf |
     Then the "pages_3.docx.pdf" PDF should have 2 page(s)
 
-  @skip
   @convert
   Scenario: POST /forms/libreoffice/convert (PDF/A-1b & PDF/UA-1)
     Given I have a default Folio container
@@ -269,7 +262,6 @@ Feature: /forms/libreoffice/convert
     Then there should be 1 PDF(s) in the response
     Then the response PDF(s) should pass PDF/A validation
 
-  @skip
   @metadata
   Scenario: POST /forms/libreoffice/convert (Metadata)
     Given I have a default Folio container
@@ -306,7 +298,6 @@ Feature: /forms/libreoffice/convert
       }
       """
 
-  @skip
   @flatten
   Scenario: POST /forms/libreoffice/convert (Flatten)
     Given I have a default Folio container
@@ -317,7 +308,6 @@ Feature: /forms/libreoffice/convert
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
-  @skip
   @encrypt
   Scenario: POST /forms/libreoffice/convert (Encrypt - user password only)
     Given I have a default Folio container
@@ -329,7 +319,6 @@ Feature: /forms/libreoffice/convert
     Then there should be 1 PDF(s) in the response
     Then the response PDF(s) should be encrypted
 
-  @skip
   @encrypt
   Scenario: POST /forms/libreoffice/convert (Encrypt - both user and owner passwords)
     Given I have a default Folio container
@@ -342,7 +331,6 @@ Feature: /forms/libreoffice/convert
     Then there should be 1 PDF(s) in the response
     Then the response PDF(s) should be encrypted
 
-  @skip
   @watermark
   Scenario: POST /forms/libreoffice/convert (Watermark - Text)
     Given I have a default Folio container
@@ -354,7 +342,6 @@ Feature: /forms/libreoffice/convert
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
-  @skip
   @stamp
   Scenario: POST /forms/libreoffice/convert (Stamp - Text)
     Given I have a default Folio container
@@ -366,7 +353,6 @@ Feature: /forms/libreoffice/convert
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
-  @skip
   @rotate
   Scenario: POST /forms/libreoffice/convert (Rotate 90)
     Given I have a default Folio container
@@ -377,7 +363,6 @@ Feature: /forms/libreoffice/convert
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
-  @skip
   @watermark
   Scenario: POST /forms/libreoffice/convert (Native Watermark - Text)
     Given I have a default Folio container
@@ -388,7 +373,6 @@ Feature: /forms/libreoffice/convert
     Then the response header "Content-Type" should be "application/pdf"
     Then there should be 1 PDF(s) in the response
 
-  @skip
   @watermark
   Scenario: POST /forms/libreoffice/convert (Native Watermark - Tiled)
     Given I have a default Folio container
@@ -504,7 +488,6 @@ Feature: /forms/libreoffice/convert
       Invalid form data: a watermark file is required for image or pdf source
       """
 
-  @skip
   Scenario: POST /forms/libreoffice/convert (Long Filename)
     Given I have a default Folio container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
