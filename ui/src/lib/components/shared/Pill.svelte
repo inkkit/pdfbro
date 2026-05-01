@@ -18,7 +18,7 @@
     font-family:ui-monospace,monospace;
     font-size:10px;
     font-weight:600;
-    border-radius:999px;
+    border-radius:4px;
     letter-spacing:0.04em;
     display:inline-block;
     line-height:16px;

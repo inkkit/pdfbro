@@ -17,8 +17,12 @@ pub async fn console_stream(
     let started_at = state.started_at;
     let mut rx = state.console.broadcast.subscribe();
 
-    // Send initial snapshot immediately on connect (no waiting for next 5s tick)
-    let initial = build_console_payload(&state, started_at).await;
+    // Send initial snapshot immediately on connect (no waiting for next 5s tick).
+    // For the initial snapshot we read the health gauges as a best-effort proxy;
+    // the sampler will probe engines directly and broadcast accurate data within 5s.
+    let chromium_up = state.metrics.chromium_healthy.get() >= 1.0;
+    let libreoffice_up = state.metrics.libreoffice_healthy.get() >= 1.0;
+    let initial = build_console_payload(&state, started_at, chromium_up, libreoffice_up).await;
     let initial_json = serde_json::to_string(&initial).unwrap_or_default();
     let initial_stream = stream::once(async move {
         Ok::<Event, Infallible>(Event::default().data(initial_json))
@@ -43,7 +47,9 @@ pub async fn console_metrics_json(
     State(state): State<AppState>,
 ) -> Json<ConsolePayload> {
     let started_at = state.started_at;
-    Json(build_console_payload(&state, started_at).await)
+    let chromium_up = state.metrics.chromium_healthy.get() >= 1.0;
+    let libreoffice_up = state.metrics.libreoffice_healthy.get() >= 1.0;
+    Json(build_console_payload(&state, started_at, chromium_up, libreoffice_up).await)
 }
 
 use axum::body::Body;

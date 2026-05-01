@@ -275,6 +275,7 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
     // Operator console SSE stream and one-shot metrics JSON (long-lived, no timeout)
     use crate::routes::console;
     untimed = untimed
+        .route("/_",             get(|| async { axum::response::Redirect::permanent("/_/") }))
         .route("/_/api/stream",  get(console::console_stream))
         .route("/_/api/metrics", get(console::console_metrics_json))
         .route("/_/",            get(console::console_asset_root))
@@ -381,10 +382,14 @@ async fn console_log_middleware(
 
     let start = Instant::now();
     let response = next.run(req).await;
-    let duration_ms = start.elapsed().as_millis() as u64;
+    let elapsed = start.elapsed();
+    let duration_ms = elapsed.as_millis() as u64;
     let status = response.status().as_u16();
 
-    state.console.record_request(method, path, status, duration_ms).await;
+    // Record into ring buffer for the console UI
+    state.console.record_request(method.clone(), path.clone(), status, duration_ms).await;
+    // Record into Prometheus counters + histogram for RPS / routes / error% calculations
+    state.metrics.record_http_request(&method, &path, status, elapsed.as_secs_f64());
     response
 }
 
