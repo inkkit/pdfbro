@@ -1,14 +1,12 @@
-//! `LibreOfficeEngine` — convert office documents to PDF via the `soffice`
-//! subprocess.
+//! `LibreOfficeEngine` — convert office documents to PDF via unoserver.
 //!
-//! Implementation of `docs/specs/12-engine-libreoffice.md`. Each call spawns a
-//! short-lived `soffice --headless` child with its own isolated
-//! `UserInstallation` profile, making concurrent invocations safe.
+//! Implementation of `docs/specs/12-engine-libreoffice.md`. A persistent
+//! `unoserver` process is managed as a child, eliminating per-request
+//! soffice startup cost (~200–400ms).
 
 pub mod filter;
 
 mod convert;
-mod discover;
 mod unoserver;
 
 use std::path::{Path, PathBuf};
@@ -16,7 +14,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::Semaphore;
+use tokio::sync::{Mutex, Semaphore};
 
 use tracing::{debug, info, instrument};
 
@@ -49,23 +47,24 @@ pub struct LibreOfficeEngine {
 }
 
 struct Inner {
-    exe: PathBuf,
+    unoserver: Mutex<unoserver::UnoserverProcess>,
+    port: u16,
+    unoserver_ready_timeout: Duration,
+    executable: Option<PathBuf>,
+    client: reqwest::Client,
     timeout: Duration,
     semaphore: Semaphore,
-    client: reqwest::Client,
-    port: u16,
 }
 
 /// Engine-wide configuration. Pass to [`LibreOfficeEngine::launch`].
 #[derive(Debug, Clone)]
 pub struct LibreOfficeConfig {
-    /// Path to `soffice` (or `libreoffice`). `None` = autodiscover via
-    /// `$LIBREOFFICE_PATH`, `$PATH`, and platform defaults.
+    /// Path to `soffice` passed to unoserver via `--executable`. `None` = unoserver
+    /// auto-discovers soffice.
     pub executable: Option<PathBuf>,
     /// Per-conversion timeout. Default 120s.
     pub timeout: Duration,
-    /// Maximum concurrent subprocess invocations. Default
-    /// [`std::thread::available_parallelism`].
+    /// Maximum concurrent conversions. Default [`std::thread::available_parallelism`].
     pub max_concurrency: usize,
     /// Use lazy initialization (start on first request).
     /// Default: false (start eagerly at server startup).
@@ -73,6 +72,10 @@ pub struct LibreOfficeConfig {
     /// Idle shutdown timeout - engine shuts down after this duration of no requests.
     /// None means no idle shutdown. Default: None.
     pub idle_shutdown_timeout: Option<Duration>,
+    /// Port unoserver listens on. Default: 2003.
+    pub unoserver_port: u16,
+    /// Maximum time to wait for unoserver to be ready at startup. Default: 60s.
+    pub unoserver_ready_timeout: Duration,
 }
 
 impl Default for LibreOfficeConfig {
@@ -85,20 +88,13 @@ impl Default for LibreOfficeConfig {
                 .unwrap_or(4),
             lazy_start: false,
             idle_shutdown_timeout: None,
+            unoserver_port: 2003,
+            unoserver_ready_timeout: Duration::from_secs(60),
         }
     }
 }
 
 impl LibreOfficeEngine {
-    /// Return a tracing span for this engine instance, tagged with
-    /// `engine="libreoffice"`.
-    pub fn logger(&self) -> tracing::Span {
-        tracing::info_span!(
-            "engine",
-            engine = "libreoffice",
-        )
-    }
-
     /// Discover `soffice` on `$PATH` and platform defaults using
     /// [`LibreOfficeConfig::default`].
     pub async fn discover() -> EngineResult<Self> {
@@ -107,38 +103,75 @@ impl LibreOfficeEngine {
 
     /// Construct an engine with explicit configuration.
     ///
-    /// If `config.executable` is `Some`, the path is required to exist;
-    /// otherwise auto-discovery is performed. The chosen executable is then
-    /// probed (`--headless --version`) before the engine is returned.
-    #[instrument(skip(config), fields(executable = ?config.executable))]
+    /// Spawns a persistent `unoserver` process. The engine is returned once
+    /// unoserver is ready to accept connections.
     pub async fn launch(config: LibreOfficeConfig) -> EngineResult<Self> {
-        info!("Launching LibreOffice engine");
-        let exe = match config.executable.as_ref() {
-            Some(p) => {
-                if !p.exists() {
-                    return Err(EngineError::Internal(format!(
-                        "LibreOffice not found: {}",
-                        p.display()
-                    )));
-                }
-                p.clone()
-            }
-            None => discover::find_soffice()?,
-        };
+        info!(port = config.unoserver_port, "Launching LibreOffice engine");
 
-        discover::probe(&exe, config.timeout).await?;
+        let unoserver = unoserver::UnoserverProcess::spawn(
+            config.unoserver_port,
+            config.unoserver_ready_timeout,
+            config.executable.as_deref(),
+        )
+        .await?;
 
         let max = config.max_concurrency.max(1);
-        info!(executable = %exe.display(), timeout = ?config.timeout, max_concurrency = max, "LibreOffice engine launched");
-        Ok(Self {
-            inner: Arc::new(Inner {
-                exe,
-                timeout: config.timeout,
-                semaphore: Semaphore::new(max),
-                client: reqwest::Client::new(),
-                port: 2003,
-            }),
-        })
+        let client = reqwest::Client::builder()
+            .tcp_keepalive(Some(Duration::from_secs(60)))
+            .pool_max_idle_per_host(1)
+            .build()
+            .map_err(|e| EngineError::Internal(format!("failed to build HTTP client: {e}")))?;
+
+        let inner = Arc::new(Inner {
+            unoserver: Mutex::new(unoserver),
+            port: config.unoserver_port,
+            unoserver_ready_timeout: config.unoserver_ready_timeout,
+            executable: config.executable,
+            client,
+            timeout: config.timeout,
+            semaphore: Semaphore::new(max),
+        });
+
+        // Background task: detect unoserver crashes and restart.
+        let inner_weak = Arc::downgrade(&inner);
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                let Some(inner) = inner_weak.upgrade() else { break };
+
+                let exited = inner.unoserver.lock().await.try_wait().ok().flatten();
+
+                if exited.is_some() {
+                    tracing::warn!("unoserver exited unexpectedly, attempting restart");
+                    for attempt in 0..3u32 {
+                        tokio::time::sleep(Duration::from_secs(1 << attempt)).await;
+                        let Some(inner) = inner_weak.upgrade() else { return };
+                        match unoserver::UnoserverProcess::spawn(
+                            inner.port,
+                            inner.unoserver_ready_timeout,
+                            inner.executable.as_deref(),
+                        )
+                        .await
+                        {
+                            Ok(new_proc) => {
+                                *inner.unoserver.lock().await = new_proc;
+                                tracing::info!("unoserver restarted");
+                                break;
+                            }
+                            Err(e) if attempt < 2 => {
+                                tracing::warn!(attempt = attempt + 1, error = %e, "unoserver restart failed");
+                            }
+                            Err(_) => {
+                                tracing::error!("unoserver failed to restart after 3 attempts, conversions will fail");
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        info!(port = config.unoserver_port, timeout = ?config.timeout, max_concurrency = max, "LibreOffice engine launched");
+        Ok(Self { inner })
     }
 
     /// Convert one input file to PDF bytes.
@@ -149,7 +182,6 @@ impl LibreOfficeEngine {
     /// `UserInstallation` directory.
     #[instrument(skip_all, fields(input = %input.display()))]
     pub async fn convert(&self, input: &Path, opts: &OfficeOptions) -> EngineResult<Vec<u8>> {
-        let _span = self.logger();
         opts.validate()?;
         if !input.exists() {
             return Err(EngineError::Io(std::io::Error::new(
@@ -231,19 +263,23 @@ impl LibreOfficeEngine {
         Ok(out)
     }
 
-    /// Returns `true` iff `soffice --version` succeeds within a 30-second
-    /// timeout (regardless of the engine's `config.timeout`).
+    /// Returns `true` iff unoserver responds to an HTTP GET within 5 seconds.
     pub async fn healthy(&self) -> bool {
-        discover::probe(&self.inner.exe, Duration::from_secs(30))
-            .await
-            .is_ok()
+        let url = format!("http://127.0.0.1:{}/", self.inner.port);
+        tokio::time::timeout(
+            Duration::from_secs(5),
+            self.inner.client.get(&url).send(),
+        )
+        .await
+        .map(|r| r.is_ok())
+        .unwrap_or(false)
     }
 }
 
 impl std::fmt::Debug for LibreOfficeEngine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LibreOfficeEngine")
-            .field("exe", &self.inner.exe)
+            .field("port", &self.inner.port)
             .field("timeout", &self.inner.timeout)
             .finish()
     }
@@ -653,6 +689,8 @@ mod tests {
         assert!(c.executable.is_none());
         assert_eq!(c.timeout, Duration::from_secs(120));
         assert!(c.max_concurrency >= 1);
+        assert_eq!(c.unoserver_port, 2003);
+        assert_eq!(c.unoserver_ready_timeout, Duration::from_secs(60));
     }
 
     #[test]
@@ -910,15 +948,4 @@ mod tests {
         assert!(ok.validate().is_ok());
     }
 
-    #[tokio::test]
-    async fn launch_with_missing_executable_path_errors() {
-        let cfg = LibreOfficeConfig {
-            executable: Some(PathBuf::from("/nonexistent/__folio_no_soffice")),
-            ..LibreOfficeConfig::default()
-        };
-        let err = LibreOfficeEngine::launch(cfg)
-            .await
-            .expect_err("should fail");
-        assert!(matches!(err, EngineError::Internal(_)));
-    }
 }
