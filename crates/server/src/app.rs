@@ -352,6 +352,13 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
     // ring buffer. Added last so it wraps the full stack.
     router = router.layer(middleware::from_fn_with_state(state_for_console, console_log_middleware));
 
+    // Optional path-prefix mount (--root-path / API_ROOT_PATH). When
+    // empty, the router is returned untouched; otherwise every route
+    // is reachable under the prefix.
+    if !config.api_root_path.is_empty() {
+        router = Router::new().nest(&config.api_root_path, router);
+    }
+
     router
 }
 
