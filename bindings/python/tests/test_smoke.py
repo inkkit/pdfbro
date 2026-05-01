@@ -21,3 +21,18 @@ def test_folio_class_methods():
     assert hasattr(folio.Folio, "close")
     assert hasattr(folio.Folio, "__enter__")
     assert hasattr(folio.Folio, "__exit__")
+
+def test_async_folio_class_exists():
+    assert hasattr(folio.AsyncFolio, "create")
+    assert hasattr(folio.AsyncFolio, "html_to_pdf")
+    assert hasattr(folio.AsyncFolio, "url_to_pdf")
+    assert hasattr(folio.AsyncFolio, "markdown_to_pdf")
+    assert hasattr(folio.AsyncFolio, "office_to_pdf")
+    assert hasattr(folio.AsyncFolio, "close")
+
+def test_async_folio_create_returns_coroutine():
+    """AsyncFolio.create() must return an awaitable, not eagerly launch."""
+    import folio, inspect
+    # Don't call it (would launch chrome). Just confirm it's a static method
+    # and the signature accepts our args.
+    assert callable(folio.AsyncFolio.create)

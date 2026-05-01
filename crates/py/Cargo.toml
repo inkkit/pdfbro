@@ -18,6 +18,7 @@ chrome-fetch = ["engine/chrome-fetch"]
 [dependencies]
 engine = { workspace = true }
 pyo3 = { workspace = true, features = ["extension-module", "abi3-py38"] }
+pyo3-async-runtimes = { version = "0.22", features = ["tokio-runtime"] }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
