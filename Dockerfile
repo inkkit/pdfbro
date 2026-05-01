@@ -179,6 +179,7 @@ LABEL org.opencontainers.image.title="Folio" \
       org.opencontainers.image.source="https://github.com/been-there-done-that/folio"
 
 # Install LibreOffice from Debian bookworm-backports (newer than bookworm's 7.4).
+# python3-uno must match the LO version so it is also pulled from backports.
 RUN echo "deb http://deb.debian.org/debian bookworm-backports main" \
       > /etc/apt/sources.list.d/backports.list && \
     apt-get update -qq && \
@@ -186,7 +187,8 @@ RUN echo "deb http://deb.debian.org/debian bookworm-backports main" \
         libreoffice-writer \
         libreoffice-calc \
         libreoffice-impress \
-        libreoffice-draw && \
+        libreoffice-draw \
+        python3-uno && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         python3-minimal \
         python3-pip && \
@@ -259,6 +261,7 @@ LABEL org.opencontainers.image.title="Folio (LibreOffice)" \
       org.opencontainers.image.source="https://github.com/been-there-done-that/folio"
 
 # Install LibreOffice from Debian bookworm-backports (newer than bookworm's 7.4).
+# python3-uno must match the LO version so it is also pulled from backports.
 RUN echo "deb http://deb.debian.org/debian bookworm-backports main" \
       > /etc/apt/sources.list.d/backports.list && \
     apt-get update -qq && \
@@ -266,7 +269,8 @@ RUN echo "deb http://deb.debian.org/debian bookworm-backports main" \
         libreoffice-writer \
         libreoffice-calc \
         libreoffice-impress \
-        libreoffice-draw && \
+        libreoffice-draw \
+        python3-uno && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         python3-minimal \
         python3-pip && \

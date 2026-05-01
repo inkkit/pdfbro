@@ -8,9 +8,10 @@ description = "Folio core engine: ChromiumEngine, LibreOfficeEngine, PdfOperatio
 [features]
 default = ["chromium", "libreoffice"]
 chromium = ["dep:chromiumoxide", "dep:futures-util", "dep:pulldown-cmark", "dep:urlencoding"]
-libreoffice = ["dep:reqwest"]
+libreoffice = ["dep:reqwest", "dep:base64"]
 
 [dependencies]
+base64 = { workspace = true, optional = true }
 chromiumoxide = { workspace = true, optional = true }
 futures-util = { workspace = true, optional = true }
 humantime-serde = { workspace = true }
