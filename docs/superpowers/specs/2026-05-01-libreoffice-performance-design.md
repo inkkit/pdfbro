@@ -325,7 +325,7 @@ docker-compose.bench.yml setup used for the baseline. Target: Folio
 | `crates/engine/src/libreoffice/unoserver.rs` | New: process management |
 | `crates/engine/src/libreoffice/convert.rs` | Replace subprocess with HTTP POST |
 | `crates/engine/src/libreoffice/mod.rs` | Add `unoserver` + `http_client` to `Inner`, update config |
-| `crates/engine/src/libreoffice/discover.rs` | Remove (probe logic absorbed into unoserver ready-check) |
+| `crates/engine/src/libreoffice/discover.rs` | Remove: `find_soffice()` is no longer needed (unoserver locates soffice itself); `probe()` is replaced by the HTTP ready-check in `unoserver.rs` |
 | `crates/server/src/supervised_engine.rs` | No changes |
 | `crates/server/src/config.rs` | Expose `unoserver_port` and `unoserver_ready_timeout` config knobs |
 
