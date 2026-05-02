@@ -35,6 +35,16 @@ run-chromium: ## Run Chromium-only image via Docker Compose
 run-libreoffice: ## Run LibreOffice-only image via Docker Compose
 	docker compose --profile libreoffice up folio-libreoffice
 
+# FLY_APP is read from fly.toml; override with: make deploy FLY_APP=myapp
+FLY_APP ?= $(shell grep '^app' fly.toml 2>/dev/null | sed "s/app = '//;s/'//")
+
+.PHONY: deploy
+deploy: build ## Build full image locally then deploy to Fly.io (bypasses buildx cache)
+	docker tag folio:latest registry.fly.io/$(FLY_APP):latest
+	fly auth docker
+	docker push registry.fly.io/$(FLY_APP):latest
+	fly deploy --app $(FLY_APP) --image registry.fly.io/$(FLY_APP):latest
+
 .PHONY: stop
 stop: ## Stop all containers
 	docker compose down -v
