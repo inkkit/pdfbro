@@ -19,6 +19,8 @@ primary_region = 'bom'
   # LibreOffice peaks at ~1.3 GB under load; Chromium adds another ~300 MB.
   LIBREOFFICE_LAZY_START = "true"
   CHROMIUM_LAZY_START = "true"
+  # Required in containers — no dbus/display available.
+  FOLIO_NO_SANDBOX = "true"
 
 [[vm]]
   memory = '2gb'
