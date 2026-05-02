@@ -47,7 +47,8 @@ deploy: ## Build linux/amd64 image and deploy to Fly.io
 	fly auth docker
 	docker buildx build --platform linux/amd64 --target folio \
 		-t registry.fly.io/$(FLY_APP):latest \
-		--push -f Dockerfile .
+		--load -f Dockerfile .
+	docker push registry.fly.io/$(FLY_APP):latest
 	fly deploy --app $(FLY_APP) --image registry.fly.io/$(FLY_APP):latest
 
 .PHONY: stop
