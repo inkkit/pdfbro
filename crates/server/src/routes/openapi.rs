@@ -44,7 +44,7 @@ pub async fn openapi_spec(State(state): State<AppState>) -> Json<Value> {
             "version": "0.1.0",
             "contact": {
                 "name": "Folio Team",
-                "url": "https://github.com/__deesh_reddy__/folio"
+                "url": "https://github.com/vel/folio"
             }
         },
         "servers": [

@@ -7,7 +7,7 @@ default-members = ["crates/*"]
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
-repository = "https://github.com/__deesh_reddy__/folio"
+repository = "https://github.com/vel/folio"
 authors = []
 
 [workspace.dependencies]

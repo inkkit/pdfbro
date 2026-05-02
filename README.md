@@ -56,7 +56,7 @@ what's ahead) read [`comparison.md`](./comparison.md).
 
 ```bash
 # Run the server (Docker, full image)
-docker run --rm -p 3000:3000 ghcr.io/__deesh_reddy__/folio:latest
+docker run --rm -p 3000:3000 ghcr.io/vel/folio:latest
 
 # Convert a URL to PDF
 curl -X POST http://localhost:3000/forms/chromium/convert/url \
@@ -77,8 +77,8 @@ split, watermark, etc.
 
 | Surface          | Command                                                       |
 |------------------|---------------------------------------------------------------|
-| Docker (full)    | `docker pull ghcr.io/__deesh_reddy__/folio:latest`            |
-| Docker (slim)    | `docker pull ghcr.io/__deesh_reddy__/folio:latest-chromium`   |
+| Docker (full)    | `docker pull ghcr.io/vel/folio:latest`            |
+| Docker (slim)    | `docker pull ghcr.io/vel/folio:latest-chromium`   |
 | CLI (cargo)      | `cargo install --path crates/cli` → `folio --help`            |
 | Server (cargo)   | `cargo run -p server -- serve --port 3000`                    |
 | Library          | `folio-engine = { path = "crates/engine" }` in `Cargo.toml`   |
@@ -91,13 +91,11 @@ Office conversion.
 
 | Surface | Install |
 |---|---|
-| Python  | `pip install folio` — see `bindings/python/README.md` |
-| Node.js | `npm install @folio/folio` — see `bindings/node/README.md` |
+| Python  | `pip install folio-py` — see `bindings/python/README.md` |
+| Node.js | `npm install @vel/folio` — see `bindings/node/README.md` |
 
-Both bindings auto-download a pinned Chrome on first use if no system
-Chrome is found. v1 supports HTML / URL / Markdown / Office → PDF;
-PDF ops and screenshots ship in v2 (spec:
-`docs/superpowers/specs/2026-05-01-bindings-design.md`).
+Both bindings embed the Rust engine directly — no HTTP server needed.
+v1 supports HTML / URL / Markdown / Office → PDF. PDF ops and screenshots ship in v2.
 
 ---
 
@@ -262,8 +260,8 @@ long tail of LibreOffice export filters · `embed` and full `stamp` routes.
 TLS in-process (use a reverse proxy) · OAuth/JWT/RBAC (use a reverse
 proxy) · workflow/DAG engine on top of batch (out of scope).
 
-**Empty placeholders (will be removed if not built):**
-Python bindings (`crates/py/`), Node bindings (`crates/js/`).
+**Embeddable bindings (v1 shipped):**
+Python (`pip install folio-py`) · Node.js (`npm install @vel/folio`) — HTML / URL / Markdown / Office → PDF in-process.
 
 ---
 
@@ -311,7 +309,7 @@ Benchmarked on a 2-CPU / 2 GB Docker cgroup, 4 concurrent clients, 60 s warm-up 
 ## Development
 
 ```bash
-git clone https://github.com/__deesh_reddy__/folio.git && cd folio
+git clone https://github.com/vel/folio.git && cd folio
 
 cargo build --release        # build everything
 cargo test                   # unit + integration (skips gracefully if Chrome missing)

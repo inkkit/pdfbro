@@ -294,7 +294,7 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
         "metaData": {
             "title": "Folio API",
             "description": "PDF generation API (Gotenberg-compatible)",
-            "favicon": "https://gotenberg.dev/favicon.ico"
+            "favicon": "/favicon.ico"
         },
         "theme": "purple",
         "darkMode": true,

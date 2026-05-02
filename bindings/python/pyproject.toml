@@ -16,8 +16,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/__deesh_reddy__/folio"
-Repository = "https://github.com/__deesh_reddy__/folio"
+Homepage = "https://github.com/vel/folio"
+Repository = "https://github.com/vel/folio"
 
 [tool.maturin]
 manifest-path = "../../crates/py/Cargo.toml"
