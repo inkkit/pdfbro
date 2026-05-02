@@ -74,6 +74,12 @@ pub(crate) struct Inner {
     /// OS process ID of the Chrome child process; used for best-effort
     /// synchronous kill in [`Inner::Drop`] when shutdown was skipped.
     pub(crate) chrome_pid: AtomicU32,
+    /// Per-engine user-data-dir. Owned so the directory (and its
+    /// SingletonLock) is removed when the engine is dropped — concurrent
+    /// or rapid sequential launches no longer collide on the chromiumoxide
+    /// default `/tmp/chromiumoxide-runner`.
+    #[allow(dead_code)]
+    pub(crate) user_data_dir: Option<tempfile::TempDir>,
 }
 
 /// Per-render context describing user-agent, headers, cookies, and
@@ -414,6 +420,7 @@ impl ChromiumEngine {
         handler_task: JoinHandle<()>,
         config: BrowserConfig,
         chrome_pid: Option<u32>,
+        user_data_dir: Option<tempfile::TempDir>,
     ) -> Self {
         Self {
             inner: Arc::new(Inner {
@@ -422,6 +429,7 @@ impl ChromiumEngine {
                 handler_task: std::sync::Mutex::new(Some(handler_task)),
                 config,
                 chrome_pid: AtomicU32::new(chrome_pid.unwrap_or(0)),
+                user_data_dir,
             }),
         }
     }

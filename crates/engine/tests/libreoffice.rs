@@ -50,14 +50,30 @@ fn csv_fixture() -> PathBuf {
     fixtures_dir().join("sample.csv")
 }
 
+/// Shared engine across all tests in this binary. We launch unoserver once
+/// and reuse it — both because per-test launches collided on the fixed
+/// default port 2003 and because the engine is explicitly designed for
+/// concurrent reuse (semaphore + per-call user dirs).
+static SHARED: tokio::sync::OnceCell<Option<LibreOfficeEngine>> =
+    tokio::sync::OnceCell::const_new();
+
 async fn engine() -> Option<LibreOfficeEngine> {
-    match LibreOfficeEngine::discover().await {
-        Ok(engine) => Some(engine),
-        Err(e) => {
-            eprintln!("skipping: failed to discover soffice: {e}");
-            None
-        }
-    }
+    SHARED
+        .get_or_init(|| async {
+            let cfg = LibreOfficeConfig {
+                unoserver_port: 0, // OS-assigned free port
+                ..Default::default()
+            };
+            match LibreOfficeEngine::launch(cfg).await {
+                Ok(e) => Some(e),
+                Err(e) => {
+                    eprintln!("skipping: failed to launch unoserver: {e}");
+                    None
+                }
+            }
+        })
+        .await
+        .clone()
 }
 
 fn assert_pdf_loadable(bytes: &[u8]) -> lopdf::Document {
@@ -196,6 +212,7 @@ async fn convert_timeout_kills_child() {
     let cfg = LibreOfficeConfig {
         timeout: Duration::from_millis(100),
         unoserver_ready_timeout: Duration::from_millis(500),
+        unoserver_port: 0,
         ..Default::default()
     };
     let started = Instant::now();

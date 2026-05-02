@@ -118,7 +118,18 @@ pub(crate) async fn launch_with(config: BrowserConfig) -> EngineResult<ChromiumE
     // Check Chrome version and warn if potentially incompatible
     check_chrome_version(&executable);
 
-    let cx_config = build_chromiumoxide_config(&config, &executable)?;
+    // Each engine gets its own user-data-dir so concurrent or rapid
+    // sequential launches do not collide on chromiumoxide's default
+    // `/tmp/chromiumoxide-runner` (whose SingletonLock survives the
+    // process if Chrome was SIGKILLed during shutdown).
+    let user_data_dir = tempfile::Builder::new()
+        .prefix("folio-chromium-")
+        .tempdir()
+        .map_err(|e| {
+            EngineError::ChromeLaunch(format!("failed to create user-data-dir: {e}"))
+        })?;
+
+    let cx_config = build_chromiumoxide_config(&config, &executable, user_data_dir.path())?;
 
     let (mut browser, mut handler) = Browser::launch(cx_config)
         .await
@@ -144,7 +155,13 @@ pub(crate) async fn launch_with(config: BrowserConfig) -> EngineResult<ChromiumE
         .get_mut_child()
         .and_then(|child| child.as_mut_inner().id());
 
-    Ok(ChromiumEngine::from_parts(browser, handler_task, config, chrome_pid))
+    Ok(ChromiumEngine::from_parts(
+        browser,
+        handler_task,
+        config,
+        chrome_pid,
+        Some(user_data_dir),
+    ))
 }
 
 /// Translate our [`BrowserConfig`] into a chromiumoxide
@@ -152,10 +169,12 @@ pub(crate) async fn launch_with(config: BrowserConfig) -> EngineResult<ChromiumE
 fn build_chromiumoxide_config(
     config: &BrowserConfig,
     executable: &Path,
+    user_data_dir: &Path,
 ) -> EngineResult<CxBrowserConfig> {
     let mut builder = CxBrowserConfig::builder()
         .chrome_executable(executable)
-        .request_timeout(config.timeout);
+        .request_timeout(config.timeout)
+        .user_data_dir(user_data_dir);
 
     if !config.headless {
         builder = builder.with_head();

@@ -28,7 +28,7 @@ use crate::types::{EngineError, EngineResult, PageRanges};
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
 /// use std::path::Path;
 /// use engine::{LibreOfficeEngine, OfficeOptions};
 ///
@@ -114,6 +114,8 @@ impl LibreOfficeEngine {
             config.executable.as_deref(),
         )
         .await?;
+        // If config requested port 0, the spawn helper picked a free one.
+        let actual_port = unoserver.port();
 
         let max = config.max_concurrency.max(1);
         let client = reqwest::Client::builder()
@@ -124,7 +126,7 @@ impl LibreOfficeEngine {
 
         let inner = Arc::new(Inner {
             unoserver: Mutex::new(unoserver),
-            port: config.unoserver_port,
+            port: actual_port,
             unoserver_ready_timeout: config.unoserver_ready_timeout,
             executable: config.executable,
             client,
@@ -172,7 +174,7 @@ impl LibreOfficeEngine {
             }
         });
 
-        info!(port = config.unoserver_port, timeout = ?config.timeout, max_concurrency = max, "LibreOffice engine launched");
+        info!(port = actual_port, timeout = ?config.timeout, max_concurrency = max, "LibreOffice engine launched");
         Ok(Self { inner })
     }
 
@@ -481,14 +483,15 @@ impl OfficeOptions {
         Ok(())
     }
 
-    /// Build the LibreOffice filter-options blob (the `:{...}` suffix on
-    /// `--convert-to`). Returns `None` if no fields are set, in which case
-    /// the bare exporter (e.g. `pdf:writer_pdf_Export`) is used unmodified.
-    pub(crate) fn filter_blob(&self) -> Option<String> {
-        let mut map = serde_json::Map::new();
+    /// Build the unoserver `filter_options` array. Each entry is a
+    /// `Name=Value` string; unoserver parses these with `split('=', 1)`
+    /// and infers the value type (`true`/`false` → bool, digits → int,
+    /// everything else → string).
+    pub(crate) fn filter_options(&self) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
 
         if let Some(pr) = &self.page_ranges {
-            map.insert("PageRange".into(), entry_str(&pr.to_string()));
+            out.push(format!("PageRange={}", pr));
         }
         if let Some(prof) = self.pdf_a {
             let v: i64 = match prof {
@@ -496,165 +499,143 @@ impl OfficeOptions {
                 PdfAProfile::A2B => 2,
                 PdfAProfile::A3B => 3,
             };
-            map.insert("SelectPdfVersion".into(), entry_long(v));
+            out.push(format!("SelectPdfVersion={v}"));
         }
         if self.pdf_ua {
-            map.insert("PDFUACompliance".into(), entry_bool(true));
+            out.push("PDFUACompliance=true".into());
         }
         if let Some(q) = self.quality {
-            map.insert("Quality".into(), entry_long(i64::from(q)));
+            out.push(format!("Quality={q}"));
         }
         if let Some(r) = self.max_image_resolution {
-            map.insert("MaxImageResolution".into(), entry_long(i64::from(r)));
+            out.push(format!("MaxImageResolution={r}"));
         }
         if self.landscape {
-            map.insert("IsLandscape".into(), entry_bool(true));
+            out.push("IsLandscape=true".into());
         }
 
-        // Bookmarks
         if self.export_bookmarks {
-            map.insert("ExportBookmarks".into(), entry_bool(true));
+            out.push("ExportBookmarks=true".into());
         }
         if self.export_bookmarks_to_pdf_destination {
-            map.insert("ExportBookmarksToPDFDestination".into(), entry_bool(true));
+            out.push("ExportBookmarksToPDFDestination=true".into());
         }
 
-        // Form Fields
         if self.export_form_fields {
-            map.insert("ExportFormFields".into(), entry_bool(true));
+            out.push("ExportFormFields=true".into());
         }
         if self.allow_duplicate_field_names {
-            map.insert("AllowDuplicateFieldNames".into(), entry_bool(true));
+            out.push("AllowDuplicateFieldNames=true".into());
         }
         if self.export_placeholders {
-            map.insert("ExportPlaceholders".into(), entry_bool(true));
+            out.push("ExportPlaceholders=true".into());
         }
 
-        // Notes
         if self.export_notes {
-            map.insert("ExportNotes".into(), entry_bool(true));
+            out.push("ExportNotes=true".into());
         }
         if self.export_notes_pages {
-            map.insert("ExportNotesPages".into(), entry_bool(true));
+            out.push("ExportNotesPages=true".into());
         }
         if self.export_only_notes_pages {
-            map.insert("ExportOnlyNotesPages".into(), entry_bool(true));
+            out.push("ExportOnlyNotesPages=true".into());
         }
         if self.export_notes_in_margin {
-            map.insert("ExportNotesInMargin".into(), entry_bool(true));
+            out.push("ExportNotesInMargin=true".into());
         }
 
-        // Advanced
         if self.convert_ooo_target_to_pdf_target {
-            map.insert("ConvertOOoTargetToPDFTarget".into(), entry_bool(true));
+            out.push("ConvertOOoTargetToPDFTarget=true".into());
         }
         if self.export_links_relative_fsys {
-            map.insert("ExportLinksRelativeFsys".into(), entry_bool(true));
+            out.push("ExportLinksRelativeFsys=true".into());
         }
         if self.export_hidden_slides {
-            map.insert("ExportHiddenSlides".into(), entry_bool(true));
+            out.push("ExportHiddenSlides=true".into());
         }
         if self.skip_empty_pages {
-            map.insert("IsSkipEmptyPages".into(), entry_bool(true));
+            out.push("IsSkipEmptyPages=true".into());
         }
         if self.add_original_document_as_stream {
-            map.insert("IsAddStream".into(), entry_bool(true));
+            out.push("IsAddStream=true".into());
         }
         if self.single_page_sheets {
-            map.insert("SinglePageSheets".into(), entry_bool(true));
+            out.push("SinglePageSheets=true".into());
         }
         if self.lossless_image_compression {
-            map.insert("UseLosslessCompression".into(), entry_bool(true));
+            out.push("UseLosslessCompression=true".into());
         }
         if self.reduce_image_resolution {
-            map.insert("ReduceImageResolution".into(), entry_bool(true));
+            out.push("ReduceImageResolution=true".into());
         }
 
-        // Native Watermarks
         if let Some(ref text) = self.native_watermark_text {
-            map.insert("Watermark".into(), entry_str(text));
+            out.push(format!("Watermark={text}"));
         }
         if let Some(color) = self.native_watermark_color {
-            map.insert("WatermarkColor".into(), entry_long(i64::from(color)));
+            out.push(format!("WatermarkColor={color}"));
         }
         if let Some(h) = self.native_watermark_font_height {
-            map.insert("WatermarkFontHeight".into(), entry_long(i64::from(h)));
+            out.push(format!("WatermarkFontHeight={h}"));
         }
         if let Some(angle) = self.native_watermark_rotate_angle {
-            map.insert("WatermarkRotateAngle".into(), entry_long(i64::from(angle)));
+            out.push(format!("WatermarkRotateAngle={angle}"));
         }
         if let Some(ref name) = self.native_watermark_font_name {
-            map.insert("WatermarkFontName".into(), entry_str(name));
+            out.push(format!("WatermarkFontName={name}"));
         }
         if let Some(ref text) = self.native_tiled_watermark_text {
-            map.insert("TiledWatermark".into(), entry_str(text));
+            out.push(format!("TiledWatermark={text}"));
         }
 
-        // Viewer Preferences
         if let Some(v) = self.initial_view {
-            map.insert("InitialView".into(), entry_long(i64::from(v)));
+            out.push(format!("InitialView={v}"));
         }
         if let Some(v) = self.initial_page {
-            map.insert("InitialPage".into(), entry_long(i64::from(v)));
+            out.push(format!("InitialPage={v}"));
         }
         if let Some(v) = self.magnification {
-            map.insert("Magnification".into(), entry_long(i64::from(v)));
+            out.push(format!("Magnification={v}"));
         }
         if let Some(v) = self.zoom {
-            map.insert("Zoom".into(), entry_long(i64::from(v)));
+            out.push(format!("Zoom={v}"));
         }
         if let Some(v) = self.page_layout {
-            map.insert("PageLayout".into(), entry_long(i64::from(v)));
+            out.push(format!("PageLayout={v}"));
         }
         if self.first_page_on_left {
-            map.insert("FirstPageOnLeft".into(), entry_bool(true));
+            out.push("FirstPageOnLeft=true".into());
         }
         if self.resize_window_to_initial_page {
-            map.insert("ResizeWindowToInitialPage".into(), entry_bool(true));
+            out.push("ResizeWindowToInitialPage=true".into());
         }
         if self.center_window {
-            map.insert("CenterWindow".into(), entry_bool(true));
+            out.push("CenterWindow=true".into());
         }
         if self.open_in_full_screen_mode {
-            map.insert("OpenInFullScreenMode".into(), entry_bool(true));
+            out.push("OpenInFullScreenMode=true".into());
         }
         if self.display_pdf_document_title {
-            map.insert("DisplayPDFDocumentTitle".into(), entry_bool(true));
+            out.push("DisplayPDFDocumentTitle=true".into());
         }
         if self.hide_viewer_menubar {
-            map.insert("HideViewerMenubar".into(), entry_bool(true));
+            out.push("HideViewerMenubar=true".into());
         }
         if self.hide_viewer_toolbar {
-            map.insert("HideViewerToolbar".into(), entry_bool(true));
+            out.push("HideViewerToolbar=true".into());
         }
         if self.hide_viewer_window_controls {
-            map.insert("HideViewerWindowControls".into(), entry_bool(true));
+            out.push("HideViewerWindowControls=true".into());
         }
         if self.use_transition_effects {
-            map.insert("UseTransitionEffects".into(), entry_bool(true));
+            out.push("UseTransitionEffects=true".into());
         }
         if let Some(v) = self.open_bookmark_levels {
-            map.insert("OpenBookmarkLevels".into(), entry_long(i64::from(v)));
+            out.push(format!("OpenBookmarkLevels={v}"));
         }
 
-        if map.is_empty() {
-            None
-        } else {
-            Some(serde_json::Value::Object(map).to_string())
-        }
+        out
     }
-}
-
-fn entry_str(v: &str) -> serde_json::Value {
-    serde_json::json!({ "type": "string", "value": v })
-}
-
-fn entry_long(v: i64) -> serde_json::Value {
-    serde_json::json!({ "type": "long", "value": v })
-}
-
-fn entry_bool(v: bool) -> serde_json::Value {
-    serde_json::json!({ "type": "boolean", "value": v })
 }
 
 /// PDF/A export profile.
@@ -697,69 +678,59 @@ mod tests {
     }
 
     #[test]
-    fn office_options_default_emits_no_filter_blob() {
-        assert!(OfficeOptions::default().filter_blob().is_none());
+    fn office_options_default_emits_no_filter_options() {
+        assert!(OfficeOptions::default().filter_options().is_empty());
     }
 
     #[test]
-    fn office_options_with_page_ranges_emits_pagerange_key() {
+    fn office_options_with_page_ranges_emits_pagerange_entry() {
         let opts = OfficeOptions {
             page_ranges: Some(PageRanges::parse("1-3,5").expect("parse")),
             ..Default::default()
         };
-        let blob = opts.filter_blob().expect("blob");
-        let v: serde_json::Value = serde_json::from_str(&blob).expect("json");
-        assert_eq!(v["PageRange"]["type"], "string");
-        assert_eq!(v["PageRange"]["value"], "1-3,5");
+        let opts = opts.filter_options();
+        assert!(opts.contains(&"PageRange=1-3,5".to_string()), "{opts:?}");
     }
 
     #[test]
-    fn office_options_with_pdf_a_maps_select_pdf_version_long() {
+    fn office_options_with_pdf_a_maps_select_pdf_version() {
         let cases = [
-            (PdfAProfile::A1B, 1),
-            (PdfAProfile::A2B, 2),
-            (PdfAProfile::A3B, 3),
+            (PdfAProfile::A1B, "SelectPdfVersion=1"),
+            (PdfAProfile::A2B, "SelectPdfVersion=2"),
+            (PdfAProfile::A3B, "SelectPdfVersion=3"),
         ];
         for (prof, expected) in cases {
             let opts = OfficeOptions {
                 pdf_a: Some(prof),
                 ..Default::default()
             };
-            let blob = opts.filter_blob().expect("blob");
-            let v: serde_json::Value = serde_json::from_str(&blob).expect("json");
-            assert_eq!(v["SelectPdfVersion"]["type"], "long");
-            assert_eq!(v["SelectPdfVersion"]["value"], expected);
+            let opts = opts.filter_options();
+            assert!(opts.contains(&expected.to_string()), "{opts:?}");
         }
     }
 
     #[test]
-    fn office_options_landscape_and_pdfua_blob_keys() {
+    fn office_options_landscape_and_pdfua_entries() {
         let opts = OfficeOptions {
             landscape: true,
             pdf_ua: true,
             ..Default::default()
         };
-        let blob = opts.filter_blob().expect("blob");
-        let v: serde_json::Value = serde_json::from_str(&blob).expect("json");
-        assert_eq!(v["IsLandscape"]["type"], "boolean");
-        assert_eq!(v["IsLandscape"]["value"], true);
-        assert_eq!(v["PDFUACompliance"]["type"], "boolean");
-        assert_eq!(v["PDFUACompliance"]["value"], true);
+        let opts = opts.filter_options();
+        assert!(opts.contains(&"IsLandscape=true".to_string()), "{opts:?}");
+        assert!(opts.contains(&"PDFUACompliance=true".to_string()), "{opts:?}");
     }
 
     #[test]
-    fn office_options_quality_and_resolution_blob_long() {
+    fn office_options_quality_and_resolution_entries() {
         let opts = OfficeOptions {
             quality: Some(75),
             max_image_resolution: Some(150),
             ..Default::default()
         };
-        let blob = opts.filter_blob().expect("blob");
-        let v: serde_json::Value = serde_json::from_str(&blob).expect("json");
-        assert_eq!(v["Quality"]["type"], "long");
-        assert_eq!(v["Quality"]["value"], 75);
-        assert_eq!(v["MaxImageResolution"]["type"], "long");
-        assert_eq!(v["MaxImageResolution"]["value"], 150);
+        let opts = opts.filter_options();
+        assert!(opts.contains(&"Quality=75".to_string()), "{opts:?}");
+        assert!(opts.contains(&"MaxImageResolution=150".to_string()), "{opts:?}");
     }
 
     #[test]
@@ -830,7 +801,7 @@ mod tests {
     }
 
     #[test]
-    fn office_options_filter_blob_all_new_fields() {
+    fn office_options_filter_options_all_new_fields() {
         let opts = OfficeOptions {
             landscape: true,
             export_bookmarks: true,
@@ -873,50 +844,53 @@ mod tests {
             open_bookmark_levels: Some(-1),
             ..Default::default()
         };
-        let blob = opts.filter_blob().expect("blob");
-        let v: serde_json::Value = serde_json::from_str(&blob).expect("json");
-        assert_eq!(v["ExportBookmarks"]["type"], "boolean");
-        assert_eq!(v["ExportBookmarks"]["value"], true);
-        assert_eq!(v["ExportBookmarksToPDFDestination"]["value"], true);
-        assert_eq!(v["ExportFormFields"]["value"], true);
-        assert_eq!(v["AllowDuplicateFieldNames"]["value"], true);
-        assert_eq!(v["ExportPlaceholders"]["value"], true);
-        assert_eq!(v["ExportNotes"]["value"], true);
-        assert_eq!(v["ExportNotesPages"]["value"], true);
-        assert_eq!(v["ExportOnlyNotesPages"]["value"], true);
-        assert_eq!(v["ExportNotesInMargin"]["value"], true);
-        assert_eq!(v["ConvertOOoTargetToPDFTarget"]["value"], true);
-        assert_eq!(v["ExportLinksRelativeFsys"]["value"], true);
-        assert_eq!(v["ExportHiddenSlides"]["value"], true);
-        assert_eq!(v["IsSkipEmptyPages"]["value"], true);
-        assert_eq!(v["IsAddStream"]["value"], true);
-        assert_eq!(v["SinglePageSheets"]["value"], true);
-        assert_eq!(v["UseLosslessCompression"]["value"], true);
-        assert_eq!(v["ReduceImageResolution"]["value"], true);
-        assert_eq!(v["Watermark"]["type"], "string");
-        assert_eq!(v["Watermark"]["value"], "SECRET");
-        assert_eq!(v["WatermarkColor"]["type"], "long");
-        assert_eq!(v["WatermarkColor"]["value"], 16711680);
-        assert_eq!(v["WatermarkFontHeight"]["value"], 20);
-        assert_eq!(v["WatermarkRotateAngle"]["value"], 30);
-        assert_eq!(v["WatermarkFontName"]["value"], "Times");
-        assert_eq!(v["TiledWatermark"]["value"], "DRAFT");
-        assert_eq!(v["InitialView"]["type"], "long");
-        assert_eq!(v["InitialView"]["value"], 1);
-        assert_eq!(v["InitialPage"]["value"], 5);
-        assert_eq!(v["Magnification"]["value"], 2);
-        assert_eq!(v["Zoom"]["value"], 150);
-        assert_eq!(v["PageLayout"]["value"], 3);
-        assert_eq!(v["FirstPageOnLeft"]["value"], true);
-        assert_eq!(v["ResizeWindowToInitialPage"]["value"], true);
-        assert_eq!(v["CenterWindow"]["value"], true);
-        assert_eq!(v["OpenInFullScreenMode"]["value"], true);
-        assert_eq!(v["DisplayPDFDocumentTitle"]["value"], true);
-        assert_eq!(v["HideViewerMenubar"]["value"], true);
-        assert_eq!(v["HideViewerToolbar"]["value"], true);
-        assert_eq!(v["HideViewerWindowControls"]["value"], true);
-        assert_eq!(v["UseTransitionEffects"]["value"], true);
-        assert_eq!(v["OpenBookmarkLevels"]["value"], -1);
+        let entries = opts.filter_options();
+        let expected = [
+            "ExportBookmarks=true",
+            "ExportBookmarksToPDFDestination=true",
+            "ExportFormFields=true",
+            "AllowDuplicateFieldNames=true",
+            "ExportPlaceholders=true",
+            "ExportNotes=true",
+            "ExportNotesPages=true",
+            "ExportOnlyNotesPages=true",
+            "ExportNotesInMargin=true",
+            "ConvertOOoTargetToPDFTarget=true",
+            "ExportLinksRelativeFsys=true",
+            "ExportHiddenSlides=true",
+            "IsSkipEmptyPages=true",
+            "IsAddStream=true",
+            "SinglePageSheets=true",
+            "UseLosslessCompression=true",
+            "ReduceImageResolution=true",
+            "Watermark=SECRET",
+            "WatermarkColor=16711680",
+            "WatermarkFontHeight=20",
+            "WatermarkRotateAngle=30",
+            "WatermarkFontName=Times",
+            "TiledWatermark=DRAFT",
+            "InitialView=1",
+            "InitialPage=5",
+            "Magnification=2",
+            "Zoom=150",
+            "PageLayout=3",
+            "FirstPageOnLeft=true",
+            "ResizeWindowToInitialPage=true",
+            "CenterWindow=true",
+            "OpenInFullScreenMode=true",
+            "DisplayPDFDocumentTitle=true",
+            "HideViewerMenubar=true",
+            "HideViewerToolbar=true",
+            "HideViewerWindowControls=true",
+            "UseTransitionEffects=true",
+            "OpenBookmarkLevels=-1",
+        ];
+        for e in expected {
+            assert!(
+                entries.iter().any(|s| s == e),
+                "missing {e}; got {entries:?}"
+            );
+        }
     }
 
     #[test]

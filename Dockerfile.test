@@ -68,5 +68,7 @@ RUN cargo chef cook --recipe-path recipe.json --tests
 COPY . .
 RUN cargo test --no-run
 
-# Run pre-compiled test binaries — no recompilation at container start
-CMD ["cargo", "test", "--no-fail-fast"]
+# Run pre-compiled test binaries — no recompilation at container start.
+# --test-threads=1 because integration tests share a single unoserver
+# instance on port 2003; running them in parallel triggers contention.
+CMD ["cargo", "test", "--no-fail-fast", "--", "--test-threads=1"]

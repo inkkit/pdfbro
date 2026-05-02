@@ -25,6 +25,22 @@ impl UnoserverProcess {
         ready_timeout: Duration,
         executable: Option<&Path>,
     ) -> EngineResult<Self> {
+        // Port 0 means "ask the OS for a free ephemeral port". We bind a
+        // listener, capture the port, drop the listener, then hand the port
+        // to unoserver. Avoids clashes when several engines start in
+        // sequence (e.g. integration tests) where the previous process
+        // hasn't fully released the socket yet.
+        let port = if port == 0 {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").map_err(|e| {
+                EngineError::Internal(format!("failed to pick free port: {e}"))
+            })?;
+            listener
+                .local_addr()
+                .map_err(|e| EngineError::Internal(format!("local_addr: {e}")))?
+                .port()
+        } else {
+            port
+        };
         info!(port, "Starting unoserver");
 
         let mut cmd = tokio::process::Command::new("unoserver");

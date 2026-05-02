@@ -37,7 +37,7 @@ pub(super) async fn run_convert(
     // unoserver's convert() takes only the bare LO filter name ("writer_pdf_Export").
     let filtername = lo_filter.split_once(':').map(|(_, name)| name);
 
-    let body = build_xmlrpc_request(&indata_b64, filtername, opts.filter_blob().as_deref());
+    let body = build_xmlrpc_request(&indata_b64, filtername, &opts.filter_options());
 
     let url = format!("http://127.0.0.1:{port}/");
 
@@ -77,7 +77,7 @@ pub(super) async fn run_convert(
 fn build_xmlrpc_request(
     indata_b64: &str,
     filtername: Option<&str>,
-    filteroptions: Option<&str>,
+    filteroptions: &[String],
 ) -> String {
     let filter_param = match filtername {
         Some(f) => format!(
@@ -86,23 +86,14 @@ fn build_xmlrpc_request(
         ),
         None => "<param><value><nil/></value></param>".to_string(),
     };
-    // filter_options must be an array (even empty); unoserver iterates over it.
-    let filteroptions_param = match filteroptions {
-        Some(fo) => {
-            // Each option is a "Name=Value" string element in the array.
-            let items: String = fo
-                .split('\n')
-                .filter(|s| !s.is_empty())
-                .map(|s| format!("<value><string>{}</string></value>", xml_escape(s)))
-                .collect();
-            format!(
-                "<param><value><array><data>{items}</data></array></value></param>"
-            )
-        }
-        None => {
-            "<param><value><array><data></data></array></value></param>".to_string()
-        }
-    };
+    // filter_options must be an array (even empty); unoserver iterates over
+    // it and parses each element as `Name=Value`.
+    let items: String = filteroptions
+        .iter()
+        .map(|s| format!("<value><string>{}</string></value>", xml_escape(s)))
+        .collect();
+    let filteroptions_param =
+        format!("<param><value><array><data>{items}</data></array></value></param>");
     // convert_to must be "pdf" when outpath is nil, otherwise unoserver
     // cannot determine the output format and raises a TypeError.
     format!(
@@ -362,14 +353,14 @@ mod tests {
 
     #[test]
     fn build_xmlrpc_request_contains_filtername() {
-        let req = build_xmlrpc_request("DATA==", Some("writer_pdf_Export"), None);
+        let req = build_xmlrpc_request("DATA==", Some("writer_pdf_Export"), &[]);
         assert!(req.contains("writer_pdf_Export"), "{req}");
         assert!(req.contains("<base64>DATA==</base64>"), "{req}");
     }
 
     #[test]
     fn build_xmlrpc_request_without_filtername_uses_nil() {
-        let req = build_xmlrpc_request("DATA==", None, None);
+        let req = build_xmlrpc_request("DATA==", None, &[]);
         // Should contain exactly one <string> element: the convert_to="pdf".
         // No extra <string> for filtername.
         let count = req.matches("<string>").count();
