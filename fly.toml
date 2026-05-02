@@ -7,6 +7,8 @@ app = 'foliov001'
 primary_region = 'bom'
 
 [build]
+  dockerfile = "Dockerfile"
+  target = "folio"
 
 [http_service]
   internal_port = 3000
