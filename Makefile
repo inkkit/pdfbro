@@ -12,8 +12,12 @@ LOG_LEVEL=info
 CHROME_VERSION=stable
 
 .PHONY: build
-build: ## Build full image (Chromium + LibreOffice)
+build: ## Build full image for local platform (fast, for local testing)
 	docker build --target folio -t folio:latest -f Dockerfile .
+
+.PHONY: build-amd64
+build-amd64: ## Build full image for linux/amd64 (required for Fly.io deploy)
+	docker buildx build --platform linux/amd64 --target folio -t folio:amd64 -f Dockerfile .
 
 .PHONY: build-chromium
 build-chromium: ## Build Chromium-only image
@@ -39,10 +43,11 @@ run-libreoffice: ## Run LibreOffice-only image via Docker Compose
 FLY_APP ?= $(shell grep '^app' fly.toml 2>/dev/null | sed "s/app = '//;s/'//")
 
 .PHONY: deploy
-deploy: build ## Build full image locally then deploy to Fly.io (bypasses buildx cache)
-	docker tag folio:latest registry.fly.io/$(FLY_APP):latest
+deploy: ## Build linux/amd64 image and deploy to Fly.io
 	fly auth docker
-	docker push registry.fly.io/$(FLY_APP):latest
+	docker buildx build --platform linux/amd64 --target folio \
+		-t registry.fly.io/$(FLY_APP):latest \
+		--push -f Dockerfile .
 	fly deploy --app $(FLY_APP) --image registry.fly.io/$(FLY_APP):latest
 
 .PHONY: stop
