@@ -91,7 +91,7 @@
 1. **`README.md` spec table** — Claims specs 14, 16, 19 are `❌ Not Done`. They are `✅ Done`.
 2. **`README.md` screenshot status** — Usage Modes table shows 🚧 for screenshot endpoints; engine and routes are implemented.
 3. **`docs/specs/20-missing-features-roadmap.md`** — Claims screenshots, bookmarks, encrypt, watermark/stamp, PDF/A, Prometheus, webhooks are all `❌ Missing`. This document is **dangerously stale** and should either be archived or rewritten.
-5. **`README.md` badges** — Still use `yourusername` placeholder instead of `__deesh_reddy__`.
+5. **`README.md` badges** — Badges point to `ghcr.io/vel/folio` — update when org is created.
 6. **`README.md` project structure** — Shows root `tests/` directory; actual tests live inside crate directories (`crates/*/tests/`).
 7. **`README.md` BDD test count** — Claims "52 Gherkin scenarios". There are 25 `.feature` files; total scenario count unverified.
 
