@@ -74,32 +74,28 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
     #[cfg(not(feature = "libreoffice"))]
     let _libreoffice: Option<()> = None;
 
-    // Eagerly start engines at server startup (unless lazy_start is enabled)
+    // Start engines in the background so the HTTP server comes up immediately
+    // and Fly.io / health checks can connect before engines finish warming up.
     #[cfg(feature = "chromium")]
     if !config.chromium_lazy_start {
-        if let Err(e) = chromium.start().await {
-            warn!(error = %e, "Failed to start Chromium engine at startup");
-        }
+        let chromium_bg = chromium.clone();
+        tokio::spawn(async move {
+            if let Err(e) = chromium_bg.start().await {
+                warn!(error = %e, "Failed to start Chromium engine at startup");
+            }
+        });
     }
     #[cfg(feature = "libreoffice")]
     if !config.libreoffice_lazy_start {
-        if let Err(e) = libreoffice.start().await {
-            warn!(error = %e, "Failed to start LibreOffice engine at startup");
-        }
+        let lo_bg = libreoffice.clone();
+        tokio::spawn(async move {
+            if let Err(e) = lo_bg.start().await {
+                warn!(error = %e, "Failed to start LibreOffice engine at startup");
+            }
+        });
     }
 
-    // Check health
-    #[cfg(feature = "chromium")]
-    let chromium_ready = chromium.healthy().await;
-    #[cfg(not(feature = "chromium"))]
-    let chromium_ready = false;
-
-    #[cfg(feature = "libreoffice")]
-    let libreoffice_ready = libreoffice.healthy().await;
-    #[cfg(not(feature = "libreoffice"))]
-    let libreoffice_ready = false;
-    
-    banner::print(&config, chromium_ready, libreoffice_ready);
+    banner::print(&config, false, false);
 
     #[cfg(feature = "chromium")]
     let backend = ChromiumBackend::new(chromium.clone());
