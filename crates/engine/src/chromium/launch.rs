@@ -174,6 +174,7 @@ fn build_chromiumoxide_config(
     let mut builder = CxBrowserConfig::builder()
         .chrome_executable(executable)
         .request_timeout(config.timeout)
+        .launch_timeout(config.chrome_launch_timeout)
         .user_data_dir(user_data_dir);
 
     if !config.headless {

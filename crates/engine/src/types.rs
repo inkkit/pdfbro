@@ -555,6 +555,11 @@ pub struct BrowserConfig {
     /// Maximum concurrent renders per browser instance.
     /// Default: 10.
     pub max_concurrent_renders: usize,
+    /// How long to wait for Chrome to print its DevTools WebSocket URL on
+    /// startup. Increase this on slow/resource-constrained hosts (e.g.
+    /// containers starting multiple engines simultaneously). Default: 60s.
+    #[serde(with = "humantime_serde")]
+    pub chrome_launch_timeout: Duration,
 }
 
 impl Default for BrowserConfig {
@@ -571,6 +576,7 @@ impl Default for BrowserConfig {
             max_page_memory_mb: 512,
             max_browser_memory_mb: 2048,
             max_concurrent_renders: 10,
+            chrome_launch_timeout: Duration::from_secs(60),
         }
     }
 }

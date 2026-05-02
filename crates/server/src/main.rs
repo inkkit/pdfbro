@@ -245,6 +245,7 @@ fn browser_config_from(config: &ServerConfig) -> BrowserConfig {
         max_page_memory_mb: defaults.max_page_memory_mb,
         max_browser_memory_mb: defaults.max_browser_memory_mb,
         max_concurrent_renders: defaults.max_concurrent_renders,
+        chrome_launch_timeout: defaults.chrome_launch_timeout,
     }
 }
 
