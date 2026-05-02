@@ -267,6 +267,34 @@ Python bindings (`crates/py/`), Node bindings (`crates/js/`).
 
 ---
 
+## Performance
+
+Benchmarked on a 2-CPU / 2 GB Docker cgroup, 4 concurrent clients, 60 s warm-up + 120 s timed run (3 repetitions). Both servers ran identical fixture files.
+
+### Latency (ms) & throughput
+
+| Workload | p50 Folio | p50 Gotenberg | p95 Folio | p95 Gotenberg | RPS Folio | RPS Gotenberg |
+|---|---|---|---|---|---|---|
+| HTML → PDF (small) | **195** | 302 | **250** | 489 | **19.9** | 12.3 |
+| HTML → PDF (large) | **213** | 299 | **271** | 421 | **17.9** | 11.9 |
+| URL → PDF | **290** | 478 | **628** | 941 | **12.3** | 7.6 |
+| DOCX → PDF (LibreOffice) | **286** | 688 | **528** | 1 262 | **12.3** | 5.1 |
+| PDF merge | **14** | 15 | **35** | 51 | **213.9** | 181.6 |
+
+### Peak memory (MiB)
+
+| Workload | Folio | Gotenberg |
+|---|---|---|
+| HTML → PDF (small) | 340 | **320** |
+| HTML → PDF (large) | 457 | **327** |
+| URL → PDF | 544 | **358** |
+| DOCX → PDF (LibreOffice) | 1 306 | **402** |
+| PDF merge | 1 747 | **384** |
+
+> **Note:** URL and LibreOffice workloads show high variance (CV > 30%) across runs — treat those numbers as indicative, not definitive. Chrome PDF rendering is non-deterministic. Results are hardware-specific; run `docker compose -f docker-compose.bench.yml up -d && cargo run -p bench -- perf` to reproduce on your machine.
+
+---
+
 ## Documentation
 
 - [`comparison.md`](./comparison.md) — in-depth audit vs Gotenberg
