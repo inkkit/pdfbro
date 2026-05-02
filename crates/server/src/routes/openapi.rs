@@ -2,11 +2,40 @@
 //!
 //! This provides the API spec for Scalar interactive documentation.
 
+use axum::extract::State;
 use axum::Json;
 use serde_json::{Value, json};
 
+use crate::state::AppState;
+
+/// Resolve the public base URL for the OpenAPI `servers` block.
+///
+/// Priority:
+/// 1. `PUBLIC_URL` env var — explicit override, works on any platform.
+/// 2. `FLY_APP_NAME` env var — auto-detected on Fly.io deployments.
+/// 3. `http://{host}:{port}` derived from server config — local / unknown.
+fn resolve_server_url(state: &AppState) -> String {
+    if let Ok(url) = std::env::var("PUBLIC_URL") {
+        return url.trim_end_matches('/').to_string();
+    }
+    if let Ok(app) = std::env::var("FLY_APP_NAME") {
+        return format!("https://{app}.fly.dev");
+    }
+    let cfg = &state.config;
+    let host = cfg.host;
+    let port = cfg.port;
+    if port == 80 {
+        format!("http://{host}")
+    } else if port == 443 {
+        format!("https://{host}")
+    } else {
+        format!("http://{host}:{port}")
+    }
+}
+
 /// `GET /openapi.json` - Returns the OpenAPI 3.0 specification for Folio.
-pub async fn openapi_spec() -> Json<Value> {
+pub async fn openapi_spec(State(state): State<AppState>) -> Json<Value> {
+    let server_url = resolve_server_url(&state);
     Json(json!({
         "openapi": "3.0.3",
         "info": {
@@ -20,8 +49,8 @@ pub async fn openapi_spec() -> Json<Value> {
         },
         "servers": [
             {
-                "url": "http://localhost:3000",
-                "description": "Local development server"
+                "url": server_url,
+                "description": "API server"
             }
         ],
         "tags": [
