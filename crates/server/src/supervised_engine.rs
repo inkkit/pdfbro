@@ -128,16 +128,16 @@ impl SupervisedChromiumEngine {
     }
 
     /// Check if the engine is healthy.
+    ///
+    /// Only probes an already-running engine — does NOT trigger lazy start.
     pub async fn healthy(&self) -> bool {
-        match self.get_engine().await {
-            Ok(guard) => {
-                if let Some(ref engine) = *guard {
-                    engine.healthy().await
-                } else {
-                    false
-                }
-            }
-            Err(_) => false,
+        if !self.inner.is_running.load(Ordering::SeqCst) {
+            return false;
+        }
+        let guard = self.inner.engine.lock().await;
+        match guard.as_ref() {
+            Some(engine) => engine.healthy().await,
+            None => false,
         }
     }
 
@@ -326,16 +326,17 @@ impl SupervisedLibreOfficeEngine {
     }
 
     /// Check if the engine is healthy.
+    /// Check if the engine is healthy.
+    ///
+    /// Only probes an already-running engine — does NOT trigger lazy start.
     pub async fn healthy(&self) -> bool {
-        match self.get_engine().await {
-            Ok(guard) => {
-                if let Some(ref engine) = *guard {
-                    engine.healthy().await
-                } else {
-                    false
-                }
-            }
-            Err(_) => false,
+        if !self.inner.is_running.load(Ordering::SeqCst) {
+            return false;
+        }
+        let guard = self.inner.engine.lock().await;
+        match guard.as_ref() {
+            Some(engine) => engine.healthy().await,
+            None => false,
         }
     }
 
