@@ -12,12 +12,28 @@ LOG_LEVEL=info
 CHROME_VERSION=stable
 
 .PHONY: build
-build: ## Build Folio Docker image
-	docker build -t folio:latest -f Dockerfile .
+build: ## Build full image (Chromium + LibreOffice)
+	docker build --target folio -t folio:latest -f Dockerfile .
+
+.PHONY: build-chromium
+build-chromium: ## Build Chromium-only image
+	docker build --target folio-chromium -t folio:chromium -f Dockerfile .
+
+.PHONY: build-libreoffice
+build-libreoffice: ## Build LibreOffice-only image
+	docker build --target folio-libreoffice -t folio:libreoffice -f Dockerfile .
 
 .PHONY: run
-run: ## Run Folio container via Docker Compose
+run: ## Run full image (Chromium + LibreOffice) via Docker Compose
 	docker compose up folio
+
+.PHONY: run-chromium
+run-chromium: ## Run Chromium-only image via Docker Compose
+	docker compose --profile chromium up folio-chromium
+
+.PHONY: run-libreoffice
+run-libreoffice: ## Run LibreOffice-only image via Docker Compose
+	docker compose --profile libreoffice up folio-libreoffice
 
 .PHONY: stop
 stop: ## Stop all containers

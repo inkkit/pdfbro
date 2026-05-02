@@ -22,11 +22,22 @@ struct Row<'a> {
 
 /// Print the startup banner if conditions are right.
 ///
-/// The banner is suppressed when `log_format` is [`LogFormat::Json`] or
-/// when stdout is not a terminal.  Color is also disabled when the
-/// `NO_COLOR` environment variable is present.
+/// TTY: full ASCII art banner with color.
+/// Non-TTY (Docker, AWS, CI): structured `tracing::info!` lines so operators
+/// can see service status in any log aggregator without the ASCII noise.
 pub fn print(config: &ServerConfig, chromium_ready: bool, libreoffice_ready: bool) {
-    if matches!(config.log_format, LogFormat::Json) || !std::io::stdout().is_terminal() {
+    if !std::io::stdout().is_terminal() {
+        let version = env!("CARGO_PKG_VERSION");
+        tracing::info!(
+            version,
+            chromium  = if chromium_ready  { "ready" } else { "unavailable" },
+            libreoffice = if libreoffice_ready { "ready" } else { "unavailable" },
+            engines = "merge,split,flatten,metadata,convert,bookmarks,watermark,stamp,encrypt,decrypt,rotate",
+            "folio server ready",
+        );
+        return;
+    }
+    if matches!(config.log_format, LogFormat::Json) {
         return;
     }
 

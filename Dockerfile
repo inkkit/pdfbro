@@ -161,6 +161,8 @@ RUN apt-get update -qq && \
 
 ENV CHROME_PATH=/usr/bin/chromium
 ENV CHROME_BIN=/usr/bin/chromium
+# Suppress chromiumoxide DevTools Protocol noise that is harmless but confusing.
+ENV RUST_LOG=info,chromiumoxide::handler=error
 
 # =============================================================================
 # Final stage: folio — full image (Chromium + LibreOffice)
