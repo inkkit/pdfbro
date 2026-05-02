@@ -138,7 +138,7 @@ pub async fn estimate(
     let analysis = analyze_html(&html).await;
 
     // Build size breakdown
-    let mut breakdown = SizeBreakdown {
+    let breakdown = SizeBreakdown {
         markup_mb: analysis.markup_size_mb,
         fonts_mb: analysis.font_size_mb,
         images_mb: analysis.image_size_mb,

@@ -56,6 +56,36 @@ pub enum EngineError {
     #[error("operation timed out after {0:?}")]
     Timeout(Duration),
 
+    /// Page navigation exceeded timeout.
+    #[error("navigation timed out after {duration:?} for {url}")]
+    NavigationTimeout {
+        /// URL that failed to load in time.
+        url: String,
+        /// Duration of the timeout.
+        duration: Duration,
+    },
+
+    /// PDF render operation exceeded timeout.
+    #[error("PDF render timed out after {0:?}")]
+    RenderTimeout(Duration),
+
+    /// Network idle detection exceeded timeout.
+    #[error("network idle detection timed out after {0:?}")]
+    IdleTimeout(Duration),
+
+    /// A resource (image, CSS, font) failed to load within timeout.
+    #[error("resource timed out after {duration:?}: {url}")]
+    ResourceTimeout {
+        /// URL of the resource that timed out.
+        url: String,
+        /// Duration of the timeout.
+        duration: Duration,
+    },
+
+    /// LibreOffice conversion exceeded timeout.
+    #[error("LibreOffice conversion timed out after {0:?}")]
+    LibreOfficeTimeout(Duration),
+
     /// An I/O error occurred (filesystem, sockets, etc.).
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
@@ -77,6 +107,58 @@ impl From<lopdf::Error> for EngineError {
 
 /// Convenience alias for results returned by engine operations.
 pub type EngineResult<T> = Result<T, EngineError>;
+
+// ---------------------------------------------------------------------------
+// Partial Success & Warnings
+// ---------------------------------------------------------------------------
+
+/// Severity level for conversion warnings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WarningSeverity {
+    /// Informational - resource failed but not critical (e.g., tracking pixel).
+    Info,
+    /// Warning - resource failed, quality may be degraded.
+    Warning,
+    /// Critical - resource failed, consider retry.
+    Critical,
+}
+
+/// A warning about a non-fatal issue during conversion.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConversionWarning {
+    /// URL or resource that caused the warning.
+    pub resource: String,
+    /// HTTP status code if applicable.
+    pub status_code: Option<u16>,
+    /// Warning message.
+    pub message: String,
+    /// Severity level.
+    pub severity: WarningSeverity,
+}
+
+/// Result of a conversion with potential warnings.
+///
+/// This allows returning a successful PDF along with warnings about
+/// non-critical issues (e.g., missing images that don't prevent PDF generation).
+#[derive(Debug, Clone)]
+pub struct ConversionResult {
+    /// The generated PDF bytes.
+    pub pdf_bytes: Vec<u8>,
+    /// Warnings about non-critical issues during conversion.
+    pub warnings: Vec<ConversionWarning>,
+    /// Number of pages in the generated PDF.
+    pub page_count: u32,
+}
+
+/// Extension trait for PdfOptions to support partial success mode.
+pub trait PartialSuccessOptions {
+    /// Whether to fail conversion if any resource fails (default: true).
+    ///
+    /// When `false`, the conversion continues and returns warnings
+    /// for failed resources instead of failing entirely.
+    fn fail_on_resource_error(&self) -> bool;
+}
 
 // ---------------------------------------------------------------------------
 // Paper size
@@ -464,6 +546,15 @@ pub struct BrowserConfig {
     /// networkIdle is skipped entirely, matching gotenberg's default.
     #[serde(with = "humantime_serde")]
     pub network_idle_timeout: Option<Duration>,
+    /// Maximum memory per page in MB (Chrome flag: --max-old-space-size).
+    /// Default: 512 MB.
+    pub max_page_memory_mb: usize,
+    /// Maximum total browser memory in MB.
+    /// Default: 2048 MB (2 GB).
+    pub max_browser_memory_mb: usize,
+    /// Maximum concurrent renders per browser instance.
+    /// Default: 10.
+    pub max_concurrent_renders: usize,
 }
 
 impl Default for BrowserConfig {
@@ -477,6 +568,9 @@ impl Default for BrowserConfig {
             lazy_start: false,
             idle_shutdown_timeout: None,
             network_idle_timeout: None,
+            max_page_memory_mb: 512,
+            max_browser_memory_mb: 2048,
+            max_concurrent_renders: 10,
         }
     }
 }
@@ -1004,6 +1098,9 @@ mod tests {
             lazy_start: false,
             idle_shutdown_timeout: None,
             network_idle_timeout: None,
+            max_page_memory_mb: 512,
+            max_browser_memory_mb: 2048,
+            max_concurrent_renders: 10,
         };
         let json = serde_json::to_string(&c).unwrap();
         let back: BrowserConfig = serde_json::from_str(&json).unwrap();

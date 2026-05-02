@@ -74,6 +74,12 @@ pub(crate) struct Inner {
     /// OS process ID of the Chrome child process; used for best-effort
     /// synchronous kill in [`Inner::Drop`] when shutdown was skipped.
     pub(crate) chrome_pid: AtomicU32,
+    /// Per-engine user-data-dir. Owned so the directory (and its
+    /// SingletonLock) is removed when the engine is dropped — concurrent
+    /// or rapid sequential launches no longer collide on the chromiumoxide
+    /// default `/tmp/chromiumoxide-runner`.
+    #[allow(dead_code)]
+    pub(crate) user_data_dir: Option<tempfile::TempDir>,
 }
 
 /// Per-render context describing user-agent, headers, cookies, and
@@ -101,6 +107,17 @@ pub struct RequestContext {
     pub fail_on_console_exceptions: bool,
     /// If true, fail the render if any resource fails to load (network error).
     pub fail_on_resource_loading_failed: bool,
+    /// If true, skip the engine's `networkIdle` race during navigation —
+    /// proceed once `load` fires. Mirrors Gotenberg's
+    /// `skipNetworkIdleEvent` / `skipNetworkAlmostIdleEvent` flags
+    /// (Chrome does not distinguish the two via CDP, so a single bool
+    /// covers both).
+    pub skip_network_idle: bool,
+    /// Resource URLs whose host contains any of these substrings are
+    /// exempt from [`Self::fail_on_resource_status`] checks. Match is
+    /// case-insensitive substring on the URL host. Empty (the default)
+    /// means no domains are ignored.
+    pub ignore_resource_status_domains: Vec<String>,
 }
 
 /// A single cookie installed on the page before a render.
@@ -403,6 +420,7 @@ impl ChromiumEngine {
         handler_task: JoinHandle<()>,
         config: BrowserConfig,
         chrome_pid: Option<u32>,
+        user_data_dir: Option<tempfile::TempDir>,
     ) -> Self {
         Self {
             inner: Arc::new(Inner {
@@ -411,6 +429,7 @@ impl ChromiumEngine {
                 handler_task: std::sync::Mutex::new(Some(handler_task)),
                 config,
                 chrome_pid: AtomicU32::new(chrome_pid.unwrap_or(0)),
+                user_data_dir,
             }),
         }
     }
@@ -453,6 +472,7 @@ mod assertions {
         assert!(ctx.fail_on_resource_status.is_empty());
         assert!(!ctx.fail_on_console_exceptions);
         assert!(!ctx.fail_on_resource_loading_failed);
+        assert!(!ctx.skip_network_idle);
     }
 
     #[test]

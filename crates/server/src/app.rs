@@ -39,14 +39,17 @@ use crate::routes::chromium;
 use crate::routes::libreoffice;
 use crate::state::AppState;
 
-/// Generates a UUIDv4 for every incoming request that did not already
+/// Generates a ULID for every incoming request that did not already
 /// carry an `X-Request-Id` header.
+///
+/// ULID provides lexicographic sorting (chronological order), is URL-safe,
+/// and uses 26 lowercase characters (Crockford base32).
 #[derive(Clone, Default)]
-pub struct UuidRequestId;
+pub struct UlidRequestId;
 
-impl MakeRequestId for UuidRequestId {
+impl MakeRequestId for UlidRequestId {
     fn make_request_id<B>(&mut self, _request: &Request<B>) -> Option<RequestId> {
-        let id = uuid::Uuid::new_v4().to_string();
+        let id = ulid::Ulid::new().to_string().to_lowercase();
         let header = id.parse::<axum::http::HeaderValue>().ok()?;
         Some(RequestId::new(header))
     }
@@ -323,7 +326,7 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
         .with_state(state)
         .layer(
             ServiceBuilder::new()
-                .layer(SetRequestIdLayer::new(header_name.clone(), UuidRequestId))
+                .layer(SetRequestIdLayer::new(header_name.clone(), UlidRequestId))
                 .layer(PropagateRequestIdLayer::new(header_name.clone()))
                 .layer(
                     TraceLayer::new_for_http()
@@ -351,6 +354,13 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
     // (including auth-rejected ones) and records them into the ConsoleStore
     // ring buffer. Added last so it wraps the full stack.
     router = router.layer(middleware::from_fn_with_state(state_for_console, console_log_middleware));
+
+    // Optional path-prefix mount (--root-path / API_ROOT_PATH). When
+    // empty, the router is returned untouched; otherwise every route
+    // is reachable under the prefix.
+    if !config.api_root_path.is_empty() {
+        router = Router::new().nest(&config.api_root_path, router);
+    }
 
     router
 }

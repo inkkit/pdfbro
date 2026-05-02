@@ -1,70 +1,74 @@
-# Dockerfile for running tests with all dependencies
-# Uses cargo-chef for efficient dependency caching
+# Dockerfile for running the full test suite (unit + BDD) with all dependencies.
+# Mirrors the folio production image: Chromium + LibreOffice + unoserver.
 
-FROM rust:1.88 AS chef
+ARG RUST_VERSION=1.88
+
+# =============================================================================
+# Stage: chef — cargo-chef for dependency caching
+# =============================================================================
+FROM rust:${RUST_VERSION} AS chef
 WORKDIR /app
 RUN cargo install cargo-chef --locked
 
+# =============================================================================
+# Stage: planner — produce recipe.json
+# =============================================================================
 FROM chef AS planner
 COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
+# =============================================================================
+# Stage: builder — compile everything including folio-server binary
+# =============================================================================
 FROM chef AS builder
 
-# Install system dependencies including Chrome (Chromium) and LibreOffice
-RUN apt-get update && apt-get install -y \
-    libgtk-3-0 \
-    libx11-xcb1 \
-    libxcomposite1 \
-    libxcursor1 \
-    libxdamage1 \
-    libxi6 \
-    libxtst6 \
-    libnss3 \
-    libcups2 \
-    libxss1 \
-    libxrandr2 \
-    libasound2 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libpangocairo-1.0-0 \
-    libpango-1.0-0 \
-    libcairo2 \
-    libgdk-pixbuf2.0-0 \
-    libgconf-2-4 \
-    libgdm1 \
-    libglib2.0-0 \
-    libgl1-mesa-glx \
-    fonts-liberation \
-    xdg-utils \
-    wget \
-    curl \
-    unzip \
+# Runtime deps for Chromium and LibreOffice needed at test time
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
+    # Chromium
     chromium \
-    libreoffice \
-    jq \
-    poppler-utils \
-    default-jre-headless \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install verapdf (PDF/A validator)
-RUN VERAPDF_VERSION=1.26.2 && \
-    curl -fsSL "https://software.verapdf.org/releases/${VERAPDF_VERSION}/verapdf-greenfield-${VERAPDF_VERSION}-CLI.zip" \
-         -o /tmp/verapdf.zip && \
-    unzip /tmp/verapdf.zip -d /opt && \
-    mv "/opt/verapdf-greenfield-${VERAPDF_VERSION}" /opt/verapdf && \
-    ln -s /opt/verapdf/verapdf /usr/local/bin/verapdf && \
-    rm /tmp/verapdf.zip
+    libgtk-3-0 libx11-xcb1 libxcomposite1 libxcursor1 \
+    libxdamage1 libxi6 libxtst6 libnss3 libcups2 libxss1 \
+    libxrandr2 libasound2 libatk1.0-0 libatk-bridge2.0-0 \
+    libpangocairo-1.0-0 libpango-1.0-0 libcairo2 \
+    libgdk-pixbuf2.0-0 libglib2.0-0 libgl1-mesa-glx \
+    fonts-liberation \
+    # LibreOffice + python3-uno (same source as production image)
+    && echo "deb http://deb.debian.org/debian bookworm-backports main" \
+         > /etc/apt/sources.list.d/backports.list \
+    && apt-get update -qq \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y -t bookworm-backports \
+         -qq --no-install-recommends \
+         libreoffice-writer \
+         libreoffice-calc \
+         libreoffice-impress \
+         libreoffice-draw \
+         python3-uno \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+         python3-minimal python3-pip \
+         # PDF tools used by BDD assertion steps
+         poppler-utils \
+         qpdf \
+         ghostscript \
+    && pip3 install --no-cache-dir --break-system-packages unoserver==2.2.1 \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ENV CHROME_PATH=/usr/bin/chromium
+ENV CHROME_BIN=/usr/bin/chromium
+# Required so Chromium can run as root inside the container
+ENV FOLIO_NO_SANDBOX=true
+ENV SAL_USE_VCLPLUGIN=svp
 ENV RUST_LOG=info
 
-# Build dependencies (cached layer) - only re-runs if recipe.json changes
+# Cache dependencies
 COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
+RUN cargo chef cook --recipe-path recipe.json
+RUN cargo chef cook --recipe-path recipe.json --tests
 
-# Copy source code (only invalidates cache if source changes)
+# Build everything: folio-server binary + all test binaries
 COPY . .
+RUN cargo test --no-run
 
-# Run tests by default
-CMD ["cargo", "test", "--release", "--", "--ignored", "--test-threads=1"]
+# Run pre-compiled test binaries — no recompilation at container start.
+# --test-threads=1 because integration tests share a single unoserver
+# instance on port 2003; running them in parallel triggers contention.
+CMD ["cargo", "test", "--no-fail-fast", "--", "--test-threads=1"]

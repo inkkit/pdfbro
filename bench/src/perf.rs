@@ -28,6 +28,9 @@ pub struct PerfArgs {
     pub skip_preflight: bool,
     #[arg(long)]
     pub output_dir: Option<PathBuf>,
+    /// Comma-separated workload names to skip (e.g. --skip url-local).
+    #[arg(long, value_delimiter = ',')]
+    pub skip: Vec<String>,
 }
 
 pub async fn run_perf(args: PerfArgs) -> anyhow::Result<()> {
@@ -44,6 +47,10 @@ pub async fn run_perf(args: PerfArgs) -> anyhow::Result<()> {
     let mut all_results = Vec::new();
 
     for w in &workloads {
+        if args.skip.iter().any(|s| s == w.name) {
+            println!("\n=== {} — skipped ===", w.name);
+            continue;
+        }
         println!("\n=== {} — {} ===", w.name, w.description);
 
         let folio_result = run_workload(
@@ -133,11 +140,13 @@ async fn quality_check(w: &workload::WorkloadDef, url: &str) -> anyhow::Result<(
     for path in &w.fixtures {
         let bytes = tokio::fs::read(path).await
             .map_err(|e| anyhow::anyhow!("failed to read fixture {:?}: {e}", path))?;
-        let filename = path.file_name().unwrap().to_string_lossy().to_string();
+        let filename = w.fixture_filename
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| path.file_name().unwrap().to_string_lossy().to_string());
         let part = reqwest::multipart::Part::bytes(bytes)
             .file_name(filename.clone())
             .mime_str("application/octet-stream")?;
-        form = form.part(filename, part);
+        form = form.part(w.fixture_field, part);
     }
     for (k, v) in &w.extra_fields {
         form = form.text(k.to_string(), v.to_string());
@@ -164,6 +173,8 @@ async fn drive_once(
         .map(|(k, v)| (k.to_string(), v.to_string()))
         .collect();
 
+    let fixture_field = w.fixture_field;
+    let fixture_filename = w.fixture_filename;
     let body_fn = Arc::new(move || {
         let url = url.clone();
         let fixtures = fixtures.clone();
@@ -172,11 +183,13 @@ async fn drive_once(
             let mut form = reqwest::multipart::Form::new();
             for path in &fixtures {
                 let bytes = tokio::fs::read(path).await?;
-                let filename = path.file_name().unwrap().to_string_lossy().to_string();
+                let filename = fixture_filename
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| path.file_name().unwrap().to_string_lossy().to_string());
                 let part = reqwest::multipart::Part::bytes(bytes)
                     .file_name(filename.clone())
                     .mime_str("application/octet-stream")?;
-                form = form.part(filename, part);
+                form = form.part(fixture_field, part);
             }
             for (k, v) in &extra_fields {
                 form = form.text(k.clone(), v.clone());

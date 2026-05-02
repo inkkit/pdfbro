@@ -112,6 +112,16 @@ fn test_config() -> ServerConfig {
         api_download_from_max_retry: 3,
         api_disable_download_from: false,
         api_correlation_id_header: "x-request-id".to_string(),
+        api_root_path: String::new(),
+        libreoffice_unoserver_port: 0, // OS-assigned, avoids cross-test collisions
+
+        libreoffice_unoserver_ready_timeout: std::time::Duration::from_secs(60),
+        webhook_max_retry: 4,
+        webhook_retry_min_wait: std::time::Duration::from_secs(1),
+        webhook_retry_max_wait: std::time::Duration::from_secs(30),
+        webhook_client_timeout: std::time::Duration::from_secs(30),
+        webhook_allow_list: vec![],
+        webhook_deny_list: vec![],
     }
 }
 
@@ -138,9 +148,18 @@ async fn launch_libreoffice(config: &ServerConfig) -> SupervisedLibreOfficeEngin
 async fn spawn_server(with_libreoffice: bool) -> TestServer {
     let config = test_config();
     let chromium = launch_chromium(&config).await;
+    chromium
+        .start()
+        .await
+        .expect("chromium engine failed to start");
     let backend = ChromiumBackend::new(chromium.clone());
     let lo = if with_libreoffice {
-        Some(Arc::new(launch_libreoffice(&config).await))
+        let engine = launch_libreoffice(&config).await;
+        engine
+            .start()
+            .await
+            .expect("libreoffice engine failed to start");
+        Some(Arc::new(engine))
     } else {
         None
     };

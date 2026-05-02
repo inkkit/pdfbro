@@ -15,7 +15,7 @@ pub async fn console_stream(
     State(state): State<AppState>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let started_at = state.started_at;
-    let mut rx = state.console.broadcast.subscribe();
+    let rx = state.console.broadcast.subscribe();
 
     // Send initial snapshot immediately on connect (no waiting for next 5s tick).
     // For the initial snapshot we read the health gauges as a best-effort proxy;

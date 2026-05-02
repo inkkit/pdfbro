@@ -18,7 +18,7 @@ mod validate;
 
 pub use config::{WebhookConfig, extract_webhook_config};
 pub use queue::{WebhookQueue, spawn_job, start_workers};
-pub use validate::{validate_webhook_url, ValidationError};
+pub use validate::{validate_webhook_url, ValidationError, WebhookUrlValidator};
 
 /// If async webhook mode is requested, spawn a job and return a 202 response.
 /// Returns `Ok(None)` if no webhook or sync mode — the caller should proceed
@@ -32,6 +32,7 @@ pub async fn maybe_spawn_webhook(
     match extract_webhook_config(headers) {
         Ok(Some(config)) => {
             tracing::info!("webhook config found, sync_mode={}", config.sync_mode);
+            validate_webhook_config(&config, &state.webhook_validator)?;
             if !config.sync_mode {
                 if let Some(queue) = &state.webhook_queue {
                     let job_id = spawn_job(queue, operation, config, data).await
@@ -51,6 +52,51 @@ pub async fn maybe_spawn_webhook(
         Ok(None) => Ok(None),
         Err(e) => Err(crate::error::ApiError::Webhook(e.to_string())),
     }
+}
+
+/// Compute the next retry delay using exponential backoff with full
+/// jitter. Returns a value in `[0, target]` where
+/// `target = min(min_wait * 2^(attempt-1), max_wait)`. Jitter source is
+/// `SystemTime` nanoseconds — sufficient to decorrelate retries from
+/// concurrent workers without dragging in a `rand` dependency.
+fn backoff_delay(min_wait: Duration, max_wait: Duration, attempt: u32) -> Duration {
+    // Cap the shift so 2^(attempt-1) never overflows u32.
+    let shift = (attempt - 1).min(31);
+    let scaled_nanos = (min_wait.as_nanos() as u64).saturating_mul(1u64 << shift);
+    let target_nanos = scaled_nanos.min(max_wait.as_nanos() as u64);
+    if target_nanos == 0 {
+        return Duration::ZERO;
+    }
+    let jitter_nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.subsec_nanos() as u64)
+        .unwrap_or(0)
+        % target_nanos.max(1);
+    Duration::from_nanos(jitter_nanos)
+}
+
+/// SSRF-validate both webhook URLs in a [`WebhookConfig`] and apply the
+/// operator-supplied allow/deny regex lists. Surfaces the failing URL
+/// via [`crate::error::ApiError::InvalidField`] so the caller returns 400.
+fn validate_webhook_config(
+    config: &WebhookConfig,
+    validator: &WebhookUrlValidator,
+) -> crate::error::ApiResult<()> {
+    validator.is_allowed(&config.webhook_url).map_err(|e| {
+        crate::error::ApiError::InvalidField {
+            field: "Gotenberg-Webhook-Url",
+            message: e.to_string(),
+        }
+    })?;
+    if let Some(error_url) = config.error_url.as_deref() {
+        validator.is_allowed(error_url).map_err(|e| {
+            crate::error::ApiError::InvalidField {
+                field: "Gotenberg-Webhook-Error-Url",
+                message: e.to_string(),
+            }
+        })?;
+    }
+    Ok(())
 }
 
 /// Engine references needed by webhook workers to execute jobs.
@@ -349,23 +395,51 @@ pub enum JobData {
     },
 }
 
+/// Tunable retry/timeout configuration for [`WebhookClient`].
+#[derive(Debug, Clone)]
+pub struct WebhookClientConfig {
+    /// Maximum delivery attempts including the first try (must be >= 1).
+    pub max_retries: u32,
+    /// Lower bound of the exponential backoff window between retries.
+    pub retry_min_wait: Duration,
+    /// Upper bound of the exponential backoff window between retries.
+    pub retry_max_wait: Duration,
+    /// Per-attempt HTTP client timeout.
+    pub client_timeout: Duration,
+}
+
+impl Default for WebhookClientConfig {
+    fn default() -> Self {
+        Self {
+            max_retries: 4,
+            retry_min_wait: Duration::from_secs(1),
+            retry_max_wait: Duration::from_secs(30),
+            client_timeout: Duration::from_secs(30),
+        }
+    }
+}
+
 /// Webhook delivery client.
 pub struct WebhookClient {
     http: Client,
-    max_retries: u32,
-    retry_delay: Duration,
+    config: WebhookClientConfig,
 }
 
 impl Default for WebhookClient {
     fn default() -> Self {
-        Self {
-            http: Client::builder()
-                .timeout(Duration::from_secs(30))
-                .build()
-                .expect("valid client config"),
-            max_retries: 3,
-            retry_delay: Duration::from_secs(5),
-        }
+        Self::new(WebhookClientConfig::default())
+    }
+}
+
+impl WebhookClient {
+    /// Build a new webhook client from explicit configuration. Used by
+    /// `main.rs` to honor `--webhook-*` CLI flags.
+    pub fn new(config: WebhookClientConfig) -> Self {
+        let http = Client::builder()
+            .timeout(config.client_timeout)
+            .build()
+            .expect("valid client config");
+        Self { http, config }
     }
 }
 
@@ -414,7 +488,7 @@ impl WebhookClient {
     ) -> Result<(), WebhookError> {
         let mut last_error = None;
 
-        for attempt in 1..=self.max_retries {
+        for attempt in 1..=self.config.max_retries {
             match self.try_deliver(url, result, extra_headers, payload).await {
                 Ok(()) => {
                     info!(job_id = %result.job_id, url = %url, attempt, "Webhook delivered successfully");
@@ -423,8 +497,13 @@ impl WebhookClient {
                 Err(e) => {
                     warn!(job_id = %result.job_id, url = %url, attempt, error = %e, "Webhook delivery failed, retrying");
                     last_error = Some(e);
-                    if attempt < self.max_retries {
-                        tokio::time::sleep(self.retry_delay).await;
+                    if attempt < self.config.max_retries {
+                        let delay = backoff_delay(
+                            self.config.retry_min_wait,
+                            self.config.retry_max_wait,
+                            attempt,
+                        );
+                        tokio::time::sleep(delay).await;
                     }
                 }
             }
@@ -588,6 +667,7 @@ pub async fn process_webhook_job(
 async fn execute_job(job: &WebhookJob, ctx: &WebhookEngineContext) -> Result<WebhookPayload, String> {
     match &job.operation {
         // ── Chromium PDF conversions ──
+        #[cfg(feature = "chromium")]
         WebhookOperation::ChromiumConvertHtml => {
             let (html, options, req_ctx) = match &job.data {
                 JobData::ChromiumHtml { html, options, ctx } => (html, options, ctx),
@@ -600,6 +680,7 @@ async fn execute_job(job: &WebhookJob, ctx: &WebhookEngineContext) -> Result<Web
                 .map_err(|e| e.to_string())?;
             Ok(WebhookPayload::Pdf { data: pdf, filename: "result.pdf".into() })
         }
+        #[cfg(feature = "chromium")]
         WebhookOperation::ChromiumConvertUrl => {
             let (url, options, req_ctx) = match &job.data {
                 JobData::ChromiumUrl { url, options, ctx } => (url, options, ctx),
@@ -611,6 +692,7 @@ async fn execute_job(job: &WebhookJob, ctx: &WebhookEngineContext) -> Result<Web
                 .map_err(|e| e.to_string())?;
             Ok(WebhookPayload::Pdf { data: pdf, filename: "result.pdf".into() })
         }
+        #[cfg(feature = "chromium")]
         WebhookOperation::ChromiumConvertMarkdown => {
             let (html, options, req_ctx) = match &job.data {
                 JobData::ChromiumMarkdown { html, options, ctx } => (html, options, ctx),
@@ -624,6 +706,7 @@ async fn execute_job(job: &WebhookJob, ctx: &WebhookEngineContext) -> Result<Web
             Ok(WebhookPayload::Pdf { data: pdf, filename: "result.pdf".into() })
         }
         // ── Chromium screenshots ──
+        #[cfg(feature = "chromium")]
         WebhookOperation::ChromiumScreenshotHtml => {
             let (html, options) = match &job.data {
                 JobData::ChromiumScreenshotHtml { html, options } => (html, options),
@@ -637,6 +720,7 @@ async fn execute_job(job: &WebhookJob, ctx: &WebhookEngineContext) -> Result<Web
             let ext = options.format.extension();
             Ok(WebhookPayload::Pdf { data: img, filename: format!("result.{ext}") })
         }
+        #[cfg(feature = "chromium")]
         WebhookOperation::ChromiumScreenshotUrl => {
             let (url, options) = match &job.data {
                 JobData::ChromiumScreenshotUrl { url, options } => (url, options),
@@ -649,6 +733,7 @@ async fn execute_job(job: &WebhookJob, ctx: &WebhookEngineContext) -> Result<Web
             let ext = options.format.extension();
             Ok(WebhookPayload::Pdf { data: img, filename: format!("result.{ext}") })
         }
+        #[cfg(feature = "chromium")]
         WebhookOperation::ChromiumScreenshotMarkdown => {
             let (html, options) = match &job.data {
                 JobData::ChromiumScreenshotMarkdown { html, options } => (html, options),
@@ -662,7 +747,17 @@ async fn execute_job(job: &WebhookJob, ctx: &WebhookEngineContext) -> Result<Web
             let ext = options.format.extension();
             Ok(WebhookPayload::Pdf { data: img, filename: format!("result.{ext}") })
         }
+        #[cfg(not(feature = "chromium"))]
+        WebhookOperation::ChromiumConvertHtml
+        | WebhookOperation::ChromiumConvertUrl
+        | WebhookOperation::ChromiumConvertMarkdown
+        | WebhookOperation::ChromiumScreenshotHtml
+        | WebhookOperation::ChromiumScreenshotUrl
+        | WebhookOperation::ChromiumScreenshotMarkdown => {
+            Err("Chromium feature not enabled".into())
+        }
         // ── LibreOffice ──
+        #[cfg(feature = "libreoffice")]
         WebhookOperation::LibreOfficeConvert => {
             let (files, options, merge) = match &job.data {
                 JobData::LibreOffice { files, options, merge } => (files, options, *merge),
@@ -693,6 +788,10 @@ async fn execute_job(job: &WebhookJob, ctx: &WebhookEngineContext) -> Result<Web
                     .map_err(|e| e.to_string())?;
                 Ok(WebhookPayload::Zip { data: zip, filename: "result.zip".into() })
             }
+        }
+        #[cfg(not(feature = "libreoffice"))]
+        WebhookOperation::LibreOfficeConvert => {
+            Err("LibreOffice feature not enabled".into())
         }
         // ── PDF merge ──
         WebhookOperation::PdfMerge => {
@@ -905,5 +1004,109 @@ mod tests {
         let error = JobStatus::Error;
         assert_eq!(serde_json::to_string(&success).unwrap(), "\"success\"");
         assert_eq!(serde_json::to_string(&error).unwrap(), "\"error\"");
+    }
+
+    fn cfg(url: &str, error_url: Option<&str>) -> WebhookConfig {
+        WebhookConfig {
+            webhook_url: url.into(),
+            error_url: error_url.map(|s| s.into()),
+            extra_headers: Default::default(),
+            sync_mode: false,
+        }
+    }
+
+    fn no_filter() -> WebhookUrlValidator {
+        WebhookUrlValidator::default()
+    }
+
+    #[test]
+    fn validate_webhook_config_accepts_public_url() {
+        let c = cfg("https://hooks.example.com/x", None);
+        assert!(validate_webhook_config(&c, &no_filter()).is_ok());
+    }
+
+    #[test]
+    fn validate_webhook_config_rejects_private_ip() {
+        let c = cfg("http://10.0.0.1/x", None);
+        let err = validate_webhook_config(&c, &no_filter()).unwrap_err();
+        match err {
+            crate::error::ApiError::InvalidField { field, .. } => {
+                assert_eq!(field, "Gotenberg-Webhook-Url");
+            }
+            other => panic!("expected InvalidField, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn validate_webhook_config_rejects_loopback_error_url() {
+        // Primary URL is fine, error URL is loopback → must reject and
+        // attribute the failure to the error-URL header.
+        let c = cfg("https://hooks.example.com/x", Some("http://127.0.0.1/err"));
+        let err = validate_webhook_config(&c, &no_filter()).unwrap_err();
+        match err {
+            crate::error::ApiError::InvalidField { field, .. } => {
+                assert_eq!(field, "Gotenberg-Webhook-Error-Url");
+            }
+            other => panic!("expected InvalidField, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn validate_webhook_config_rejects_localhost_hostname() {
+        let c = cfg("http://localhost:9000/hook", None);
+        assert!(validate_webhook_config(&c, &no_filter()).is_err());
+    }
+
+    #[test]
+    fn validate_webhook_config_honors_allow_list() {
+        let v = WebhookUrlValidator::compile(
+            &["^https://hooks\\.example\\.com/".into()],
+            &[],
+        )
+        .unwrap();
+        let ok = cfg("https://hooks.example.com/x", None);
+        assert!(validate_webhook_config(&ok, &v).is_ok());
+        let blocked = cfg("https://other.example.org/x", None);
+        assert!(validate_webhook_config(&blocked, &v).is_err());
+    }
+
+    #[test]
+    fn validate_webhook_config_honors_deny_list() {
+        let v = WebhookUrlValidator::compile(&[], &["evil\\.example\\.com".into()]).unwrap();
+        let blocked = cfg("https://evil.example.com/x", None);
+        assert!(validate_webhook_config(&blocked, &v).is_err());
+    }
+
+    #[test]
+    fn backoff_delay_respects_min_when_attempt_one() {
+        // attempt=1 → shift=0 → target = min_wait → jitter ∈ [0, min_wait]
+        let min = Duration::from_secs(1);
+        let max = Duration::from_secs(30);
+        let d = backoff_delay(min, max, 1);
+        assert!(d <= min, "first-attempt delay {d:?} must be <= min {min:?}");
+    }
+
+    #[test]
+    fn backoff_delay_caps_at_max() {
+        let min = Duration::from_secs(1);
+        let max = Duration::from_secs(8);
+        // attempt=10 → 2^9 = 512 → would be 512s, but capped to 8s
+        let d = backoff_delay(min, max, 10);
+        assert!(d <= max, "delay {d:?} must be <= max {max:?}");
+    }
+
+    #[test]
+    fn backoff_delay_does_not_overflow_at_huge_attempt() {
+        // The shift cap (31) prevents overflow. Just verify it doesn't
+        // panic and stays inside max.
+        let min = Duration::from_millis(1);
+        let max = Duration::from_secs(30);
+        let _ = backoff_delay(min, max, u32::MAX);
+    }
+
+    #[test]
+    fn backoff_delay_zero_min_wait_is_zero() {
+        let d = backoff_delay(Duration::ZERO, Duration::from_secs(30), 1);
+        assert_eq!(d, Duration::ZERO);
     }
 }

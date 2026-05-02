@@ -128,6 +128,14 @@ pub struct ServerArgs {
     #[arg(long, value_name = "DUR", env = "LIBREOFFICE_IDLE_SHUTDOWN_TIMEOUT")]
     pub libreoffice_idle_shutdown_timeout: Option<String>,
 
+    /// Port unoserver listens on (default: 2003).
+    #[arg(long, value_name = "PORT", env = "LIBREOFFICE_UNOSERVER_PORT")]
+    pub libreoffice_unoserver_port: Option<u16>,
+
+    /// Maximum time to wait for unoserver to be ready (e.g., "60s", "2m"). Default: 60s.
+    #[arg(long, value_name = "DUR", env = "LIBREOFFICE_UNOSERVER_READY_TIMEOUT")]
+    pub libreoffice_unoserver_ready_timeout: Option<String>,
+
     // === API Server Flags ===
     /// Disable telemetry for health check route.
     #[arg(long, env = "API_DISABLE_HEALTH_ROUTE_TELEMETRY")]
@@ -187,6 +195,41 @@ pub struct ServerArgs {
     /// incoming requests and propagates it to responses and trace spans.
     #[arg(long, value_name = "HEADER", env = "API_CORRELATION_ID_HEADER")]
     pub api_correlation_id_header: Option<String>,
+
+    /// Mount the entire API under this path prefix (default: empty / no prefix).
+    /// Useful when running behind a reverse proxy that strips no path. Must
+    /// start with `/` and have no trailing slash. Example: `--root-path /pdf`
+    /// makes `/forms/chromium/convert/url` reachable at `/pdf/forms/chromium/convert/url`.
+    #[arg(long, value_name = "PATH", env = "API_ROOT_PATH")]
+    pub api_root_path: Option<String>,
+
+    /// Maximum number of webhook delivery attempts (default: 4).
+    #[arg(long, value_name = "N", env = "WEBHOOK_MAX_RETRY")]
+    pub webhook_max_retry: Option<u32>,
+
+    /// Minimum wait between webhook retries — start of exponential
+    /// backoff window (default: 1s).
+    #[arg(long, value_name = "DURATION", env = "WEBHOOK_RETRY_MIN_WAIT")]
+    pub webhook_retry_min_wait: Option<String>,
+
+    /// Maximum wait between webhook retries — cap of exponential
+    /// backoff window (default: 30s).
+    #[arg(long, value_name = "DURATION", env = "WEBHOOK_RETRY_MAX_WAIT")]
+    pub webhook_retry_max_wait: Option<String>,
+
+    /// Per-attempt webhook HTTP client timeout (default: 30s).
+    #[arg(long, value_name = "DURATION", env = "WEBHOOK_CLIENT_TIMEOUT")]
+    pub webhook_client_timeout: Option<String>,
+
+    /// Regex pattern that webhook URLs must match. Repeat for multiple.
+    /// Empty = allow all (subject to SSRF and deny-list).
+    #[arg(long = "webhook-allow-list", value_name = "REGEX")]
+    pub webhook_allow_list: Vec<String>,
+
+    /// Regex pattern that webhook URLs must NOT match. Repeat for
+    /// multiple. Evaluated after allow-list and SSRF checks.
+    #[arg(long = "webhook-deny-list", value_name = "REGEX")]
+    pub webhook_deny_list: Vec<String>,
 }
 
 /// Log output formats supported by the server.
@@ -263,6 +306,10 @@ pub struct ServerConfig {
     pub libreoffice_lazy_start: bool,
     /// Idle shutdown timeout for LibreOffice (None = disabled).
     pub libreoffice_idle_shutdown_timeout: Option<Duration>,
+    /// Port unoserver listens on. Default: 2003.
+    pub libreoffice_unoserver_port: u16,
+    /// Maximum time to wait for unoserver to be ready at startup. Default: 60s.
+    pub libreoffice_unoserver_ready_timeout: Duration,
 
     // === API Server Config ===
     /// Disable telemetry for health check route.
@@ -293,6 +340,23 @@ pub struct ServerConfig {
     pub api_disable_download_from: bool,
     /// Request-correlation header name.
     pub api_correlation_id_header: String,
+    /// Path prefix to mount the API under. Empty string means no prefix.
+    /// Always starts with `/` and never ends with `/` (validated at resolve).
+    pub api_root_path: String,
+
+    /// Maximum webhook delivery attempts (>= 1).
+    pub webhook_max_retry: u32,
+    /// Minimum wait before retry (start of exponential backoff window).
+    pub webhook_retry_min_wait: Duration,
+    /// Maximum wait before retry (cap of exponential backoff window).
+    pub webhook_retry_max_wait: Duration,
+    /// Per-attempt HTTP client timeout for webhook delivery.
+    pub webhook_client_timeout: Duration,
+    /// Webhook URL allow-list (raw regex strings; compiled in main.rs).
+    /// Empty = allow all (subject to SSRF + deny-list).
+    pub webhook_allow_list: Vec<String>,
+    /// Webhook URL deny-list (raw regex strings; compiled in main.rs).
+    pub webhook_deny_list: Vec<String>,
 }
 
 /// Errors produced by [`ServerConfig::resolve`].
@@ -461,6 +525,24 @@ impl ServerConfig {
                     .filter(|d| !d.is_zero())
             });
 
+        let libreoffice_unoserver_port = match args.libreoffice_unoserver_port {
+            Some(p) => p,
+            None => match env.get("LIBREOFFICE_UNOSERVER_PORT") {
+                Some(v) => v.parse::<u16>().map_err(|e| ConfigError::Parse {
+                    field: "libreoffice_unoserver_port",
+                    message: e.to_string(),
+                })?,
+                None => 2003,
+            },
+        };
+
+        let libreoffice_unoserver_ready_timeout = args
+            .libreoffice_unoserver_ready_timeout
+            .as_deref()
+            .or_else(|| env.get("LIBREOFFICE_UNOSERVER_READY_TIMEOUT").map(|v| v.as_str()))
+            .and_then(|v| humantime::parse_duration(v).ok())
+            .unwrap_or(Duration::from_secs(60));
+
         // === API Server Config Resolution ===
         let api_disable_health_route_telemetry = args.api_disable_health_route_telemetry
             || env.get("API_DISABLE_HEALTH_ROUTE_TELEMETRY").map(|v| is_truthy(v)).unwrap_or(false);
@@ -521,6 +603,57 @@ impl ServerConfig {
                 message: format!("`{}` is not a valid HTTP header name", api_correlation_id_header),
             })?;
 
+        let api_root_path = args
+            .api_root_path
+            .clone()
+            .or_else(|| env.get("API_ROOT_PATH").cloned())
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default();
+        let api_root_path = normalize_root_path(&api_root_path).map_err(|message| {
+            ConfigError::Parse {
+                field: "api_root_path",
+                message,
+            }
+        })?;
+
+        let webhook_max_retry = args
+            .webhook_max_retry
+            .or_else(|| env.get("WEBHOOK_MAX_RETRY").and_then(|v| v.parse().ok()))
+            .unwrap_or(4);
+        if webhook_max_retry == 0 {
+            return Err(ConfigError::Parse {
+                field: "webhook_max_retry",
+                message: "must be >= 1".to_string(),
+            });
+        }
+        let webhook_retry_min_wait = parse_duration_opt(
+            &args.webhook_retry_min_wait,
+            env.get("WEBHOOK_RETRY_MIN_WAIT").map(String::as_str),
+            Duration::from_secs(1),
+            "webhook_retry_min_wait",
+        )?;
+        let webhook_retry_max_wait = parse_duration_opt(
+            &args.webhook_retry_max_wait,
+            env.get("WEBHOOK_RETRY_MAX_WAIT").map(String::as_str),
+            Duration::from_secs(30),
+            "webhook_retry_max_wait",
+        )?;
+        if webhook_retry_max_wait < webhook_retry_min_wait {
+            return Err(ConfigError::Parse {
+                field: "webhook_retry_max_wait",
+                message: format!(
+                    "must be >= webhook_retry_min_wait ({:?})",
+                    webhook_retry_min_wait
+                ),
+            });
+        }
+        let webhook_client_timeout = parse_duration_opt(
+            &args.webhook_client_timeout,
+            env.get("WEBHOOK_CLIENT_TIMEOUT").map(String::as_str),
+            Duration::from_secs(30),
+            "webhook_client_timeout",
+        )?;
+
         Ok(Self {
             host,
             port,
@@ -543,6 +676,8 @@ impl ServerConfig {
             chromium_idle_shutdown_timeout,
             libreoffice_lazy_start,
             libreoffice_idle_shutdown_timeout,
+            libreoffice_unoserver_port,
+            libreoffice_unoserver_ready_timeout,
             api_disable_health_route_telemetry,
             api_disable_root_route_telemetry,
             api_disable_debug_route_telemetry,
@@ -557,6 +692,13 @@ impl ServerConfig {
             api_download_from_max_retry,
             api_disable_download_from,
             api_correlation_id_header,
+            api_root_path,
+            webhook_max_retry,
+            webhook_retry_min_wait,
+            webhook_retry_max_wait,
+            webhook_client_timeout,
+            webhook_allow_list: args.webhook_allow_list.clone(),
+            webhook_deny_list: args.webhook_deny_list.clone(),
         })
     }
 
@@ -586,6 +728,52 @@ fn pick_string(
         return v.clone();
     }
     default.to_string()
+}
+
+/// Normalise a user-supplied root-path. Returns `Ok("")` for empty input.
+/// For non-empty input, ensures it starts with `/` and has no trailing slash.
+fn normalize_root_path(s: &str) -> Result<String, String> {
+    let s = s.trim();
+    if s.is_empty() {
+        return Ok(String::new());
+    }
+    if !s.starts_with('/') {
+        return Err(format!("must start with `/`, got `{s}`"));
+    }
+    let trimmed = s.trim_end_matches('/');
+    if trimmed.is_empty() {
+        // Input was just "/" — equivalent to no prefix.
+        return Ok(String::new());
+    }
+    if trimmed.contains("//") {
+        return Err(format!(
+            "must not contain consecutive slashes, got `{s}`"
+        ));
+    }
+    Ok(trimmed.to_string())
+}
+
+/// Parse a humantime duration from CLI arg → env → default, mapping
+/// parse errors to a structured [`ConfigError::Parse`] tagged with the
+/// caller's field name.
+fn parse_duration_opt(
+    arg: &Option<String>,
+    env_val: Option<&str>,
+    default: Duration,
+    field: &'static str,
+) -> Result<Duration, ConfigError> {
+    let raw = arg
+        .as_deref()
+        .or(env_val)
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    match raw {
+        Some(s) => humantime::parse_duration(s).map_err(|e| ConfigError::Parse {
+            field,
+            message: e.to_string(),
+        }),
+        None => Ok(default),
+    }
 }
 
 fn is_truthy(s: &str) -> bool {
@@ -618,6 +806,53 @@ mod tests {
             .iter()
             .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
             .collect()
+    }
+
+    #[test]
+    fn root_path_defaults_empty() {
+        let args = ServerArgs::default();
+        let cfg = ServerConfig::resolve(&args, &env(&[])).unwrap();
+        assert_eq!(cfg.api_root_path, "");
+    }
+
+    #[test]
+    fn root_path_from_env() {
+        let args = ServerArgs::default();
+        let cfg =
+            ServerConfig::resolve(&args, &env(&[("API_ROOT_PATH", "/pdf")])).unwrap();
+        assert_eq!(cfg.api_root_path, "/pdf");
+    }
+
+    #[test]
+    fn root_path_strips_trailing_slash() {
+        let args = ServerArgs::default();
+        let cfg =
+            ServerConfig::resolve(&args, &env(&[("API_ROOT_PATH", "/pdf/")])).unwrap();
+        assert_eq!(cfg.api_root_path, "/pdf");
+    }
+
+    #[test]
+    fn root_path_just_slash_normalised_to_empty() {
+        let args = ServerArgs::default();
+        let cfg = ServerConfig::resolve(&args, &env(&[("API_ROOT_PATH", "/")])).unwrap();
+        assert_eq!(cfg.api_root_path, "");
+    }
+
+    #[test]
+    fn root_path_missing_leading_slash_rejected() {
+        let args = ServerArgs::default();
+        let err = ServerConfig::resolve(&args, &env(&[("API_ROOT_PATH", "pdf")])).unwrap_err();
+        let ConfigError::Parse { field, .. } = err;
+        assert_eq!(field, "api_root_path");
+    }
+
+    #[test]
+    fn root_path_double_slash_rejected() {
+        let args = ServerArgs::default();
+        let err = ServerConfig::resolve(&args, &env(&[("API_ROOT_PATH", "/a//b")]))
+            .unwrap_err();
+        let ConfigError::Parse { field, .. } = err;
+        assert_eq!(field, "api_root_path");
     }
 
     #[test]
@@ -870,6 +1105,29 @@ mod tests {
         )
         .unwrap();
         assert_eq!(cfg.api_correlation_id_header, "x-trace-id");
+    }
+
+    #[test]
+    fn libreoffice_unoserver_defaults() {
+        let args = ServerArgs::default();
+        let cfg = ServerConfig::resolve(&args, &env(&[])).unwrap();
+        assert_eq!(cfg.libreoffice_unoserver_port, 2003);
+        assert_eq!(cfg.libreoffice_unoserver_ready_timeout, Duration::from_secs(60));
+    }
+
+    #[test]
+    fn libreoffice_unoserver_env_override() {
+        let args = ServerArgs::default();
+        let cfg = ServerConfig::resolve(
+            &args,
+            &env(&[
+                ("LIBREOFFICE_UNOSERVER_PORT", "2004"),
+                ("LIBREOFFICE_UNOSERVER_READY_TIMEOUT", "90s"),
+            ]),
+        )
+        .unwrap();
+        assert_eq!(cfg.libreoffice_unoserver_port, 2004);
+        assert_eq!(cfg.libreoffice_unoserver_ready_timeout, Duration::from_secs(90));
     }
 
     #[test]

@@ -143,7 +143,14 @@ async fn render_url_on(
     let resource_status = if request.fail_on_resource_status.is_empty() {
         None
     } else {
-        Some(spawn_resource_status_capture(page, &request.fail_on_resource_status).await?)
+        Some(
+            spawn_resource_status_capture(
+                page,
+                &request.fail_on_resource_status,
+                &request.ignore_resource_status_domains,
+            )
+            .await?,
+        )
     };
 
     let console_exceptions = if request.fail_on_console_exceptions {
@@ -160,7 +167,12 @@ async fn render_url_on(
 
     // Navigate with lifecycle event waits.
     debug!("render_url_on: navigating to {}" , url);
-    navigate_with_lifecycle(page, url, engine.inner().config.network_idle_timeout)
+    let network_idle_timeout = if request.skip_network_idle {
+        None
+    } else {
+        engine.inner().config.network_idle_timeout
+    };
+    navigate_with_lifecycle(page, url, network_idle_timeout)
         .await
         .map_err(|e| navigation_error(url, e))?;
     debug!("render_url_on: navigation complete");
@@ -544,12 +556,14 @@ async fn spawn_console_exception_capture(
 async fn spawn_resource_status_capture(
     page: &Page,
     fail_statuses: &[u16],
+    ignore_domains: &[String],
 ) -> EngineResult<(Arc<Mutex<Vec<String>>>, JoinHandle<()>)> {
     let mut events = page
         .event_listener::<EventResponseReceived>()
         .await
         .map_err(|e| EngineError::Cdp(e.to_string()))?;
     let fail_set: HashSet<u16> = fail_statuses.iter().copied().collect();
+    let ignore_lower: Vec<String> = ignore_domains.iter().map(|d| d.to_lowercase()).collect();
     let errors: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
     let writer = errors.clone();
     let task = tokio::spawn(async move {
@@ -557,7 +571,9 @@ async fn spawn_resource_status_capture(
             // Only check resources, not main document.
             if !matches!(ev.r#type, ResourceType::Document) {
                 let status = ev.response.status as u16;
-                if fail_set.contains(&status) {
+                if fail_set.contains(&status)
+                    && !url_host_matches_any(&ev.response.url, &ignore_lower)
+                {
                     let msg = format!("{}: {}", ev.response.url, status);
                     if let Ok(mut g) = writer.lock() {
                         g.push(msg);
@@ -636,4 +652,79 @@ async fn wait_lifecycle_event(
     }
     debug!("wait_lifecycle_event: stream ended without {}", event_name);
     Ok(())
+}
+
+/// Return true if the URL's host contains any of the given lowercase
+/// substrings. URLs that fail to parse never match — they are not
+/// silently ignored from the fail-on-resource-status check.
+fn url_host_matches_any(url: &str, ignore_lower: &[String]) -> bool {
+    if ignore_lower.is_empty() {
+        return false;
+    }
+    // Cheap host extraction without pulling in the `url` crate: take the
+    // segment between `://` and the next `/`, `?`, or `#`. Strip
+    // `userinfo@` and `:port`.
+    let after_scheme = match url.find("://") {
+        Some(i) => &url[i + 3..],
+        None => return false,
+    };
+    let host_with_userinfo = after_scheme
+        .split(|c: char| c == '/' || c == '?' || c == '#')
+        .next()
+        .unwrap_or("");
+    let host_with_port = match host_with_userinfo.rfind('@') {
+        Some(i) => &host_with_userinfo[i + 1..],
+        None => host_with_userinfo,
+    };
+    let host = match host_with_port.rfind(':') {
+        Some(i) => &host_with_port[..i],
+        None => host_with_port,
+    };
+    let host_lower = host.to_lowercase();
+    ignore_lower.iter().any(|d| host_lower.contains(d))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::url_host_matches_any;
+
+    #[test]
+    fn host_match_substring_case_insensitive() {
+        let ignore = vec!["googleapis.com".to_string()];
+        assert!(url_host_matches_any(
+            "https://fonts.googleapis.com/css?family=Inter",
+            &ignore
+        ));
+        assert!(url_host_matches_any(
+            "HTTPS://Fonts.GoogleAPIS.com/x",
+            &ignore
+        ));
+    }
+
+    #[test]
+    fn host_no_match_when_outside_host() {
+        // The substring lives in the path, not the host — must NOT match.
+        let ignore = vec!["googleapis.com".to_string()];
+        assert!(!url_host_matches_any(
+            "https://example.com/path/googleapis.com/x",
+            &ignore
+        ));
+    }
+
+    #[test]
+    fn host_with_port_strips_correctly() {
+        let ignore = vec!["example.com".to_string()];
+        assert!(url_host_matches_any("http://example.com:8080/x", &ignore));
+    }
+
+    #[test]
+    fn empty_ignore_list_never_matches() {
+        assert!(!url_host_matches_any("https://example.com/", &[]));
+    }
+
+    #[test]
+    fn malformed_url_never_matches() {
+        let ignore = vec!["example.com".to_string()];
+        assert!(!url_host_matches_any("not-a-url", &ignore));
+    }
 }

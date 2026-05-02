@@ -50,14 +50,30 @@ fn csv_fixture() -> PathBuf {
     fixtures_dir().join("sample.csv")
 }
 
+/// Shared engine across all tests in this binary. We launch unoserver once
+/// and reuse it — both because per-test launches collided on the fixed
+/// default port 2003 and because the engine is explicitly designed for
+/// concurrent reuse (semaphore + per-call user dirs).
+static SHARED: tokio::sync::OnceCell<Option<LibreOfficeEngine>> =
+    tokio::sync::OnceCell::const_new();
+
 async fn engine() -> Option<LibreOfficeEngine> {
-    match LibreOfficeEngine::discover().await {
-        Ok(engine) => Some(engine),
-        Err(e) => {
-            eprintln!("skipping: failed to discover soffice: {e}");
-            None
-        }
-    }
+    SHARED
+        .get_or_init(|| async {
+            let cfg = LibreOfficeConfig {
+                unoserver_port: 0, // OS-assigned free port
+                ..Default::default()
+            };
+            match LibreOfficeEngine::launch(cfg).await {
+                Ok(e) => Some(e),
+                Err(e) => {
+                    eprintln!("skipping: failed to launch unoserver: {e}");
+                    None
+                }
+            }
+        })
+        .await
+        .clone()
 }
 
 fn assert_pdf_loadable(bytes: &[u8]) -> lopdf::Document {
@@ -189,13 +205,14 @@ async fn convert_many_preserves_order() {
 
 #[tokio::test]
 async fn convert_timeout_kills_child() {
-    // Build an engine with a pathologically small per-call timeout.
-    // Probe also runs under this timeout; if probe itself succeeds (some
-    // platforms can run `soffice --version` in <100ms) the test then
-    // exercises the convert-side timeout. If probe fails, we treat the
-    // timeout as proven by `launch` itself.
+    // Build an engine with a pathologically small unoserver-ready timeout so
+    // launch() fails quickly, and a small per-call timeout so that if launch()
+    // succeeds (unoserver happened to already be running), the convert itself
+    // is exercised under the timeout.
     let cfg = LibreOfficeConfig {
         timeout: Duration::from_millis(100),
+        unoserver_ready_timeout: Duration::from_millis(500),
+        unoserver_port: 0,
         ..Default::default()
     };
     let started = Instant::now();
@@ -204,15 +221,15 @@ async fn convert_timeout_kills_child() {
 
     match res {
         Err(EngineError::Timeout(_)) => {
-            // Probe itself timed out. That's fine — the timeout plumbing works.
+            // unoserver did not become ready in time. Timeout plumbing works.
             assert!(elapsed < Duration::from_secs(2));
         }
         Err(EngineError::Internal(_)) => {
-            // Probe killed for being too slow but reported as Internal:
-            // also acceptable.
+            // Launch failed for another reason (e.g. unoserver not installed).
+            // Also acceptable — engine is not available.
         }
         Ok(lo) => {
-            // Probe was fast enough; now hammer convert.
+            // unoserver was already running; exercise the convert timeout.
             let err = lo
                 .convert(&writer_fixture(), &OfficeOptions::default())
                 .await

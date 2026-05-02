@@ -116,7 +116,22 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
         #[cfg(not(feature = "libreoffice"))]
         libreoffice: None,
     };
-    start_workers(webhook_rx, 2, WebhookClient::default(), webhook_ctx);
+    let webhook_client = WebhookClient::new(server::webhook::WebhookClientConfig {
+        max_retries: config.webhook_max_retry,
+        retry_min_wait: config.webhook_retry_min_wait,
+        retry_max_wait: config.webhook_retry_max_wait,
+        client_timeout: config.webhook_client_timeout,
+    });
+    start_workers(webhook_rx, 2, webhook_client, webhook_ctx);
+
+    // Compile the operator-supplied allow/deny regex lists once at startup.
+    // Bad patterns abort startup so the operator gets immediate feedback.
+    let webhook_validator = server::webhook::WebhookUrlValidator::compile(
+        &config.webhook_allow_list,
+        &config.webhook_deny_list,
+    )
+    .map_err(anyhow::Error::msg)
+    .context("compile webhook allow/deny regex lists")?;
 
     // Initialize batch state manager
     let batch_manager = BatchStateManager::new(
@@ -137,6 +152,7 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
         config.clone(),
     )
     .with_webhook_queue(webhook_queue)
+    .with_webhook_validator(webhook_validator)
     .with_batch_manager(batch_manager);
     #[cfg(feature = "libreoffice")]
     let state = state.with_libreoffice(Some(Arc::new(libreoffice)));
@@ -230,6 +246,9 @@ fn browser_config_from(config: &ServerConfig) -> BrowserConfig {
         lazy_start: config.chromium_lazy_start,
         idle_shutdown_timeout: config.chromium_idle_shutdown_timeout,
         network_idle_timeout: None,
+        max_page_memory_mb: defaults.max_page_memory_mb,
+        max_browser_memory_mb: defaults.max_browser_memory_mb,
+        max_concurrent_renders: defaults.max_concurrent_renders,
     }
 }
 
@@ -242,5 +261,7 @@ fn libreoffice_config_from(config: &ServerConfig) -> LibreOfficeConfig {
         max_concurrency: defaults.max_concurrency,
         lazy_start: config.libreoffice_lazy_start,
         idle_shutdown_timeout: config.libreoffice_idle_shutdown_timeout,
+        unoserver_port: config.libreoffice_unoserver_port,
+        unoserver_ready_timeout: config.libreoffice_unoserver_ready_timeout,
     }
 }

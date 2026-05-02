@@ -24,6 +24,42 @@ use tokio::io::AsyncWriteExt;
 
 use crate::error::ApiError;
 
+/// Security limits for multipart parsing.
+#[derive(Debug, Clone)]
+pub struct MultipartSecurityConfig {
+    /// Maximum length of a field name (default: 256).
+    pub max_field_name_len: usize,
+    /// Maximum length of a non-file field value (default: 1 MB).
+    pub max_field_value_len: usize,
+    /// Maximum number of files in a single request (default: 100).
+    pub max_file_count: usize,
+    /// Maximum length of a filename (default: 255).
+    pub max_filename_len: usize,
+}
+
+impl Default for MultipartSecurityConfig {
+    fn default() -> Self {
+        Self {
+            max_field_name_len: 256,
+            max_field_value_len: 1024 * 1024, // 1 MB
+            max_file_count: 100,
+            max_filename_len: 255,
+        }
+    }
+}
+
+impl MultipartSecurityConfig {
+    /// Create a strict configuration for high-security environments.
+    pub fn strict() -> Self {
+        Self {
+            max_field_name_len: 128,
+            max_field_value_len: 64 * 1024, // 64 KB
+            max_file_count: 10,
+            max_filename_len: 100,
+        }
+    }
+}
+
 /// Result of consuming a multipart body.
 #[derive(Debug)]
 pub struct FormFields {
@@ -58,7 +94,15 @@ impl FormFields {
     /// Files are streamed out to disk to keep memory usage bounded; the
     /// scratch directory is auto-deleted when [`FormFields`] (and hence
     /// [`Self::tmp`]) is dropped.
-    pub async fn from_multipart(mut mp: Multipart) -> Result<Self, ApiError> {
+    pub async fn from_multipart(mp: Multipart) -> Result<Self, ApiError> {
+        Self::from_multipart_with_config(mp, MultipartSecurityConfig::default()).await
+    }
+
+    /// Read multipart body with custom security configuration.
+    pub async fn from_multipart_with_config(
+        mut mp: Multipart,
+        config: MultipartSecurityConfig,
+    ) -> Result<Self, ApiError> {
         let tmp = TempDir::new().map_err(|e| ApiError::Internal(e.to_string()))?;
         let mut files: Vec<UploadedFile> = Vec::new();
         let mut map: HashMap<String, String> = HashMap::new();
@@ -66,8 +110,32 @@ impl FormFields {
         while let Some(field) = next_field(&mut mp).await? {
             let name = field.name().unwrap_or("").to_string();
 
+            // Field name length check
+            if name.len() > config.max_field_name_len {
+                return Err(ApiError::BadMultipart(format!(
+                    "Field name too long: {} chars (max {})",
+                    name.len(), config.max_field_name_len
+                )));
+            }
+
             // Files have an associated file_name; non-files do not.
             if let Some(raw_filename) = field.file_name().map(str::to_string) {
+                // File count limit
+                if files.len() >= config.max_file_count {
+                    return Err(ApiError::BadMultipart(format!(
+                        "Too many files: {} (max {})",
+                        files.len(), config.max_file_count
+                    )));
+                }
+
+                // Filename length check
+                if raw_filename.len() > config.max_filename_len {
+                    return Err(ApiError::BadMultipart(format!(
+                        "Filename too long: {} chars (max {})",
+                        raw_filename.len(), config.max_filename_len
+                    )));
+                }
+
                 let filename = sanitise_filename(&raw_filename)
                     .ok_or_else(|| ApiError::UnsafeFilename(raw_filename.clone()))?;
                 let content_type = field.content_type().map(str::to_string);
@@ -104,6 +172,17 @@ impl FormFields {
             } else {
                 // Plain text field.
                 let bytes = field.bytes().await.map_err(multipart_to_api)?;
+
+                // Field value length check
+                if bytes.len() > config.max_field_value_len {
+                    return Err(ApiError::BadMultipart(format!(
+                        "Field '{}' value too large: {} bytes (max {})",
+                        name,
+                        bytes.len(),
+                        config.max_field_value_len
+                    )));
+                }
+
                 // Decode best-effort as UTF-8; on failure fall back to lossy.
                 let value = String::from_utf8(bytes.to_vec())
                     .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned());
@@ -268,5 +347,23 @@ mod tests {
             size: 0,
         });
         assert_eq!(unique_filename(&files, "report.pdf"), "report-2.pdf");
+    }
+
+    #[test]
+    fn multipart_security_config_defaults() {
+        let config = MultipartSecurityConfig::default();
+        assert_eq!(config.max_field_name_len, 256);
+        assert_eq!(config.max_field_value_len, 1024 * 1024);
+        assert_eq!(config.max_file_count, 100);
+        assert_eq!(config.max_filename_len, 255);
+    }
+
+    #[test]
+    fn multipart_security_config_strict() {
+        let config = MultipartSecurityConfig::strict();
+        assert_eq!(config.max_field_name_len, 128);
+        assert_eq!(config.max_field_value_len, 64 * 1024);
+        assert_eq!(config.max_file_count, 10);
+        assert_eq!(config.max_filename_len, 100);
     }
 }

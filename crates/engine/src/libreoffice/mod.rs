@@ -1,21 +1,20 @@
-//! `LibreOfficeEngine` — convert office documents to PDF via the `soffice`
-//! subprocess.
+//! `LibreOfficeEngine` — convert office documents to PDF via unoserver.
 //!
-//! Implementation of `docs/specs/12-engine-libreoffice.md`. Each call spawns a
-//! short-lived `soffice --headless` child with its own isolated
-//! `UserInstallation` profile, making concurrent invocations safe.
+//! Implementation of `docs/specs/12-engine-libreoffice.md`. A persistent
+//! `unoserver` process is managed as a child, eliminating per-request
+//! soffice startup cost (~200–400ms).
 
 pub mod filter;
 
 mod convert;
-mod discover;
+mod unoserver;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::Semaphore;
+use tokio::sync::{Mutex, Semaphore};
 
 use tracing::{debug, info, instrument};
 
@@ -25,11 +24,11 @@ use crate::types::{EngineError, EngineResult, PageRanges};
 // Engine
 // ---------------------------------------------------------------------------
 
-/// Wrapper around the `soffice` binary. Cheap to clone (`Arc` inside).
+/// Wrapper around a persistent `unoserver` process. Cheap to clone (`Arc` inside).
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
 /// use std::path::Path;
 /// use engine::{LibreOfficeEngine, OfficeOptions};
 ///
@@ -48,7 +47,11 @@ pub struct LibreOfficeEngine {
 }
 
 struct Inner {
-    exe: PathBuf,
+    unoserver: Mutex<unoserver::UnoserverProcess>,
+    port: u16,
+    unoserver_ready_timeout: Duration,
+    executable: Option<PathBuf>,
+    client: reqwest::Client,
     timeout: Duration,
     semaphore: Semaphore,
 }
@@ -56,13 +59,12 @@ struct Inner {
 /// Engine-wide configuration. Pass to [`LibreOfficeEngine::launch`].
 #[derive(Debug, Clone)]
 pub struct LibreOfficeConfig {
-    /// Path to `soffice` (or `libreoffice`). `None` = autodiscover via
-    /// `$LIBREOFFICE_PATH`, `$PATH`, and platform defaults.
+    /// Path to `soffice` passed to unoserver via `--executable`. `None` = unoserver
+    /// auto-discovers soffice.
     pub executable: Option<PathBuf>,
     /// Per-conversion timeout. Default 120s.
     pub timeout: Duration,
-    /// Maximum concurrent subprocess invocations. Default
-    /// [`std::thread::available_parallelism`].
+    /// Maximum concurrent conversions. Default [`std::thread::available_parallelism`].
     pub max_concurrency: usize,
     /// Use lazy initialization (start on first request).
     /// Default: false (start eagerly at server startup).
@@ -70,6 +72,10 @@ pub struct LibreOfficeConfig {
     /// Idle shutdown timeout - engine shuts down after this duration of no requests.
     /// None means no idle shutdown. Default: None.
     pub idle_shutdown_timeout: Option<Duration>,
+    /// Port unoserver listens on. Default: 2003.
+    pub unoserver_port: u16,
+    /// Maximum time to wait for unoserver to be ready at startup. Default: 60s.
+    pub unoserver_ready_timeout: Duration,
 }
 
 impl Default for LibreOfficeConfig {
@@ -82,20 +88,13 @@ impl Default for LibreOfficeConfig {
                 .unwrap_or(4),
             lazy_start: false,
             idle_shutdown_timeout: None,
+            unoserver_port: 2003,
+            unoserver_ready_timeout: Duration::from_secs(60),
         }
     }
 }
 
 impl LibreOfficeEngine {
-    /// Return a tracing span for this engine instance, tagged with
-    /// `engine="libreoffice"`.
-    pub fn logger(&self) -> tracing::Span {
-        tracing::info_span!(
-            "engine",
-            engine = "libreoffice",
-        )
-    }
-
     /// Discover `soffice` on `$PATH` and platform defaults using
     /// [`LibreOfficeConfig::default`].
     pub async fn discover() -> EngineResult<Self> {
@@ -104,36 +103,79 @@ impl LibreOfficeEngine {
 
     /// Construct an engine with explicit configuration.
     ///
-    /// If `config.executable` is `Some`, the path is required to exist;
-    /// otherwise auto-discovery is performed. The chosen executable is then
-    /// probed (`--headless --version`) before the engine is returned.
-    #[instrument(skip(config), fields(executable = ?config.executable))]
+    /// Spawns a persistent `unoserver` process. The engine is returned once
+    /// unoserver is ready to accept connections.
     pub async fn launch(config: LibreOfficeConfig) -> EngineResult<Self> {
-        info!("Launching LibreOffice engine");
-        let exe = match config.executable.as_ref() {
-            Some(p) => {
-                if !p.exists() {
-                    return Err(EngineError::Internal(format!(
-                        "LibreOffice not found: {}",
-                        p.display()
-                    )));
-                }
-                p.clone()
-            }
-            None => discover::find_soffice()?,
-        };
+        info!(port = config.unoserver_port, "Launching LibreOffice engine");
 
-        discover::probe(&exe, config.timeout).await?;
+        let unoserver = unoserver::UnoserverProcess::spawn(
+            config.unoserver_port,
+            config.unoserver_ready_timeout,
+            config.executable.as_deref(),
+        )
+        .await?;
+        // If config requested port 0, the spawn helper picked a free one.
+        let actual_port = unoserver.port();
 
         let max = config.max_concurrency.max(1);
-        info!(executable = %exe.display(), timeout = ?config.timeout, max_concurrency = max, "LibreOffice engine launched");
-        Ok(Self {
-            inner: Arc::new(Inner {
-                exe,
-                timeout: config.timeout,
-                semaphore: Semaphore::new(max),
-            }),
-        })
+        let client = reqwest::Client::builder()
+            .tcp_keepalive(Some(Duration::from_secs(60)))
+            .pool_max_idle_per_host(1)
+            .build()
+            .map_err(|e| EngineError::Internal(format!("failed to build HTTP client: {e}")))?;
+
+        let inner = Arc::new(Inner {
+            unoserver: Mutex::new(unoserver),
+            port: actual_port,
+            unoserver_ready_timeout: config.unoserver_ready_timeout,
+            executable: config.executable,
+            client,
+            timeout: config.timeout,
+            semaphore: Semaphore::new(max),
+        });
+
+        // Background task: detect unoserver crashes and restart.
+        let inner_weak = Arc::downgrade(&inner);
+        tokio::spawn(async move {
+            'monitor: loop {
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                let Some(inner) = inner_weak.upgrade() else { break };
+
+                // try_wait() is non-blocking — it does not yield the lock for long.
+                let exited = inner.unoserver.lock().await.try_wait().ok().flatten();
+
+                if exited.is_some() {
+                    tracing::warn!("unoserver exited unexpectedly, attempting restart");
+                    for attempt in 0..3u32 {
+                        tokio::time::sleep(Duration::from_secs(1 << attempt)).await;
+                        let Some(inner) = inner_weak.upgrade() else { break 'monitor };
+                        match unoserver::UnoserverProcess::spawn(
+                            inner.port,
+                            inner.unoserver_ready_timeout,
+                            inner.executable.as_deref(),
+                        )
+                        .await
+                        {
+                            Ok(new_proc) => {
+                                *inner.unoserver.lock().await = new_proc;
+                                tracing::info!("unoserver restarted");
+                                break;
+                            }
+                            Err(e) if attempt < 2 => {
+                                tracing::warn!(attempt = attempt + 1, error = %e, "unoserver restart failed");
+                            }
+                            Err(_) => {
+                                tracing::error!("unoserver failed to restart after 3 attempts, conversions will fail");
+                                break 'monitor;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        info!(port = actual_port, timeout = ?config.timeout, max_concurrency = max, "LibreOffice engine launched");
+        Ok(Self { inner })
     }
 
     /// Convert one input file to PDF bytes.
@@ -144,7 +186,6 @@ impl LibreOfficeEngine {
     /// `UserInstallation` directory.
     #[instrument(skip_all, fields(input = %input.display()))]
     pub async fn convert(&self, input: &Path, opts: &OfficeOptions) -> EngineResult<Vec<u8>> {
-        let _span = self.logger();
         opts.validate()?;
         if !input.exists() {
             return Err(EngineError::Io(std::io::Error::new(
@@ -160,7 +201,7 @@ impl LibreOfficeEngine {
             .map_err(|e| EngineError::Internal(format!("semaphore closed: {e}")))?;
         debug!("Starting LibreOffice conversion");
         let start = std::time::Instant::now();
-        let result = convert::run_convert(&self.inner.exe, self.inner.timeout, input, opts).await;
+        let result = convert::run_convert(&self.inner.client, self.inner.port, self.inner.timeout, input, opts).await;
         let duration = start.elapsed();
         match &result {
             Ok(_) => info!(
@@ -226,19 +267,23 @@ impl LibreOfficeEngine {
         Ok(out)
     }
 
-    /// Returns `true` iff `soffice --version` succeeds within a 30-second
-    /// timeout (regardless of the engine's `config.timeout`).
+    /// Returns `true` iff unoserver responds to an HTTP GET within 5 seconds.
     pub async fn healthy(&self) -> bool {
-        discover::probe(&self.inner.exe, Duration::from_secs(30))
-            .await
-            .is_ok()
+        let url = format!("http://127.0.0.1:{}/", self.inner.port);
+        tokio::time::timeout(
+            Duration::from_secs(5),
+            self.inner.client.get(&url).send(),
+        )
+        .await
+        .map(|r| r.is_ok())
+        .unwrap_or(false)
     }
 }
 
 impl std::fmt::Debug for LibreOfficeEngine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LibreOfficeEngine")
-            .field("exe", &self.inner.exe)
+            .field("port", &self.inner.port)
             .field("timeout", &self.inner.timeout)
             .finish()
     }
@@ -273,6 +318,7 @@ pub struct OfficeOptions {
     /// Export bookmarks as Named Destinations.
     pub export_bookmarks_to_pdf_destination: bool,
     /// Update document indexes before conversion.
+    /// Note: not currently passed to unoserver (unoserver has no direct API for this).
     pub update_indexes: bool,
 
     // --- Form Fields & Placeholders ---
@@ -437,14 +483,15 @@ impl OfficeOptions {
         Ok(())
     }
 
-    /// Build the LibreOffice filter-options blob (the `:{...}` suffix on
-    /// `--convert-to`). Returns `None` if no fields are set, in which case
-    /// the bare exporter (e.g. `pdf:writer_pdf_Export`) is used unmodified.
-    pub(crate) fn filter_blob(&self) -> Option<String> {
-        let mut map = serde_json::Map::new();
+    /// Build the unoserver `filter_options` array. Each entry is a
+    /// `Name=Value` string; unoserver parses these with `split('=', 1)`
+    /// and infers the value type (`true`/`false` → bool, digits → int,
+    /// everything else → string).
+    pub(crate) fn filter_options(&self) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
 
         if let Some(pr) = &self.page_ranges {
-            map.insert("PageRange".into(), entry_str(&pr.to_string()));
+            out.push(format!("PageRange={}", pr));
         }
         if let Some(prof) = self.pdf_a {
             let v: i64 = match prof {
@@ -452,165 +499,143 @@ impl OfficeOptions {
                 PdfAProfile::A2B => 2,
                 PdfAProfile::A3B => 3,
             };
-            map.insert("SelectPdfVersion".into(), entry_long(v));
+            out.push(format!("SelectPdfVersion={v}"));
         }
         if self.pdf_ua {
-            map.insert("PDFUACompliance".into(), entry_bool(true));
+            out.push("PDFUACompliance=true".into());
         }
         if let Some(q) = self.quality {
-            map.insert("Quality".into(), entry_long(i64::from(q)));
+            out.push(format!("Quality={q}"));
         }
         if let Some(r) = self.max_image_resolution {
-            map.insert("MaxImageResolution".into(), entry_long(i64::from(r)));
+            out.push(format!("MaxImageResolution={r}"));
         }
         if self.landscape {
-            map.insert("IsLandscape".into(), entry_bool(true));
+            out.push("IsLandscape=true".into());
         }
 
-        // Bookmarks
         if self.export_bookmarks {
-            map.insert("ExportBookmarks".into(), entry_bool(true));
+            out.push("ExportBookmarks=true".into());
         }
         if self.export_bookmarks_to_pdf_destination {
-            map.insert("ExportBookmarksToPDFDestination".into(), entry_bool(true));
+            out.push("ExportBookmarksToPDFDestination=true".into());
         }
 
-        // Form Fields
         if self.export_form_fields {
-            map.insert("ExportFormFields".into(), entry_bool(true));
+            out.push("ExportFormFields=true".into());
         }
         if self.allow_duplicate_field_names {
-            map.insert("AllowDuplicateFieldNames".into(), entry_bool(true));
+            out.push("AllowDuplicateFieldNames=true".into());
         }
         if self.export_placeholders {
-            map.insert("ExportPlaceholders".into(), entry_bool(true));
+            out.push("ExportPlaceholders=true".into());
         }
 
-        // Notes
         if self.export_notes {
-            map.insert("ExportNotes".into(), entry_bool(true));
+            out.push("ExportNotes=true".into());
         }
         if self.export_notes_pages {
-            map.insert("ExportNotesPages".into(), entry_bool(true));
+            out.push("ExportNotesPages=true".into());
         }
         if self.export_only_notes_pages {
-            map.insert("ExportOnlyNotesPages".into(), entry_bool(true));
+            out.push("ExportOnlyNotesPages=true".into());
         }
         if self.export_notes_in_margin {
-            map.insert("ExportNotesInMargin".into(), entry_bool(true));
+            out.push("ExportNotesInMargin=true".into());
         }
 
-        // Advanced
         if self.convert_ooo_target_to_pdf_target {
-            map.insert("ConvertOOoTargetToPDFTarget".into(), entry_bool(true));
+            out.push("ConvertOOoTargetToPDFTarget=true".into());
         }
         if self.export_links_relative_fsys {
-            map.insert("ExportLinksRelativeFsys".into(), entry_bool(true));
+            out.push("ExportLinksRelativeFsys=true".into());
         }
         if self.export_hidden_slides {
-            map.insert("ExportHiddenSlides".into(), entry_bool(true));
+            out.push("ExportHiddenSlides=true".into());
         }
         if self.skip_empty_pages {
-            map.insert("IsSkipEmptyPages".into(), entry_bool(true));
+            out.push("IsSkipEmptyPages=true".into());
         }
         if self.add_original_document_as_stream {
-            map.insert("IsAddStream".into(), entry_bool(true));
+            out.push("IsAddStream=true".into());
         }
         if self.single_page_sheets {
-            map.insert("SinglePageSheets".into(), entry_bool(true));
+            out.push("SinglePageSheets=true".into());
         }
         if self.lossless_image_compression {
-            map.insert("UseLosslessCompression".into(), entry_bool(true));
+            out.push("UseLosslessCompression=true".into());
         }
         if self.reduce_image_resolution {
-            map.insert("ReduceImageResolution".into(), entry_bool(true));
+            out.push("ReduceImageResolution=true".into());
         }
 
-        // Native Watermarks
         if let Some(ref text) = self.native_watermark_text {
-            map.insert("Watermark".into(), entry_str(text));
+            out.push(format!("Watermark={text}"));
         }
         if let Some(color) = self.native_watermark_color {
-            map.insert("WatermarkColor".into(), entry_long(i64::from(color)));
+            out.push(format!("WatermarkColor={color}"));
         }
         if let Some(h) = self.native_watermark_font_height {
-            map.insert("WatermarkFontHeight".into(), entry_long(i64::from(h)));
+            out.push(format!("WatermarkFontHeight={h}"));
         }
         if let Some(angle) = self.native_watermark_rotate_angle {
-            map.insert("WatermarkRotateAngle".into(), entry_long(i64::from(angle)));
+            out.push(format!("WatermarkRotateAngle={angle}"));
         }
         if let Some(ref name) = self.native_watermark_font_name {
-            map.insert("WatermarkFontName".into(), entry_str(name));
+            out.push(format!("WatermarkFontName={name}"));
         }
         if let Some(ref text) = self.native_tiled_watermark_text {
-            map.insert("TiledWatermark".into(), entry_str(text));
+            out.push(format!("TiledWatermark={text}"));
         }
 
-        // Viewer Preferences
         if let Some(v) = self.initial_view {
-            map.insert("InitialView".into(), entry_long(i64::from(v)));
+            out.push(format!("InitialView={v}"));
         }
         if let Some(v) = self.initial_page {
-            map.insert("InitialPage".into(), entry_long(i64::from(v)));
+            out.push(format!("InitialPage={v}"));
         }
         if let Some(v) = self.magnification {
-            map.insert("Magnification".into(), entry_long(i64::from(v)));
+            out.push(format!("Magnification={v}"));
         }
         if let Some(v) = self.zoom {
-            map.insert("Zoom".into(), entry_long(i64::from(v)));
+            out.push(format!("Zoom={v}"));
         }
         if let Some(v) = self.page_layout {
-            map.insert("PageLayout".into(), entry_long(i64::from(v)));
+            out.push(format!("PageLayout={v}"));
         }
         if self.first_page_on_left {
-            map.insert("FirstPageOnLeft".into(), entry_bool(true));
+            out.push("FirstPageOnLeft=true".into());
         }
         if self.resize_window_to_initial_page {
-            map.insert("ResizeWindowToInitialPage".into(), entry_bool(true));
+            out.push("ResizeWindowToInitialPage=true".into());
         }
         if self.center_window {
-            map.insert("CenterWindow".into(), entry_bool(true));
+            out.push("CenterWindow=true".into());
         }
         if self.open_in_full_screen_mode {
-            map.insert("OpenInFullScreenMode".into(), entry_bool(true));
+            out.push("OpenInFullScreenMode=true".into());
         }
         if self.display_pdf_document_title {
-            map.insert("DisplayPDFDocumentTitle".into(), entry_bool(true));
+            out.push("DisplayPDFDocumentTitle=true".into());
         }
         if self.hide_viewer_menubar {
-            map.insert("HideViewerMenubar".into(), entry_bool(true));
+            out.push("HideViewerMenubar=true".into());
         }
         if self.hide_viewer_toolbar {
-            map.insert("HideViewerToolbar".into(), entry_bool(true));
+            out.push("HideViewerToolbar=true".into());
         }
         if self.hide_viewer_window_controls {
-            map.insert("HideViewerWindowControls".into(), entry_bool(true));
+            out.push("HideViewerWindowControls=true".into());
         }
         if self.use_transition_effects {
-            map.insert("UseTransitionEffects".into(), entry_bool(true));
+            out.push("UseTransitionEffects=true".into());
         }
         if let Some(v) = self.open_bookmark_levels {
-            map.insert("OpenBookmarkLevels".into(), entry_long(i64::from(v)));
+            out.push(format!("OpenBookmarkLevels={v}"));
         }
 
-        if map.is_empty() {
-            None
-        } else {
-            Some(serde_json::Value::Object(map).to_string())
-        }
+        out
     }
-}
-
-fn entry_str(v: &str) -> serde_json::Value {
-    serde_json::json!({ "type": "string", "value": v })
-}
-
-fn entry_long(v: i64) -> serde_json::Value {
-    serde_json::json!({ "type": "long", "value": v })
-}
-
-fn entry_bool(v: bool) -> serde_json::Value {
-    serde_json::json!({ "type": "boolean", "value": v })
 }
 
 /// PDF/A export profile.
@@ -648,72 +673,64 @@ mod tests {
         assert!(c.executable.is_none());
         assert_eq!(c.timeout, Duration::from_secs(120));
         assert!(c.max_concurrency >= 1);
+        assert_eq!(c.unoserver_port, 2003);
+        assert_eq!(c.unoserver_ready_timeout, Duration::from_secs(60));
     }
 
     #[test]
-    fn office_options_default_emits_no_filter_blob() {
-        assert!(OfficeOptions::default().filter_blob().is_none());
+    fn office_options_default_emits_no_filter_options() {
+        assert!(OfficeOptions::default().filter_options().is_empty());
     }
 
     #[test]
-    fn office_options_with_page_ranges_emits_pagerange_key() {
+    fn office_options_with_page_ranges_emits_pagerange_entry() {
         let opts = OfficeOptions {
             page_ranges: Some(PageRanges::parse("1-3,5").expect("parse")),
             ..Default::default()
         };
-        let blob = opts.filter_blob().expect("blob");
-        let v: serde_json::Value = serde_json::from_str(&blob).expect("json");
-        assert_eq!(v["PageRange"]["type"], "string");
-        assert_eq!(v["PageRange"]["value"], "1-3,5");
+        let opts = opts.filter_options();
+        assert!(opts.contains(&"PageRange=1-3,5".to_string()), "{opts:?}");
     }
 
     #[test]
-    fn office_options_with_pdf_a_maps_select_pdf_version_long() {
+    fn office_options_with_pdf_a_maps_select_pdf_version() {
         let cases = [
-            (PdfAProfile::A1B, 1),
-            (PdfAProfile::A2B, 2),
-            (PdfAProfile::A3B, 3),
+            (PdfAProfile::A1B, "SelectPdfVersion=1"),
+            (PdfAProfile::A2B, "SelectPdfVersion=2"),
+            (PdfAProfile::A3B, "SelectPdfVersion=3"),
         ];
         for (prof, expected) in cases {
             let opts = OfficeOptions {
                 pdf_a: Some(prof),
                 ..Default::default()
             };
-            let blob = opts.filter_blob().expect("blob");
-            let v: serde_json::Value = serde_json::from_str(&blob).expect("json");
-            assert_eq!(v["SelectPdfVersion"]["type"], "long");
-            assert_eq!(v["SelectPdfVersion"]["value"], expected);
+            let opts = opts.filter_options();
+            assert!(opts.contains(&expected.to_string()), "{opts:?}");
         }
     }
 
     #[test]
-    fn office_options_landscape_and_pdfua_blob_keys() {
+    fn office_options_landscape_and_pdfua_entries() {
         let opts = OfficeOptions {
             landscape: true,
             pdf_ua: true,
             ..Default::default()
         };
-        let blob = opts.filter_blob().expect("blob");
-        let v: serde_json::Value = serde_json::from_str(&blob).expect("json");
-        assert_eq!(v["IsLandscape"]["type"], "boolean");
-        assert_eq!(v["IsLandscape"]["value"], true);
-        assert_eq!(v["PDFUACompliance"]["type"], "boolean");
-        assert_eq!(v["PDFUACompliance"]["value"], true);
+        let opts = opts.filter_options();
+        assert!(opts.contains(&"IsLandscape=true".to_string()), "{opts:?}");
+        assert!(opts.contains(&"PDFUACompliance=true".to_string()), "{opts:?}");
     }
 
     #[test]
-    fn office_options_quality_and_resolution_blob_long() {
+    fn office_options_quality_and_resolution_entries() {
         let opts = OfficeOptions {
             quality: Some(75),
             max_image_resolution: Some(150),
             ..Default::default()
         };
-        let blob = opts.filter_blob().expect("blob");
-        let v: serde_json::Value = serde_json::from_str(&blob).expect("json");
-        assert_eq!(v["Quality"]["type"], "long");
-        assert_eq!(v["Quality"]["value"], 75);
-        assert_eq!(v["MaxImageResolution"]["type"], "long");
-        assert_eq!(v["MaxImageResolution"]["value"], 150);
+        let opts = opts.filter_options();
+        assert!(opts.contains(&"Quality=75".to_string()), "{opts:?}");
+        assert!(opts.contains(&"MaxImageResolution=150".to_string()), "{opts:?}");
     }
 
     #[test]
@@ -784,7 +801,7 @@ mod tests {
     }
 
     #[test]
-    fn office_options_filter_blob_all_new_fields() {
+    fn office_options_filter_options_all_new_fields() {
         let opts = OfficeOptions {
             landscape: true,
             export_bookmarks: true,
@@ -827,50 +844,53 @@ mod tests {
             open_bookmark_levels: Some(-1),
             ..Default::default()
         };
-        let blob = opts.filter_blob().expect("blob");
-        let v: serde_json::Value = serde_json::from_str(&blob).expect("json");
-        assert_eq!(v["ExportBookmarks"]["type"], "boolean");
-        assert_eq!(v["ExportBookmarks"]["value"], true);
-        assert_eq!(v["ExportBookmarksToPDFDestination"]["value"], true);
-        assert_eq!(v["ExportFormFields"]["value"], true);
-        assert_eq!(v["AllowDuplicateFieldNames"]["value"], true);
-        assert_eq!(v["ExportPlaceholders"]["value"], true);
-        assert_eq!(v["ExportNotes"]["value"], true);
-        assert_eq!(v["ExportNotesPages"]["value"], true);
-        assert_eq!(v["ExportOnlyNotesPages"]["value"], true);
-        assert_eq!(v["ExportNotesInMargin"]["value"], true);
-        assert_eq!(v["ConvertOOoTargetToPDFTarget"]["value"], true);
-        assert_eq!(v["ExportLinksRelativeFsys"]["value"], true);
-        assert_eq!(v["ExportHiddenSlides"]["value"], true);
-        assert_eq!(v["IsSkipEmptyPages"]["value"], true);
-        assert_eq!(v["IsAddStream"]["value"], true);
-        assert_eq!(v["SinglePageSheets"]["value"], true);
-        assert_eq!(v["UseLosslessCompression"]["value"], true);
-        assert_eq!(v["ReduceImageResolution"]["value"], true);
-        assert_eq!(v["Watermark"]["type"], "string");
-        assert_eq!(v["Watermark"]["value"], "SECRET");
-        assert_eq!(v["WatermarkColor"]["type"], "long");
-        assert_eq!(v["WatermarkColor"]["value"], 16711680);
-        assert_eq!(v["WatermarkFontHeight"]["value"], 20);
-        assert_eq!(v["WatermarkRotateAngle"]["value"], 30);
-        assert_eq!(v["WatermarkFontName"]["value"], "Times");
-        assert_eq!(v["TiledWatermark"]["value"], "DRAFT");
-        assert_eq!(v["InitialView"]["type"], "long");
-        assert_eq!(v["InitialView"]["value"], 1);
-        assert_eq!(v["InitialPage"]["value"], 5);
-        assert_eq!(v["Magnification"]["value"], 2);
-        assert_eq!(v["Zoom"]["value"], 150);
-        assert_eq!(v["PageLayout"]["value"], 3);
-        assert_eq!(v["FirstPageOnLeft"]["value"], true);
-        assert_eq!(v["ResizeWindowToInitialPage"]["value"], true);
-        assert_eq!(v["CenterWindow"]["value"], true);
-        assert_eq!(v["OpenInFullScreenMode"]["value"], true);
-        assert_eq!(v["DisplayPDFDocumentTitle"]["value"], true);
-        assert_eq!(v["HideViewerMenubar"]["value"], true);
-        assert_eq!(v["HideViewerToolbar"]["value"], true);
-        assert_eq!(v["HideViewerWindowControls"]["value"], true);
-        assert_eq!(v["UseTransitionEffects"]["value"], true);
-        assert_eq!(v["OpenBookmarkLevels"]["value"], -1);
+        let entries = opts.filter_options();
+        let expected = [
+            "ExportBookmarks=true",
+            "ExportBookmarksToPDFDestination=true",
+            "ExportFormFields=true",
+            "AllowDuplicateFieldNames=true",
+            "ExportPlaceholders=true",
+            "ExportNotes=true",
+            "ExportNotesPages=true",
+            "ExportOnlyNotesPages=true",
+            "ExportNotesInMargin=true",
+            "ConvertOOoTargetToPDFTarget=true",
+            "ExportLinksRelativeFsys=true",
+            "ExportHiddenSlides=true",
+            "IsSkipEmptyPages=true",
+            "IsAddStream=true",
+            "SinglePageSheets=true",
+            "UseLosslessCompression=true",
+            "ReduceImageResolution=true",
+            "Watermark=SECRET",
+            "WatermarkColor=16711680",
+            "WatermarkFontHeight=20",
+            "WatermarkRotateAngle=30",
+            "WatermarkFontName=Times",
+            "TiledWatermark=DRAFT",
+            "InitialView=1",
+            "InitialPage=5",
+            "Magnification=2",
+            "Zoom=150",
+            "PageLayout=3",
+            "FirstPageOnLeft=true",
+            "ResizeWindowToInitialPage=true",
+            "CenterWindow=true",
+            "OpenInFullScreenMode=true",
+            "DisplayPDFDocumentTitle=true",
+            "HideViewerMenubar=true",
+            "HideViewerToolbar=true",
+            "HideViewerWindowControls=true",
+            "UseTransitionEffects=true",
+            "OpenBookmarkLevels=-1",
+        ];
+        for e in expected {
+            assert!(
+                entries.iter().any(|s| s == e),
+                "missing {e}; got {entries:?}"
+            );
+        }
     }
 
     #[test]
@@ -905,15 +925,4 @@ mod tests {
         assert!(ok.validate().is_ok());
     }
 
-    #[tokio::test]
-    async fn launch_with_missing_executable_path_errors() {
-        let cfg = LibreOfficeConfig {
-            executable: Some(PathBuf::from("/nonexistent/__folio_no_soffice")),
-            ..LibreOfficeConfig::default()
-        };
-        let err = LibreOfficeEngine::launch(cfg)
-            .await
-            .expect_err("should fail");
-        assert!(matches!(err, EngineError::Internal(_)));
-    }
 }

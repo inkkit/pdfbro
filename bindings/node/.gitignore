@@ -1,0 +1,6 @@
+node_modules/
+*.node
+dist/
+*.log
+_native.js
+_native.d.ts

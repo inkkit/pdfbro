@@ -14,6 +14,9 @@ authors = []
 # Internal
 engine = { path = "crates/engine" }
 
+# Encoding
+base64 = "0.22"
+
 # Async / runtime
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
@@ -69,7 +72,7 @@ url = "2"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 
 # Identifiers
-uuid = { version = "1", features = ["v4"] }
+ulid = "1"
 
 # CLI
 assert_cmd = "2"
@@ -83,10 +86,17 @@ walkdir = "2"
 lopdf = "0.34"
 zip = "2"
 
+# Chrome auto-download
+sha2 = "0.10"
+flate2 = "1"
+tar = "0.4"
+dirs = "5"
+
 # Bindings
 pyo3 = { version = "0.22", features = ["extension-module"] }
-napi = { version = "2", features = ["napi8"] }
+napi = { version = "2", features = ["napi8", "tokio_rt", "serde-json"] }
 napi-derive = "2"
+napi-build = "2"
 
 [profile.release]
 opt-level = 3

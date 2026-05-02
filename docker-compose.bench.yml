@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: folio
     container_name: bench-folio
     ports:
       - "3001:3000"
@@ -17,6 +18,9 @@ services:
   gotenberg:
     image: gotenberg/gotenberg:8
     container_name: bench-gotenberg
+    command:
+      - gotenberg
+      - --chromium-allow-list=.*
     ports:
       - "3002:3000"
     deploy:

@@ -138,7 +138,7 @@ pub async fn preview_url(
 pub async fn preview_url(
     State(_state): State<AppState>,
     Query(_query): Query<PreviewQuery>,
-) -> ApiResult<impl IntoResponse> {
+) -> ApiResult<axum::response::Response> {
     Err(ApiError::InvalidField {
         field: "feature",
         message: "Preview mode requires Chromium feature".into(),
@@ -226,7 +226,7 @@ pub async fn preview_html(
 pub async fn preview_html(
     State(_state): State<AppState>,
     _mp: Multipart,
-) -> ApiResult<impl IntoResponse> {
+) -> ApiResult<axum::response::Response> {
     Err(ApiError::InvalidField {
         field: "feature",
         message: "Preview mode requires Chromium feature".into(),
@@ -313,7 +313,7 @@ pub async fn preview_markdown(
 pub async fn preview_markdown(
     State(_state): State<AppState>,
     _mp: Multipart,
-) -> ApiResult<impl IntoResponse> {
+) -> ApiResult<axum::response::Response> {
     Err(ApiError::InvalidField {
         field: "feature",
         message: "Preview mode requires Chromium feature".into(),
@@ -403,7 +403,7 @@ pub async fn preview_compare(
 pub async fn preview_compare(
     State(_state): State<AppState>,
     _mp: Multipart,
-) -> ApiResult<impl IntoResponse> {
+) -> ApiResult<axum::response::Response> {
     Err(ApiError::InvalidField {
         field: "feature",
         message: "Preview mode requires Chromium feature".into(),

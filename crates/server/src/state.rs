@@ -15,7 +15,7 @@ use crate::console_store::ConsoleStore;
 use crate::metrics::FolioMetrics;
 use crate::routes::batch_state::BatchStateManager;
 use crate::supervised_engine::SupervisedLibreOfficeEngine;
-use crate::webhook::WebhookQueue;
+use crate::webhook::{WebhookQueue, WebhookUrlValidator};
 
 /// Per-process server state.
 #[derive(Clone)]
@@ -33,6 +33,9 @@ pub struct AppState {
     pub started_at: Instant,
     /// Webhook job queue; `None` when webhook workers are not started.
     pub webhook_queue: Option<WebhookQueue>,
+    /// Compiled SSRF + allow/deny regex validator for incoming webhook URLs.
+    /// Default validator (empty allow/deny lists) only enforces SSRF.
+    pub webhook_validator: Arc<WebhookUrlValidator>,
     /// Prometheus metrics for monitoring.
     pub metrics: Arc<FolioMetrics>,
     /// Batch state manager for batch API.
@@ -58,10 +61,18 @@ impl AppState {
             config: Arc::new(config),
             started_at: Instant::now(),
             webhook_queue: None,
+            webhook_validator: Arc::new(WebhookUrlValidator::default()),
             metrics,
             batch_manager: None,
             console: Arc::new(ConsoleStore::new()),
         }
+    }
+
+    /// Override the webhook URL validator (used by main.rs after compiling
+    /// `--webhook-allow-list` / `--webhook-deny-list`).
+    pub fn with_webhook_validator(mut self, validator: WebhookUrlValidator) -> Self {
+        self.webhook_validator = Arc::new(validator);
+        self
     }
 
     #[cfg(feature = "libreoffice")]

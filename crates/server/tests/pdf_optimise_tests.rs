@@ -46,6 +46,15 @@ fn test_config() -> ServerConfig {
         api_download_from_max_retry: 3,
         api_disable_download_from: false,
         api_correlation_id_header: "x-request-id".to_string(),
+        api_root_path: String::new(),
+        libreoffice_unoserver_port: 2003,
+        libreoffice_unoserver_ready_timeout: std::time::Duration::from_secs(60),
+        webhook_max_retry: 4,
+        webhook_retry_min_wait: std::time::Duration::from_secs(1),
+        webhook_retry_max_wait: std::time::Duration::from_secs(30),
+        webhook_client_timeout: std::time::Duration::from_secs(30),
+        webhook_allow_list: vec![],
+        webhook_deny_list: vec![],
     }
 }
 
@@ -64,27 +73,27 @@ fn build_optimise_request(pdf_data: Vec<u8>, preset: Option<&str>, backend: Opti
     let boundary = "----test-boundary";
     let mut body = Vec::new();
 
-    body.extend_from_slice(format!("------{}\r\n", boundary).as_bytes());
+    body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
     body.extend_from_slice(b"Content-Disposition: form-data; name=\"files\"; filename=\"test.pdf\"\r\n");
     body.extend_from_slice(b"Content-Type: application/pdf\r\n\r\n");
     body.extend_from_slice(&pdf_data);
     body.extend_from_slice(b"\r\n");
 
     if let Some(p) = preset {
-        body.extend_from_slice(format!("------{}\r\n", boundary).as_bytes());
+        body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
         body.extend_from_slice(b"Content-Disposition: form-data; name=\"preset\"\r\n\r\n");
         body.extend_from_slice(p.as_bytes());
         body.extend_from_slice(b"\r\n");
     }
 
     if let Some(b) = backend {
-        body.extend_from_slice(format!("------{}\r\n", boundary).as_bytes());
+        body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
         body.extend_from_slice(b"Content-Disposition: form-data; name=\"backend\"\r\n\r\n");
         body.extend_from_slice(b.as_bytes());
         body.extend_from_slice(b"\r\n");
     }
 
-    body.extend_from_slice(format!("------{}--\r\n", boundary).as_bytes());
+    body.extend_from_slice(format!("--{}--\r\n", boundary).as_bytes());
 
     Request::builder()
         .method("POST")
@@ -176,7 +185,7 @@ async fn test_optimise_pdf_returns_400_for_missing_file() {
     
     let boundary = "----test-boundary";
     let body = format!(
-        "------{}\r\nContent-Disposition: form-data; name=\"preset\"\r\n\r\nscreen\r\n------{}--\r\n",
+        "--{}\r\nContent-Disposition: form-data; name=\"preset\"\r\n\r\nscreen\r\n--{}--\r\n",
         boundary, boundary
     );
 

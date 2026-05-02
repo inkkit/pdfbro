@@ -9,4 +9,19 @@ description = "Folio Node.js bindings (napi-rs)"
 name = "folio_js"
 crate-type = ["cdylib"]
 
+[features]
+default = ["chromium", "libreoffice", "chrome-fetch"]
+chromium = ["engine/chromium"]
+libreoffice = ["engine/libreoffice"]
+chrome-fetch = ["engine/chrome-fetch"]
+
 [dependencies]
+engine = { workspace = true }
+napi = { workspace = true, features = ["napi8", "tokio_rt", "serde-json"] }
+napi-derive = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+
+[build-dependencies]
+napi-build = { workspace = true }
