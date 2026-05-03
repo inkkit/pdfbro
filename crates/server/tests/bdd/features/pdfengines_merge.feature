@@ -48,7 +48,7 @@ Feature: /forms/pdfengines/merge
 
   @skip
   Scenario: POST /forms/pdfengines/merge (PDFtk)
-    # Reason: Folio uses lopdf/qpdf, not pdftk
+    # Reason: pdfbro uses lopdf/qpdf, not pdftk
     Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_MERGE_ENGINES | pdftk |
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
@@ -333,7 +333,7 @@ Feature: /forms/pdfengines/merge
   @webhook
   @skip
   Scenario: POST /forms/pdfengines/merge (Webhook)
-    # Reason: Folio uses synchronous response API; no push webhook support
+    # Reason: pdfbro uses synchronous response API; no push webhook support
     Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files                       | testdata/page_1.pdf                 | file   |
@@ -356,7 +356,7 @@ Feature: /forms/pdfengines/merge
 
   @skip
   Scenario: POST /foo/forms/pdfengines/merge (Root Path)
-    # Reason: Folio does not support configurable API root path prefix
+    # Reason: pdfbro does not support configurable API root path prefix
     Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_DEBUG_ROUTE | true  |
       | API_ROOT_PATH          | /foo/ |

@@ -45,7 +45,7 @@ Feature: /forms/pdfengines/embed
   @webhook
   @skip
   Scenario: POST /forms/pdfengines/embed (Webhook)
-    # Reason: Folio uses synchronous response API; no push webhook support
+    # Reason: pdfbro uses synchronous response API; no push webhook support
     Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/embed" with the following form data and header(s):
       | files                       | testdata/page_1.pdf                 | file   |
@@ -69,7 +69,7 @@ Feature: /forms/pdfengines/embed
 
   @skip
   Scenario: POST /foo/forms/pdfengines/embed (Root Path)
-    # Reason: Folio does not support configurable API root path prefix
+    # Reason: pdfbro does not support configurable API root path prefix
     Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_DEBUG_ROUTE | true  |
       | API_ROOT_PATH          | /foo/ |

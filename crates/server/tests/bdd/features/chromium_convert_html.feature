@@ -1039,7 +1039,7 @@ Feature: /forms/chromium/convert/html
   @webhook
   @skip
   Scenario: POST /forms/chromium/convert/html (Webhook)
-    # Reason: Folio uses synchronous response API; no push webhook support
+    # Reason: pdfbro uses synchronous response API; no push webhook support
     Given I have a default pdfbro container
     Given I have a webhook server
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
@@ -1065,7 +1065,7 @@ Feature: /forms/chromium/convert/html
 
   @skip
   Scenario: POST /foo/forms/chromium/convert/html (Root Path)
-    # Reason: Folio does not support configurable API root path prefix
+    # Reason: pdfbro does not support configurable API root path prefix
     Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_DEBUG_ROUTE | true  |
       | API_ROOT_PATH          | /foo/ |

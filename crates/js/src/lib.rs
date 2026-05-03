@@ -1,6 +1,6 @@
 //! pdfbro Node.js bindings — see `bindings/node/README.md`.
 
 mod errors;
-mod folio;
+mod pdfbro;
 
-pub use folio::{CreateOptions, PdfBro};
+pub use pdfbro::{CreateOptions, PdfBro};

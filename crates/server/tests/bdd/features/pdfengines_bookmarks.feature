@@ -253,7 +253,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
   @webhook
   @skip
   Scenario: POST /forms/pdfengines/bookmarks/write (Webhook)
-    # Reason: Folio uses synchronous response API; no push webhook support
+    # Reason: pdfbro uses synchronous response API; no push webhook support
     Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/bookmarks/write" with the following form data and header(s):
       | files                       | testdata/page_1.pdf                 | file   |
@@ -265,7 +265,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
   @webhook
   @skip
   Scenario: POST /forms/pdfengines/bookmarks/read (Webhook)
-    # Reason: Folio uses synchronous response API; no push webhook support
+    # Reason: pdfbro uses synchronous response API; no push webhook support
     Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/bookmarks/read" with the following form data and header(s):
       | files                       | testdata/page_1.pdf                 | file   |
@@ -297,7 +297,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
 
   @skip
   Scenario: POST /foo/forms/pdfengines/bookmarks/{write|read} (Root Path)
-    # Reason: Folio does not support configurable API root path prefix
+    # Reason: pdfbro does not support configurable API root path prefix
     Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_DEBUG_ROUTE | true  |
       | API_ROOT_PATH          | /foo/ |

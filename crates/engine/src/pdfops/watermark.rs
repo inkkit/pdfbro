@@ -477,12 +477,12 @@ mod tests {
     #[test]
     fn watermark_text_appears_on_every_page() {
         let pdf = make_multipage_pdf(3, 612, 792);
-        let opts = default_opts(text_kind("FOLIO-MARK"));
+        let opts = default_opts(text_kind("PDFBRO-MARK"));
         let out = watermark(&pdf, &opts).unwrap();
 
         for p in 1..=3 {
             let content = raw_page_content(&out, p);
-            let needle = b"(FOLIO-MARK) Tj";
+            let needle = b"(PDFBRO-MARK) Tj";
             assert!(
                 content.windows(needle.len()).any(|w| w == needle),
                 "page {p} content missing watermark: {:?}",

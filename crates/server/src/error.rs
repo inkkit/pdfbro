@@ -433,7 +433,7 @@ impl ApiError {
                 code: code.to_string(),
                 details: None,
                 suggestion: Some(
-                    "Reduce request size or increase limit: FOLIO_MAX_BODY_SIZE=100MB. Consider uploading large files separately.".to_string()
+                    "Reduce request size or increase limit: PDFBRO_MAX_BODY_SIZE=100MB. Consider uploading large files separately.".to_string()
                 ),
                 documentation: Some(documentation_link("BODY_TOO_LARGE")),
             },
