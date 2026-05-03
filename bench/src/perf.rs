@@ -31,6 +31,10 @@ pub struct PerfArgs {
     /// Comma-separated workload names to skip (e.g. --skip url-local).
     #[arg(long, value_delimiter = ',')]
     pub skip: Vec<String>,
+    /// Restart both containers before each workload so each measurement starts
+    /// from a clean-slate container with no accumulated engine state.
+    #[arg(long)]
+    pub isolated: bool,
 }
 
 pub async fn run_perf(args: PerfArgs) -> anyhow::Result<()> {
@@ -43,6 +47,13 @@ pub async fn run_perf(args: PerfArgs) -> anyhow::Result<()> {
         PathBuf::from("bench/results").join(&timestamp)
     });
 
+    let bench_mode = if args.isolated {
+        "isolated (container restarted before each workload)"
+    } else {
+        "accumulated (containers warm throughout)"
+    };
+    println!("Bench mode: {bench_mode}");
+
     let workloads = workload::all_workloads();
     let mut all_results = Vec::new();
 
@@ -52,6 +63,14 @@ pub async fn run_perf(args: PerfArgs) -> anyhow::Result<()> {
             continue;
         }
         println!("\n=== {} — {} ===", w.name, w.description);
+
+        if args.isolated {
+            println!("  restarting containers...");
+            restart_and_wait(
+                &args.pdfbro_container, &args.pdfbro_url,
+                &args.gotenberg_container, &args.gotenberg_url,
+            ).await?;
+        }
 
         let pdfbro_result = run_workload(
             w, &args.pdfbro_url, w.pdfbro_route, &args.pdfbro_container,
@@ -70,9 +89,50 @@ pub async fn run_perf(args: PerfArgs) -> anyhow::Result<()> {
         });
     }
 
-    let path = report::write(&all_results, &output_dir)?;
+    let path = report::write(&all_results, &output_dir, bench_mode)?;
     println!("\nReport written to: {}", path.display());
     Ok(())
+}
+
+/// Restart both containers and wait until their /health endpoints respond.
+async fn restart_and_wait(
+    pdfbro_container: &str,
+    pdfbro_url: &str,
+    gotenberg_container: &str,
+    gotenberg_url: &str,
+) -> anyhow::Result<()> {
+    docker_restart(pdfbro_container)?;
+    docker_restart(gotenberg_container)?;
+    wait_healthy(pdfbro_url, 120).await?;
+    wait_healthy(gotenberg_url, 120).await?;
+    Ok(())
+}
+
+fn docker_restart(container: &str) -> anyhow::Result<()> {
+    let status = std::process::Command::new("docker")
+        .args(["restart", container])
+        .status()?;
+    if !status.success() {
+        anyhow::bail!("docker restart {container} failed");
+    }
+    Ok(())
+}
+
+async fn wait_healthy(base_url: &str, timeout_secs: u64) -> anyhow::Result<()> {
+    let url = format!("{base_url}/health");
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()?;
+    let deadline = std::time::Instant::now() + Duration::from_secs(timeout_secs);
+    loop {
+        if std::time::Instant::now() >= deadline {
+            anyhow::bail!("timed out waiting for {url} to become healthy");
+        }
+        match client.get(&url).send().await {
+            Ok(r) if r.status().is_success() => return Ok(()),
+            _ => tokio::time::sleep(Duration::from_secs(2)).await,
+        }
+    }
 }
 
 async fn run_workload(
