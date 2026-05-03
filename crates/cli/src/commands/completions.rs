@@ -1,4 +1,4 @@
-//! `folio completions <shell>` — emit a clap completion script to stdout.
+//! `pdfbro completions <shell>` — emit a clap completion script to stdout.
 
 use clap::CommandFactory;
 use clap_complete::{Shell, generate};

@@ -1,4 +1,4 @@
-//! Centralised engine-launch wiring for both Folio and AsyncFolio.
+//! Centralised engine-launch wiring for both PdfBro and AsyncPdfBro.
 
 #[cfg(feature = "chromium")]
 use engine::BrowserConfig;

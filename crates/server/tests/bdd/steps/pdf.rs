@@ -9,10 +9,10 @@
 
 use lopdf::Document;
 
-use crate::support::world::FolioWorld;
+use crate::support::world::PdfBroWorld;
 
 /// Step: Then there should be 1 PDF(s) in the response
-pub async fn check_pdf_count(world: &mut FolioWorld, expected: usize) {
+pub async fn check_pdf_count(world: &mut PdfBroWorld, expected: usize) {
     let body = world.body.as_ref().unwrap();
     
     if expected == 1 {
@@ -54,7 +54,7 @@ fn is_zip_content(bytes: &[u8]) -> bool {
 }
 
 /// Step: Then the "foo.pdf" PDF should have 2 page(s)
-pub async fn check_page_count(world: &mut FolioWorld, filename: String, expected: usize) {
+pub async fn check_page_count(world: &mut PdfBroWorld, filename: String, expected: usize) {
     let body = world.body.as_ref().expect("No response body");
     let pdf_bytes = extract_named_pdf(body, &filename);
 
@@ -70,7 +70,7 @@ pub async fn check_page_count(world: &mut FolioWorld, filename: String, expected
 
 /// Step: Then the "foo.pdf" PDF should NOT have the following content at page 1:
 pub async fn check_page_not_contain(
-    world: &mut FolioWorld,
+    world: &mut PdfBroWorld,
     filename: String,
     page_num: usize,
     excluded: String,
@@ -90,7 +90,7 @@ pub async fn check_page_not_contain(
 }
 
 /// Step: Then the "foo.pdf" PDF should be set to landscape orientation
-pub async fn check_landscape(world: &mut FolioWorld, filename: String) {
+pub async fn check_landscape(world: &mut PdfBroWorld, filename: String) {
     let body = world.body.as_ref().expect("No response body");
     let pdf_bytes = extract_named_pdf(body, &filename);
     let doc = lopdf::Document::load_mem(&pdf_bytes).expect("Failed to parse PDF");
@@ -111,7 +111,7 @@ pub async fn check_landscape(world: &mut FolioWorld, filename: String) {
 }
 
 /// Step: Then the "foo.pdf" PDF should NOT be set to landscape orientation
-pub async fn check_not_landscape(world: &mut FolioWorld, filename: String) {
+pub async fn check_not_landscape(world: &mut PdfBroWorld, filename: String) {
     let body = world.body.as_ref().expect("No response body");
     let pdf_bytes = extract_named_pdf(body, &filename);
     let doc = lopdf::Document::load_mem(&pdf_bytes).expect("Failed to parse PDF");
@@ -132,7 +132,7 @@ pub async fn check_not_landscape(world: &mut FolioWorld, filename: String) {
 }
 
 /// Step: Then all concurrent responses should have N PDF(s)
-pub async fn check_concurrent_pdf_count(world: &mut FolioWorld, expected: usize) {
+pub async fn check_concurrent_pdf_count(world: &mut PdfBroWorld, expected: usize) {
     let responses = world.concurrent_responses.as_ref().expect("No concurrent responses");
     for (i, (_, body)) in responses.iter().enumerate() {
         if expected == 1 {
@@ -153,7 +153,7 @@ pub async fn check_concurrent_pdf_count(world: &mut FolioWorld, expected: usize)
 /// Expected text
 /// """
 pub async fn check_page_content(
-    world: &mut FolioWorld,
+    world: &mut PdfBroWorld,
     filename: String,
     page_num: usize,
     expected: String,
@@ -181,7 +181,7 @@ pub async fn check_page_content(
 /// Step: Then there should be the following file(s) in the response:
 /// | foo.pdf |
 /// | bar.pdf |
-pub async fn check_files_in_response(world: &mut FolioWorld, files: Vec<String>) {
+pub async fn check_files_in_response(world: &mut PdfBroWorld, files: Vec<String>) {
     let body = world.body.as_ref().expect("No response body");
     let headers = world.response_headers.as_ref().expect("No response headers available");
     let cd = headers.get("content-disposition").cloned().unwrap_or_default();
@@ -272,7 +272,7 @@ fn extract_named_pdf(body: &[u8], filename: &str) -> Vec<u8> {
 }
 
 /// Step: Then the "foo.pdf" PDF should pass PDF/A validation
-pub async fn check_pdfa_valid(world: &mut FolioWorld, filename: String) {
+pub async fn check_pdfa_valid(world: &mut PdfBroWorld, filename: String) {
     let body = world.body.as_ref().expect("No response body");
     let pdf_bytes = extract_named_pdf(body, &filename);
     match verapdf_validate(&pdf_bytes) {
@@ -283,7 +283,7 @@ pub async fn check_pdfa_valid(world: &mut FolioWorld, filename: String) {
 }
 
 /// Step: Then the "foo.pdf" PDF should have N image(s)
-pub async fn check_image_count(world: &mut FolioWorld, filename: String, expected: usize) {
+pub async fn check_image_count(world: &mut PdfBroWorld, filename: String, expected: usize) {
     let body = world.body.as_ref().expect("No response body");
     let pdf_bytes = extract_named_pdf(body, &filename);
     let doc = lopdf::Document::load_mem(&pdf_bytes).expect("Failed to parse PDF");

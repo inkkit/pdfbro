@@ -1,7 +1,7 @@
 ARG RUST_VERSION=1.88
-ARG FOLIO_VERSION=0.1.0
-ARG FOLIO_USER_UID=1001
-ARG FOLIO_USER_GID=1001
+ARG PDFBRO_VERSION=0.1.0
+ARG PDFBRO_USER_UID=1001
+ARG PDFBRO_USER_GID=1001
 # Pinned for reproducible builds — bump deliberately when upgrading.
 # See: https://snapshot.debian.org/package/chromium/
 ARG CHROMIUM_VERSION=142.0.7444.175-1
@@ -31,7 +31,7 @@ COPY --link . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 # =============================================================================
-# Stage: builder-full — compiles folio with chromium + libreoffice features
+# Stage: builder-full — compiles pdfbro with chromium + libreoffice features
 # =============================================================================
 FROM chef AS builder-full
 WORKDIR /app
@@ -41,11 +41,11 @@ RUN cargo chef cook --release --recipe-path recipe.json --features "chromium lib
 COPY --link . .
 COPY --link --from=ui-builder /ui/build /app/ui/build
 RUN cargo build --release --features "chromium libreoffice" && \
-    strip target/release/folio-server && \
-    strip target/release/folio
+    strip target/release/pdfbro-server && \
+    strip target/release/pdfbro
 
 # =============================================================================
-# Stage: builder-chromium — compiles folio with chromium feature only
+# Stage: builder-chromium — compiles pdfbro with chromium feature only
 # =============================================================================
 FROM chef AS builder-chromium
 WORKDIR /app
@@ -54,11 +54,11 @@ RUN cargo chef cook --release --recipe-path recipe.json --no-default-features --
 COPY --link . .
 COPY --link --from=ui-builder /ui/build /app/ui/build
 RUN cargo build --release --no-default-features --features chromium && \
-    strip target/release/folio-server && \
-    strip target/release/folio
+    strip target/release/pdfbro-server && \
+    strip target/release/pdfbro
 
 # =============================================================================
-# Stage: builder-libreoffice — compiles folio with libreoffice feature only
+# Stage: builder-libreoffice — compiles pdfbro with libreoffice feature only
 # =============================================================================
 FROM chef AS builder-libreoffice
 WORKDIR /app
@@ -67,27 +67,27 @@ RUN cargo chef cook --release --recipe-path recipe.json --no-default-features --
 COPY --link . .
 COPY --link --from=ui-builder /ui/build /app/ui/build
 RUN cargo build --release --no-default-features --features libreoffice && \
-    strip target/release/folio-server && \
-    strip target/release/folio
+    strip target/release/pdfbro-server && \
+    strip target/release/pdfbro
 
 # =============================================================================
 # Stage: common — non-root user, tini, fonts, PDF tools (no engines yet)
 # =============================================================================
 FROM debian:bookworm-slim AS common
 
-ARG FOLIO_VERSION
-ARG FOLIO_USER_UID
-ARG FOLIO_USER_GID
+ARG PDFBRO_VERSION
+ARG PDFBRO_USER_UID
+ARG PDFBRO_USER_GID
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 ENV TZ=UTC
 
-RUN groupadd --gid "${FOLIO_USER_GID}" folio && \
-    useradd --uid "${FOLIO_USER_UID}" --gid folio --shell /bin/bash \
-        --home /home/folio --no-create-home folio && \
-    mkdir -p /home/folio && \
-    chown folio:folio /home/folio
+RUN groupadd --gid "${PDFBRO_USER_GID}" pdfbro && \
+    useradd --uid "${PDFBRO_USER_UID}" --gid pdfbro --shell /bin/bash \
+        --home /home/pdfbro --no-create-home pdfbro && \
+    mkdir -p /home/pdfbro && \
+    chown pdfbro:pdfbro /home/pdfbro
 
 RUN apt-get update -qq && apt-get upgrade -yqq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
@@ -115,7 +115,7 @@ RUN apt-get update -qq && apt-get upgrade -yqq && \
         ghostscript \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-ENV FOLIO_VERSION=${FOLIO_VERSION}
+ENV PDFBRO_VERSION=${PDFBRO_VERSION}
 ENV RUST_LOG=info
 ENV GS_BIN=/usr/bin/gs
 
@@ -165,20 +165,20 @@ ENV CHROME_BIN=/usr/bin/chromium
 ENV RUST_LOG=info,chromiumoxide::handler=error
 
 # =============================================================================
-# Final stage: folio — full image (Chromium + LibreOffice)
+# Final stage: pdfbro — full image (Chromium + LibreOffice)
 # Tags: latest, X.Y.Z
 # =============================================================================
-FROM common-chromium AS folio
+FROM common-chromium AS pdfbro
 
-ARG FOLIO_VERSION
-ARG FOLIO_USER_UID
-ARG FOLIO_USER_GID
+ARG PDFBRO_VERSION
+ARG PDFBRO_USER_UID
+ARG PDFBRO_USER_GID
 
-LABEL org.opencontainers.image.title="Folio" \
+LABEL org.opencontainers.image.title="pdfbro" \
       org.opencontainers.image.description="A Docker-based API for converting documents to PDF." \
-      org.opencontainers.image.version="${FOLIO_VERSION}" \
-      org.opencontainers.image.authors="Folio Team" \
-      org.opencontainers.image.source="https://github.com/vel/folio"
+      org.opencontainers.image.version="${PDFBRO_VERSION}" \
+      org.opencontainers.image.authors="pdfbro Team" \
+      org.opencontainers.image.source="https://github.com/vel/pdfbro"
 
 # Install LibreOffice from Debian bookworm-backports (newer than bookworm's 7.4).
 # python3-uno must match the LO version so it is also pulled from backports.
@@ -200,67 +200,67 @@ RUN echo "deb http://deb.debian.org/debian bookworm-backports main" \
 # Force headless SVP rendering backend — skips virtual display probe (~50–100ms).
 ENV SAL_USE_VCLPLUGIN=svp
 
-COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" \
-    --from=builder-full /app/target/release/folio-server /usr/bin/
-COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" \
-    --from=builder-full /app/target/release/folio /usr/bin/
+COPY --link --chown="${PDFBRO_USER_UID}:${PDFBRO_USER_GID}" \
+    --from=builder-full /app/target/release/pdfbro-server /usr/bin/
+COPY --link --chown="${PDFBRO_USER_UID}:${PDFBRO_USER_GID}" \
+    --from=builder-full /app/target/release/pdfbro /usr/bin/
 
-USER folio
-WORKDIR /home/folio
+USER pdfbro
+WORKDIR /home/pdfbro
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:3000/health || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["/usr/bin/folio-server", "serve"]
+CMD ["/usr/bin/pdfbro-server", "serve"]
 
 # =============================================================================
-# Final stage: folio-chromium — Chromium only (~30% smaller than full)
+# Final stage: pdfbro-chromium — Chromium only (~30% smaller than full)
 # Tags: latest-chromium, X.Y.Z-chromium
 # =============================================================================
-FROM common-chromium AS folio-chromium
+FROM common-chromium AS pdfbro-chromium
 
-ARG FOLIO_VERSION
-ARG FOLIO_USER_UID
-ARG FOLIO_USER_GID
+ARG PDFBRO_VERSION
+ARG PDFBRO_USER_UID
+ARG PDFBRO_USER_GID
 
-LABEL org.opencontainers.image.title="Folio (Chromium)" \
+LABEL org.opencontainers.image.title="pdfbro (Chromium)" \
       org.opencontainers.image.description="A Docker-based API for converting documents to PDF — Chromium variant." \
-      org.opencontainers.image.version="${FOLIO_VERSION}" \
-      org.opencontainers.image.authors="Folio Team" \
-      org.opencontainers.image.source="https://github.com/vel/folio"
+      org.opencontainers.image.version="${PDFBRO_VERSION}" \
+      org.opencontainers.image.authors="pdfbro Team" \
+      org.opencontainers.image.source="https://github.com/vel/pdfbro"
 
-COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" \
-    --from=builder-chromium /app/target/release/folio-server /usr/bin/
-COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" \
-    --from=builder-chromium /app/target/release/folio /usr/bin/
+COPY --link --chown="${PDFBRO_USER_UID}:${PDFBRO_USER_GID}" \
+    --from=builder-chromium /app/target/release/pdfbro-server /usr/bin/
+COPY --link --chown="${PDFBRO_USER_UID}:${PDFBRO_USER_GID}" \
+    --from=builder-chromium /app/target/release/pdfbro /usr/bin/
 
-USER folio
-WORKDIR /home/folio
+USER pdfbro
+WORKDIR /home/pdfbro
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:3000/health || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["/usr/bin/folio-server", "serve"]
+CMD ["/usr/bin/pdfbro-server", "serve"]
 
 # =============================================================================
-# Final stage: folio-libreoffice — LibreOffice only (~40% smaller than full)
+# Final stage: pdfbro-libreoffice — LibreOffice only (~40% smaller than full)
 # Tags: latest-libreoffice, X.Y.Z-libreoffice
 # =============================================================================
-FROM common AS folio-libreoffice
+FROM common AS pdfbro-libreoffice
 
-ARG FOLIO_VERSION
-ARG FOLIO_USER_UID
-ARG FOLIO_USER_GID
+ARG PDFBRO_VERSION
+ARG PDFBRO_USER_UID
+ARG PDFBRO_USER_GID
 
-LABEL org.opencontainers.image.title="Folio (LibreOffice)" \
+LABEL org.opencontainers.image.title="pdfbro (LibreOffice)" \
       org.opencontainers.image.description="A Docker-based API for converting documents to PDF — LibreOffice variant." \
-      org.opencontainers.image.version="${FOLIO_VERSION}" \
-      org.opencontainers.image.authors="Folio Team" \
-      org.opencontainers.image.source="https://github.com/vel/folio"
+      org.opencontainers.image.version="${PDFBRO_VERSION}" \
+      org.opencontainers.image.authors="pdfbro Team" \
+      org.opencontainers.image.source="https://github.com/vel/pdfbro"
 
 # Install LibreOffice from Debian bookworm-backports (newer than bookworm's 7.4).
 # python3-uno must match the LO version so it is also pulled from backports.
@@ -282,20 +282,20 @@ RUN echo "deb http://deb.debian.org/debian bookworm-backports main" \
 # Force headless SVP rendering backend — skips virtual display probe (~50–100ms).
 ENV SAL_USE_VCLPLUGIN=svp
 
-COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" \
-    --from=builder-libreoffice /app/target/release/folio-server /usr/bin/
-COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" \
-    --from=builder-libreoffice /app/target/release/folio /usr/bin/
+COPY --link --chown="${PDFBRO_USER_UID}:${PDFBRO_USER_GID}" \
+    --from=builder-libreoffice /app/target/release/pdfbro-server /usr/bin/
+COPY --link --chown="${PDFBRO_USER_UID}:${PDFBRO_USER_GID}" \
+    --from=builder-libreoffice /app/target/release/pdfbro /usr/bin/
 
-USER folio
-WORKDIR /home/folio
+USER pdfbro
+WORKDIR /home/pdfbro
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:3000/health || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["/usr/bin/folio-server", "serve"]
+CMD ["/usr/bin/pdfbro-server", "serve"]
 
 # =============================================================================
 # Cloud Run variants — thin layers that set platform env vars.
@@ -303,75 +303,75 @@ CMD ["/usr/bin/folio-server", "serve"]
 # running user. See https://github.com/gotenberg/gotenberg/issues/90.
 # =============================================================================
 
-# folio-cloudrun: full (Chromium + LibreOffice)
+# pdfbro-cloudrun: full (Chromium + LibreOffice)
 # Tags: latest-cloudrun, X.Y.Z-cloudrun
-FROM folio AS folio-cloudrun
+FROM pdfbro AS pdfbro-cloudrun
 USER root
-RUN chown folio: /usr/bin/tini
-# Cloud Run injects PORT; folio-server reads FOLIO_PORT (or --port flag).
-# Set FOLIO_PORT_FROM_ENV so the server picks up PORT automatically.
-ENV FOLIO_PORT_FROM_ENV=PORT
+RUN chown pdfbro: /usr/bin/tini
+# Cloud Run injects PORT; pdfbro-server reads PDFBRO_PORT (or --port flag).
+# Set PDFBRO_PORT_FROM_ENV so the server picks up PORT automatically.
+ENV PDFBRO_PORT_FROM_ENV=PORT
 ENV CHROMIUM_LAZY_START=false
 ENV LIBREOFFICE_LAZY_START=false
 ENV RUST_LOG=info
-USER folio
+USER pdfbro
 
-# folio-cloudrun-chromium: Chromium only
+# pdfbro-cloudrun-chromium: Chromium only
 # Tags: latest-chromium-cloudrun, X.Y.Z-chromium-cloudrun
-FROM folio-chromium AS folio-cloudrun-chromium
+FROM pdfbro-chromium AS pdfbro-cloudrun-chromium
 USER root
-RUN chown folio: /usr/bin/tini
-ENV FOLIO_PORT_FROM_ENV=PORT
+RUN chown pdfbro: /usr/bin/tini
+ENV PDFBRO_PORT_FROM_ENV=PORT
 ENV CHROMIUM_LAZY_START=false
 ENV RUST_LOG=info
-USER folio
+USER pdfbro
 
-# folio-cloudrun-libreoffice: LibreOffice only
+# pdfbro-cloudrun-libreoffice: LibreOffice only
 # Tags: latest-libreoffice-cloudrun, X.Y.Z-libreoffice-cloudrun
-FROM folio-libreoffice AS folio-cloudrun-libreoffice
+FROM pdfbro-libreoffice AS pdfbro-cloudrun-libreoffice
 USER root
-RUN chown folio: /usr/bin/tini
-ENV FOLIO_PORT_FROM_ENV=PORT
+RUN chown pdfbro: /usr/bin/tini
+ENV PDFBRO_PORT_FROM_ENV=PORT
 ENV LIBREOFFICE_LAZY_START=false
 ENV RUST_LOG=info
-USER folio
+USER pdfbro
 
 # =============================================================================
-# AWS Lambda variants — use the Lambda Web Adapter (LWA) sidecar so folio-server
+# AWS Lambda variants — use the Lambda Web Adapter (LWA) sidecar so pdfbro-server
 # runs as a normal HTTP server without any Lambda-specific code changes.
 # The LWA translates Lambda invoke events into HTTP requests on AWS_LWA_PORT.
 # See: https://github.com/awslabs/aws-lambda-web-adapter
 # =============================================================================
 
-# folio-lambda: full (Chromium + LibreOffice)
+# pdfbro-lambda: full (Chromium + LibreOffice)
 # Tags: latest-lambda, X.Y.Z-lambda
-FROM folio AS folio-lambda
+FROM pdfbro AS pdfbro-lambda
 USER root
 COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 \
     /lambda-adapter /opt/extensions/lambda-adapter
 ENV AWS_LWA_PORT=3000
 ENV AWS_LWA_READINESS_CHECK_PATH=/health
 ENV AWS_LWA_INVOKE_MODE=buffered
-USER folio
+USER pdfbro
 
-# folio-lambda-chromium: Chromium only
+# pdfbro-lambda-chromium: Chromium only
 # Tags: latest-chromium-lambda, X.Y.Z-chromium-lambda
-FROM folio-chromium AS folio-lambda-chromium
+FROM pdfbro-chromium AS pdfbro-lambda-chromium
 USER root
 COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 \
     /lambda-adapter /opt/extensions/lambda-adapter
 ENV AWS_LWA_PORT=3000
 ENV AWS_LWA_READINESS_CHECK_PATH=/health
 ENV AWS_LWA_INVOKE_MODE=buffered
-USER folio
+USER pdfbro
 
-# folio-lambda-libreoffice: LibreOffice only
+# pdfbro-lambda-libreoffice: LibreOffice only
 # Tags: latest-libreoffice-lambda, X.Y.Z-libreoffice-lambda
-FROM folio-libreoffice AS folio-lambda-libreoffice
+FROM pdfbro-libreoffice AS pdfbro-lambda-libreoffice
 USER root
 COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 \
     /lambda-adapter /opt/extensions/lambda-adapter
 ENV AWS_LWA_PORT=3000
 ENV AWS_LWA_READINESS_CHECK_PATH=/health
 ENV AWS_LWA_INVOKE_MODE=buffered
-USER folio
+USER pdfbro

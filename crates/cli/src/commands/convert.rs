@@ -1,4 +1,4 @@
-//! `folio convert` — single conversion (HTML / URL / Markdown / Office /
+//! `pdfbro convert` — single conversion (HTML / URL / Markdown / Office /
 //! stdin) into a single PDF.
 
 use std::time::Instant;
@@ -10,7 +10,7 @@ use crate::args::{ConvertArgs, GlobalOpts, StdinKind};
 use crate::io_helpers::{is_stdout, read_stdin_async, write_output};
 use crate::model;
 
-/// Entry point for `folio convert`. Decides which engine to invoke based
+/// Entry point for `pdfbro convert`. Decides which engine to invoke based
 /// on which mutually-exclusive `--{html,url,markdown,office,stdin}` flag
 /// the user supplied (clap enforces exactly one).
 pub(crate) async fn run(global: &GlobalOpts, args: &ConvertArgs) -> anyhow::Result<()> {

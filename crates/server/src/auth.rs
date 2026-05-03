@@ -96,7 +96,7 @@ where
             // Authentication failed - return 401
             let response = Response::builder()
                 .status(StatusCode::UNAUTHORIZED)
-                .header(header::WWW_AUTHENTICATE, "Basic realm=\"folio\"")
+                .header(header::WWW_AUTHENTICATE, "Basic realm=\"pdfbro\"")
                 .body(Body::from(r#"{"error": "Unauthorized"}"#))
                 .unwrap();
 

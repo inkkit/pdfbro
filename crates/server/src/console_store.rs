@@ -336,10 +336,10 @@ pub async fn build_console_payload(
 fn build_route_payloads(state: &crate::state::AppState, concurrency_max: u32) -> Vec<RoutePayload> {
     let families = prometheus::gather();
 
-    // Build count + error map from folio_http_requests_total
+    // Build count + error map from pdfbro_http_requests_total
     let mut route_counts: std::collections::HashMap<String, (f64, f64)> = std::collections::HashMap::new();
     for family in &families {
-        if family.get_name() != "folio_http_requests_total" { continue; }
+        if family.get_name() != "pdfbro_http_requests_total" { continue; }
         for m in family.get_metric() {
             let labels: std::collections::HashMap<_, _> = m.get_label().iter()
                 .map(|l| (l.get_name(), l.get_value()))
@@ -356,10 +356,10 @@ fn build_route_payloads(state: &crate::state::AppState, concurrency_max: u32) ->
         break;
     }
 
-    // Build latency percentiles from folio_http_request_duration_seconds histogram
+    // Build latency percentiles from pdfbro_http_request_duration_seconds histogram
     let mut route_latency: std::collections::HashMap<String, (f64, f64, f64)> = std::collections::HashMap::new();
     for family in &families {
-        if family.get_name() != "folio_http_request_duration_seconds" { continue; }
+        if family.get_name() != "pdfbro_http_request_duration_seconds" { continue; }
         for m in family.get_metric() {
             let labels: std::collections::HashMap<_, _> = m.get_label().iter()
                 .map(|l| (l.get_name(), l.get_value()))
@@ -511,12 +511,12 @@ pub fn spawn_console_sampler(state: crate::state::AppState, started_at: Instant)
             let families = prometheus::gather();
 
             let http_total: f64 = families.iter()
-                .find(|f| f.get_name() == "folio_http_requests_total")
+                .find(|f| f.get_name() == "pdfbro_http_requests_total")
                 .map(|f| f.get_metric().iter().map(|m| m.get_counter().get_value()).sum())
                 .unwrap_or(0.0);
 
             let error_total: f64 = families.iter()
-                .find(|f| f.get_name() == "folio_http_requests_total")
+                .find(|f| f.get_name() == "pdfbro_http_requests_total")
                 .map(|f| f.get_metric().iter()
                     .filter(|m| m.get_label().iter()
                         .any(|l| l.get_name() == "status"
@@ -538,7 +538,7 @@ pub fn spawn_console_sampler(state: crate::state::AppState, started_at: Instant)
 
             // ── p95 from histogram (global, across all routes) ─────────────
             let p95_ms = families.iter()
-                .find(|f| f.get_name() == "folio_http_request_duration_seconds")
+                .find(|f| f.get_name() == "pdfbro_http_request_duration_seconds")
                 .map(|f| {
                     // Aggregate all route histograms into one virtual histogram
                     let mut agg_count = 0u64;

@@ -1,4 +1,4 @@
-//! `class Folio` — sync facade over the engine using a shared tokio runtime.
+//! `class PdfBro` — sync facade over the engine using a shared tokio runtime.
 
 use std::sync::Arc;
 
@@ -22,13 +22,13 @@ pub(crate) struct State {
     pub closed: bool,
 }
 
-#[pyclass(name = "Folio", module = "folio")]
-pub struct Folio {
+#[pyclass(name = "PdfBro", module = "pdfbro")]
+pub struct PdfBro {
     pub(crate) inner: parking_lot::Mutex<State>,
 }
 
 #[pymethods]
-impl Folio {
+impl PdfBro {
     #[new]
     #[pyo3(signature = (engines = None, chrome_path = None, auto_download_chrome = true, chrome_cache_dir = None))]
     fn new(
@@ -70,7 +70,7 @@ impl Folio {
                 #[cfg(not(feature = "libreoffice"))]
                 let _ = want_office;
 
-                Ok(Folio {
+                Ok(PdfBro {
                     inner: parking_lot::Mutex::new(State {
                         #[cfg(feature = "chromium")]
                         chromium,
@@ -183,11 +183,11 @@ impl Folio {
     }
 }
 
-impl Folio {
+impl PdfBro {
     #[cfg(feature = "chromium")]
     fn chromium_or_err(&self) -> PyResult<Arc<ChromiumEngine>> {
         self.inner.lock().chromium.clone().ok_or_else(|| {
-            EngineDisabledError::new_err("chromium engine not enabled for this Folio instance")
+            EngineDisabledError::new_err("chromium engine not enabled for this PdfBro instance")
         })
     }
 
@@ -201,7 +201,7 @@ impl Folio {
     #[cfg(feature = "libreoffice")]
     fn office_or_err(&self) -> PyResult<Arc<LibreOfficeEngine>> {
         self.inner.lock().libreoffice.clone().ok_or_else(|| {
-            EngineDisabledError::new_err("libreoffice engine not enabled for this Folio instance")
+            EngineDisabledError::new_err("libreoffice engine not enabled for this PdfBro instance")
         })
     }
 

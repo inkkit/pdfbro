@@ -1,4 +1,4 @@
-//! `class Folio` — async Node.js facade over the engine.
+//! `class PdfBro` — async Node.js facade over the engine.
 
 use std::sync::Arc;
 
@@ -15,7 +15,7 @@ use crate::errors::engine_to_napi;
 #[cfg(feature = "chrome-fetch")]
 use crate::errors::fetch_to_napi;
 
-/// Options passed to [`Folio::create`].
+/// Options passed to [`PdfBro::create`].
 #[napi(object)]
 pub struct CreateOptions {
     /// Which engines to enable. Defaults to `["chromium", "office"]`.
@@ -28,9 +28,9 @@ pub struct CreateOptions {
     pub chrome_cache_dir: Option<String>,
 }
 
-/// Async Folio client that wraps the PDF/document engines.
+/// Async PdfBro client that wraps the PDF/document engines.
 #[napi]
-pub struct Folio {
+pub struct PdfBro {
     #[cfg(feature = "chromium")]
     chromium: Option<Arc<ChromiumEngine>>,
     #[cfg(feature = "libreoffice")]
@@ -38,10 +38,10 @@ pub struct Folio {
 }
 
 #[napi]
-impl Folio {
-    /// Create a new Folio instance, launching the requested engines.
+impl PdfBro {
+    /// Create a new PdfBro instance, launching the requested engines.
     #[napi(factory)]
-    pub async fn create(opts: Option<CreateOptions>) -> Result<Folio> {
+    pub async fn create(opts: Option<CreateOptions>) -> Result<PdfBro> {
         let opts = opts.unwrap_or(CreateOptions {
             engines: None,
             chrome_path: None,
@@ -85,7 +85,7 @@ impl Folio {
         #[cfg(not(feature = "libreoffice"))]
         let _ = want_office;
 
-        Ok(Folio {
+        Ok(PdfBro {
             #[cfg(feature = "chromium")]
             chromium,
             #[cfg(feature = "libreoffice")]
@@ -206,7 +206,7 @@ impl Folio {
         }
     }
 
-    /// Shut down the Folio instance and release resources.
+    /// Shut down the PdfBro instance and release resources.
     #[napi]
     pub async fn close(&self) -> Result<()> {
         Ok(())

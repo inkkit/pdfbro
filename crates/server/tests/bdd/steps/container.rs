@@ -10,20 +10,20 @@ use std::collections::HashMap;
 
 use cucumber::gherkin::Table;
 
-use crate::support::world::FolioWorld;
+use crate::support::world::PdfBroWorld;
 
-/// Step: Given I have a default Folio container
-pub async fn default_container(world: &mut FolioWorld) {
+/// Step: Given I have a default pdfbro container
+pub async fn default_container(world: &mut PdfBroWorld) {
     world.start_container(HashMap::new()).await;
 }
 
-/// Step: Given I have a Folio container with environment variables
+/// Step: Given I have a pdfbro container with environment variables
 ///
 /// Table format:
 /// | VAR_NAME | value |
 /// | VAR_NAME2 | value2 |
 /// Step: Then the logs should contain "<substring>"
-pub async fn check_logs_contain(world: &mut FolioWorld, substring: String) {
+pub async fn check_logs_contain(world: &mut PdfBroWorld, substring: String) {
     let found = world.logs.iter().any(|line| line.contains(&substring));
     assert!(
         found,
@@ -33,7 +33,7 @@ pub async fn check_logs_contain(world: &mut FolioWorld, substring: String) {
     );
 }
 
-pub async fn container_with_env(world: &mut FolioWorld, table: &Table) {
+pub async fn container_with_env(world: &mut PdfBroWorld, table: &Table) {
     let mut env = HashMap::new();
 
     // Table in cucumber 0.21 is Vec<Vec<String>>

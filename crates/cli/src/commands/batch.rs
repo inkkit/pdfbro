@@ -1,4 +1,4 @@
-//! `folio batch` — recursive directory walk with bounded concurrency.
+//! `pdfbro batch` — recursive directory walk with bounded concurrency.
 //!
 //! Files are matched against `--pattern` (a glob with brace expansion).
 //! Each matching path is scheduled on a tokio task gated by a
@@ -19,7 +19,7 @@ use crate::args::{BatchArgs, GlobalOpts, OnError};
 use crate::exit::{BatchPartialFailure, UsageError};
 use crate::model;
 
-/// Entry point for `folio batch`.
+/// Entry point for `pdfbro batch`.
 pub(crate) async fn run(global: &GlobalOpts, args: &BatchArgs) -> anyhow::Result<()> {
     if !args.input_dir.exists() {
         return Err(

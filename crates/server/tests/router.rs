@@ -22,7 +22,7 @@ use server::{AppState, build_router};
 use tower::ServiceExt;
 
 /// Multipart boundary used by the helper builder.
-const BOUNDARY: &str = "----folio-test-boundary";
+const BOUNDARY: &str = "----pdfbro-test-boundary";
 
 enum BackendBehavior {
     Pdf(Vec<u8>),
@@ -167,7 +167,7 @@ fn test_config() -> ServerConfig {
         batch_concurrency: 4,
         batch_max_active: 10,
         batch_retention_minutes: 60,
-        batch_storage_path: std::path::PathBuf::from("/tmp/folio-batches"),
+        batch_storage_path: std::path::PathBuf::from("/tmp/pdfbro-batches"),
         otel_enabled: false,
         otel_endpoint: "http://localhost:4318/v1/traces".to_string(),
         chromium_lazy_start: false,

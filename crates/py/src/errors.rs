@@ -5,14 +5,14 @@ use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 
-create_exception!(_native, FolioError, PyException);
-create_exception!(_native, ChromeNotFoundError, FolioError);
-create_exception!(_native, ChromeFetchError, FolioError);
-create_exception!(_native, ChromiumError, FolioError);
-create_exception!(_native, OfficeError, FolioError);
-create_exception!(_native, EngineDisabledError, FolioError);
-create_exception!(_native, TimeoutError, FolioError);
-create_exception!(_native, ValidationError, FolioError);
+create_exception!(_native, PdfBroError, PyException);
+create_exception!(_native, ChromeNotFoundError, PdfBroError);
+create_exception!(_native, ChromeFetchError, PdfBroError);
+create_exception!(_native, ChromiumError, PdfBroError);
+create_exception!(_native, OfficeError, PdfBroError);
+create_exception!(_native, EngineDisabledError, PdfBroError);
+create_exception!(_native, TimeoutError, PdfBroError);
+create_exception!(_native, ValidationError, PdfBroError);
 
 pub fn engine_to_py(err: EngineError) -> PyErr {
     match err {
@@ -26,9 +26,9 @@ pub fn engine_to_py(err: EngineError) -> PyErr {
         }
         // No specific Office variant in EngineError; office failures surface as
         // Internal / Io / Pdf depending on what failed. Route everything else
-        // to the generic FolioError. If finer routing matters later, the engine
+        // to the generic PdfBroError. If finer routing matters later, the engine
         // can grow an Office variant.
-        _ => FolioError::new_err(err.to_string()),
+        _ => PdfBroError::new_err(err.to_string()),
     }
 }
 
@@ -42,7 +42,7 @@ pub fn fetch_to_py(err: engine::chrome_fetch::ChromeFetchError) -> PyErr {
 }
 
 pub fn register(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add("FolioError", py.get_type_bound::<FolioError>())?;
+    m.add("PdfBroError", py.get_type_bound::<PdfBroError>())?;
     m.add("ChromeNotFoundError", py.get_type_bound::<ChromeNotFoundError>())?;
     m.add("ChromeFetchError", py.get_type_bound::<ChromeFetchError>())?;
     m.add("ChromiumError", py.get_type_bound::<ChromiumError>())?;

@@ -1,4 +1,4 @@
-//! `folio-server serve` CLI surface and runtime configuration.
+//! `pdfbro-server serve` CLI surface and runtime configuration.
 //!
 //! Resolution precedence is **flag > env var > default**. The full,
 //! resolved configuration lives in [`ServerConfig`]; the raw clap surface
@@ -25,12 +25,12 @@ pub const DEFAULT_HOST: &str = "0.0.0.0";
 /// Default bind port.
 pub const DEFAULT_PORT: u16 = 3000;
 
-/// Top-level CLI for the `folio-server` binary.
+/// Top-level CLI for the `pdfbro-server` binary.
 #[derive(Debug, Parser)]
 #[command(
-    name = "folio-server",
+    name = "pdfbro-server",
     version,
-    about = "Folio HTTP server (Gotenberg-compatible)",
+    about = "pdfbro HTTP server (Gotenberg-compatible)",
     long_about = None,
 )]
 pub struct Cli {
@@ -46,7 +46,7 @@ pub enum Command {
     Serve(ServerArgs),
 }
 
-/// CLI arguments for `folio-server serve`.
+/// CLI arguments for `pdfbro-server serve`.
 ///
 /// Each flag has an `env`-overridable default. Resolution to a fully-typed
 /// [`ServerConfig`] is performed by [`ServerConfig::resolve`].
@@ -100,7 +100,7 @@ pub struct ServerArgs {
     pub log_format: Option<LogFormat>,
 
     /// Enable OpenTelemetry trace export via OTLP HTTP.
-    #[arg(long, env = "FOLIO_OTEL_ENABLED")]
+    #[arg(long, env = "PDFBRO_OTEL_ENABLED")]
     pub otel_enabled: bool,
 
     /// OTLP HTTP endpoint for trace export.
@@ -191,7 +191,7 @@ pub struct ServerArgs {
     pub api_disable_download_from: bool,
 
     /// Override the request-correlation header name (default: `x-request-id`).
-    /// Must be a valid HTTP header name. When set, Folio reads this header from
+    /// Must be a valid HTTP header name. When set, pdfbro reads this header from
     /// incoming requests and propagates it to responses and trace spans.
     #[arg(long, value_name = "HEADER", env = "API_CORRELATION_ID_HEADER")]
     pub api_correlation_id_header: Option<String>,
@@ -379,7 +379,7 @@ impl ServerConfig {
     /// `env` is taken explicitly (rather than read from `std::env`) so unit
     /// tests can drive resolution deterministically.
     pub fn resolve(args: &ServerArgs, env: &HashMap<String, String>) -> Result<Self, ConfigError> {
-        let host_str = pick_string(args.host.as_deref(), env, "FOLIO_HOST", DEFAULT_HOST);
+        let host_str = pick_string(args.host.as_deref(), env, "PDFBRO_HOST", DEFAULT_HOST);
         let host = host_str.parse::<IpAddr>().map_err(|e| ConfigError::Parse {
             field: "host",
             message: e.to_string(),
@@ -387,7 +387,7 @@ impl ServerConfig {
 
         let port = match args.port {
             Some(p) => p,
-            None => match env.get("FOLIO_PORT") {
+            None => match env.get("PDFBRO_PORT") {
                 Some(v) => v.parse::<u16>().map_err(|e| ConfigError::Parse {
                     field: "port",
                     message: e.to_string(),
@@ -398,7 +398,7 @@ impl ServerConfig {
 
         let concurrency = match args.concurrency {
             Some(c) => c,
-            None => match env.get("FOLIO_CONCURRENCY") {
+            None => match env.get("PDFBRO_CONCURRENCY") {
                 Some(v) => v.parse::<usize>().map_err(|e| ConfigError::Parse {
                     field: "concurrency",
                     message: e.to_string(),
@@ -415,7 +415,7 @@ impl ServerConfig {
 
         let max_body_bytes = match args.max_body_bytes {
             Some(v) => v,
-            None => match env.get("FOLIO_MAX_BODY") {
+            None => match env.get("PDFBRO_MAX_BODY") {
                 Some(v) => v.parse::<usize>().map_err(|e| ConfigError::Parse {
                     field: "max_body_bytes",
                     message: e.to_string(),
@@ -427,7 +427,7 @@ impl ServerConfig {
         let request_timeout_str = pick_string(
             args.request_timeout.as_deref(),
             env,
-            "FOLIO_REQUEST_TIMEOUT",
+            "PDFBRO_REQUEST_TIMEOUT",
             "120s",
         );
         let request_timeout =
@@ -441,13 +441,13 @@ impl ServerConfig {
             .clone()
             .or_else(|| env.get("CHROME_PATH").map(PathBuf::from));
 
-        // --no-sandbox / --sandbox / FOLIO_NO_SANDBOX (truthy: 1/true/yes).
+        // --no-sandbox / --sandbox / PDFBRO_NO_SANDBOX (truthy: 1/true/yes).
         let no_sandbox = if args.no_sandbox {
             Some(true)
         } else if args.sandbox {
             Some(false)
         } else {
-            env.get("FOLIO_NO_SANDBOX").map(|v| is_truthy(v))
+            env.get("PDFBRO_NO_SANDBOX").map(|v| is_truthy(v))
         };
 
         let soffice_path = args
@@ -459,7 +459,7 @@ impl ServerConfig {
 
         let log_format = match args.log_format {
             Some(f) => f,
-            None => match env.get("FOLIO_LOG_FORMAT").map(|s| s.as_str()) {
+            None => match env.get("PDFBRO_LOG_FORMAT").map(|s| s.as_str()) {
                 Some("json") => LogFormat::Json,
                 Some("text") => LogFormat::Text,
                 Some(other) => {
@@ -474,28 +474,28 @@ impl ServerConfig {
 
         // Batch config defaults (can be extended with CLI/env later)
         let batch_max_items: usize = env
-            .get("FOLIO_BATCH_MAX_ITEMS")
+            .get("PDFBRO_BATCH_MAX_ITEMS")
             .and_then(|v| v.parse().ok())
             .unwrap_or(50);
         let batch_concurrency: usize = env
-            .get("FOLIO_BATCH_CONCURRENCY")
+            .get("PDFBRO_BATCH_CONCURRENCY")
             .and_then(|v| v.parse().ok())
             .unwrap_or(4);
         let batch_max_active: usize = env
-            .get("FOLIO_BATCH_MAX_ACTIVE")
+            .get("PDFBRO_BATCH_MAX_ACTIVE")
             .and_then(|v| v.parse().ok())
             .unwrap_or(10);
         let batch_retention_minutes: u64 = env
-            .get("FOLIO_BATCH_RETENTION_MINUTES")
+            .get("PDFBRO_BATCH_RETENTION_MINUTES")
             .and_then(|v| v.parse().ok())
             .unwrap_or(60);
         let batch_storage_path: PathBuf = env
-            .get("FOLIO_BATCH_STORAGE_PATH")
+            .get("PDFBRO_BATCH_STORAGE_PATH")
             .map(PathBuf::from)
-            .unwrap_or_else(|| std::path::PathBuf::from("/tmp/folio-batches"));
+            .unwrap_or_else(|| std::path::PathBuf::from("/tmp/pdfbro-batches"));
 
         let otel_enabled = args.otel_enabled
-            || env.get("FOLIO_OTEL_ENABLED").map(|v| is_truthy(v)).unwrap_or(false);
+            || env.get("PDFBRO_OTEL_ENABLED").map(|v| is_truthy(v)).unwrap_or(false);
 
         let otel_endpoint = pick_string(
             args.otel_endpoint.as_deref(),
@@ -877,16 +877,16 @@ mod tests {
         let cfg = ServerConfig::resolve(
             &args,
             &env(&[
-                ("FOLIO_HOST", "127.0.0.1"),
-                ("FOLIO_PORT", "8080"),
-                ("FOLIO_CONCURRENCY", "12"),
-                ("FOLIO_MAX_BODY", "1048576"),
-                ("FOLIO_REQUEST_TIMEOUT", "30s"),
+                ("PDFBRO_HOST", "127.0.0.1"),
+                ("PDFBRO_PORT", "8080"),
+                ("PDFBRO_CONCURRENCY", "12"),
+                ("PDFBRO_MAX_BODY", "1048576"),
+                ("PDFBRO_REQUEST_TIMEOUT", "30s"),
                 ("CHROME_PATH", "/opt/chrome"),
                 ("LIBREOFFICE_PATH", "/opt/soffice"),
                 ("RUST_LOG", "debug"),
-                ("FOLIO_LOG_FORMAT", "json"),
-                ("FOLIO_NO_SANDBOX", "true"),
+                ("PDFBRO_LOG_FORMAT", "json"),
+                ("PDFBRO_NO_SANDBOX", "true"),
             ]),
         )
         .unwrap();
@@ -923,11 +923,11 @@ mod tests {
         let cfg = ServerConfig::resolve(
             &args,
             &env(&[
-                ("FOLIO_HOST", "127.0.0.1"),
-                ("FOLIO_PORT", "8080"),
-                ("FOLIO_REQUEST_TIMEOUT", "30s"),
-                ("FOLIO_NO_SANDBOX", "false"),
-                ("FOLIO_LOG_FORMAT", "json"),
+                ("PDFBRO_HOST", "127.0.0.1"),
+                ("PDFBRO_PORT", "8080"),
+                ("PDFBRO_REQUEST_TIMEOUT", "30s"),
+                ("PDFBRO_NO_SANDBOX", "false"),
+                ("PDFBRO_LOG_FORMAT", "json"),
             ]),
         )
         .unwrap();
@@ -947,7 +947,7 @@ mod tests {
             sandbox: true,
             ..ServerArgs::default()
         };
-        let cfg = ServerConfig::resolve(&args, &env(&[("FOLIO_NO_SANDBOX", "true")])).unwrap();
+        let cfg = ServerConfig::resolve(&args, &env(&[("PDFBRO_NO_SANDBOX", "true")])).unwrap();
         assert_eq!(cfg.no_sandbox, Some(false));
     }
 
@@ -965,7 +965,7 @@ mod tests {
     #[test]
     fn invalid_log_format_env_rejected() {
         let args = ServerArgs::default();
-        let err = ServerConfig::resolve(&args, &env(&[("FOLIO_LOG_FORMAT", "yaml")])).unwrap_err();
+        let err = ServerConfig::resolve(&args, &env(&[("PDFBRO_LOG_FORMAT", "yaml")])).unwrap_err();
         let ConfigError::Parse { field, .. } = err;
         assert_eq!(field, "log_format");
     }
@@ -985,11 +985,11 @@ mod tests {
     fn truthy_sandbox_env_values() {
         for v in &["1", "true", "TRUE", "yes", "on"] {
             let cfg =
-                ServerConfig::resolve(&ServerArgs::default(), &env(&[("FOLIO_NO_SANDBOX", v)]))
+                ServerConfig::resolve(&ServerArgs::default(), &env(&[("PDFBRO_NO_SANDBOX", v)]))
                     .unwrap();
             assert_eq!(cfg.no_sandbox, Some(true), "value: {v}");
         }
-        let cfg = ServerConfig::resolve(&ServerArgs::default(), &env(&[("FOLIO_NO_SANDBOX", "0")]))
+        let cfg = ServerConfig::resolve(&ServerArgs::default(), &env(&[("PDFBRO_NO_SANDBOX", "0")]))
             .unwrap();
         assert_eq!(cfg.no_sandbox, Some(false));
     }

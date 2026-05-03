@@ -10,7 +10,7 @@ mod stats;
 mod workload;
 
 #[derive(Parser)]
-#[command(name = "bench", about = "Folio benchmarking tool")]
+#[command(name = "bench", about = "pdfbro benchmarking tool")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,

@@ -1,9 +1,9 @@
 services:
-  folio:
+  pdfbro:
     build:
       context: .
       dockerfile: Dockerfile
-      target: folio
+      target: pdfbro
     ports:
       - "${API_PORT:-3000}:3000"
     environment:
@@ -16,11 +16,11 @@ services:
       retries: 3
       start_period: 15s
 
-  folio-chromium:
+  pdfbro-chromium:
     build:
       context: .
       dockerfile: Dockerfile
-      target: folio-chromium
+      target: pdfbro-chromium
     ports:
       - "${API_PORT:-3000}:3000"
     environment:
@@ -28,11 +28,11 @@ services:
     tty: true
     profiles: [chromium]
 
-  folio-libreoffice:
+  pdfbro-libreoffice:
     build:
       context: .
       dockerfile: Dockerfile
-      target: folio-libreoffice
+      target: pdfbro-libreoffice
     ports:
       - "${API_PORT:-3000}:3000"
     environment:

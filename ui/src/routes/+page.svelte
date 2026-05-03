@@ -33,7 +33,7 @@
 <div style="background:{t.bg};color:{t.ink};font-family:'Geist Variable',ui-sans-serif,system-ui,sans-serif;min-height:100vh;padding:{D.gap + 4}px;transition:background 0.25s ease,color 0.25s ease">
     {#if metricsStore.loading}
         <div style="display:flex;align-items:center;justify-content:center;height:80vh;color:{t.muted}">
-            Connecting to Folio…
+            Connecting to pdfbro…
         </div>
     {:else if metricsStore.data}
         <!-- Header -->

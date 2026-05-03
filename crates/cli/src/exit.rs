@@ -1,4 +1,4 @@
-//! Exit-code mapping for the `folio` binary.
+//! Exit-code mapping for the `pdfbro` binary.
 //!
 //! The numeric codes are wired into the binary so test harnesses
 //! (`assert_cmd`) and shell pipelines can branch on them. The mapping is
@@ -33,7 +33,7 @@ impl std::fmt::Display for BatchPartialFailure {
 
 impl std::error::Error for BatchPartialFailure {}
 
-/// Process exit codes used by the `folio` binary.
+/// Process exit codes used by the `pdfbro` binary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub(crate) enum ExitCode {

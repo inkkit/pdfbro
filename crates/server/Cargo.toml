@@ -3,10 +3,10 @@ name = "server"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Folio HTTP server (Gotenberg-compatible)"
+description = "pdfbro HTTP server (Gotenberg-compatible)"
 
 [[bin]]
-name = "folio-server"
+name = "pdfbro-server"
 path = "src/main.rs"
 
 [features]
@@ -100,7 +100,7 @@ http = "1"
 hyper = { version = "0.14", features = ["full"] }
 
 # Conditional Docker support for BDD tests
-# Note: Set FOLIO_BDD_SKIP_DOCKER=1 to skip Docker-based tests
+# Note: Set PDFBRO_BDD_SKIP_DOCKER=1 to skip Docker-based tests
 testcontainers = "0.22"
 
 [[test]]

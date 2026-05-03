@@ -1,4 +1,4 @@
-# fly.toml app configuration file for Folio on Fly.io
+# fly.toml app configuration file for pdfbro on Fly.io
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
@@ -20,7 +20,7 @@ primary_region = 'bom'
   LIBREOFFICE_LAZY_START = "false"
   CHROMIUM_LAZY_START = "false"
   # Required in containers — no dbus/display available.
-  FOLIO_NO_SANDBOX = "true"
+  PDFBRO_NO_SANDBOX = "true"
 
 [[vm]]
   memory = '2gb'

@@ -20,7 +20,7 @@ pub use cache::{cache_dir, cached_chrome};
 
 use std::path::PathBuf;
 
-/// Pinned Chrome-for-Testing version. Bumped per Folio release.
+/// Pinned Chrome-for-Testing version. Bumped per pdfbro release.
 /// Single source of truth: `bindings/CHROME_VERSION` mirrors this string.
 pub const CHROME_VERSION: &str = include_str!("../../../../bindings/CHROME_VERSION");
 

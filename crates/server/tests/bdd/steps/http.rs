@@ -11,16 +11,16 @@
 use cucumber::gherkin::Table;
 use reqwest;
 
-use crate::support::world::FolioWorld;
+use crate::support::world::PdfBroWorld;
 
 /// Step: When I make a "GET" request to "/health"
-pub async fn make_request(world: &mut FolioWorld, method: String, endpoint: String) {
+pub async fn make_request(world: &mut PdfBroWorld, method: String, endpoint: String) {
     make_request_with_request_headers(world, method, endpoint, &[]).await;
 }
 
 /// Step: When I make a "GET" request to "/health" with the following header(s):
 pub async fn make_request_with_headers(
-    world: &mut FolioWorld,
+    world: &mut PdfBroWorld,
     method: String,
     endpoint: String,
     table: &cucumber::gherkin::Table,
@@ -35,7 +35,7 @@ pub async fn make_request_with_headers(
 }
 
 async fn make_request_with_request_headers(
-    world: &mut FolioWorld,
+    world: &mut PdfBroWorld,
     method: String,
     endpoint: String,
     extra_headers: &[(String, String)],
@@ -75,7 +75,7 @@ async fn make_request_with_request_headers(
 }
 
 /// Step: Then the response status code should be 200
-pub async fn check_status_code(world: &mut FolioWorld, expected: u16) {
+pub async fn check_status_code(world: &mut PdfBroWorld, expected: u16) {
     let actual = world.status_code.expect("No status code available");
     let body = String::from_utf8_lossy(world.body.as_deref().unwrap_or(&[]));
     assert_eq!(
@@ -86,7 +86,7 @@ pub async fn check_status_code(world: &mut FolioWorld, expected: u16) {
 }
 
 /// Step: Then the response header "Content-Type" should be "application/json"
-pub async fn check_header(world: &mut FolioWorld, header_name: String, expected: String) {
+pub async fn check_header(world: &mut PdfBroWorld, header_name: String, expected: String) {
     let headers = world.response_headers.as_ref().expect("No response headers available");
     let lower_name = header_name.to_lowercase();
     let actual = headers.get(&lower_name).unwrap_or_else(|| {
@@ -107,7 +107,7 @@ pub async fn check_header(world: &mut FolioWorld, header_name: String, expected:
 /// """
 /// {"status": "up"}
 /// """
-pub async fn check_json_body(world: &mut FolioWorld, expected: String) {
+pub async fn check_json_body(world: &mut PdfBroWorld, expected: String) {
     let body_str = String::from_utf8_lossy(world.body.as_ref().unwrap());
 
     // Parse both as JSON for comparison
@@ -122,7 +122,7 @@ pub async fn check_json_body(world: &mut FolioWorld, expected: String) {
 
 /// Step: When I make a POST request with form data
 pub async fn make_request_with_form(
-    world: &mut FolioWorld,
+    world: &mut PdfBroWorld,
     _method: String,
     endpoint: String,
     table: &Table,
@@ -206,7 +206,7 @@ fn extract_filename_from_disposition(disposition: &str) -> String {
 
 /// Build multipart form from Gherkin table, also extracting headers.
 async fn build_form_and_headers_from_table(
-    _world: &mut FolioWorld,
+    _world: &mut PdfBroWorld,
     table: &Table,
 ) -> (reqwest::multipart::Form, Vec<(String, String)>) {
     let mut form = reqwest::multipart::Form::new();
@@ -330,7 +330,7 @@ fn assert_json_matches(expected: &serde_json::Value, actual: &serde_json::Value,
 
 /// Step: When I make concurrent "POST" requests to "/forms/chromium/convert/html" with the following form data:
 /// Sends 10 concurrent requests and collects all responses.
-pub async fn make_concurrent_requests(world: &mut FolioWorld, _method: String, endpoint: String, table: &Table) {
+pub async fn make_concurrent_requests(world: &mut PdfBroWorld, _method: String, endpoint: String, table: &Table) {
     let url = format!("{}{}", world.base_url.as_ref().unwrap(), endpoint);
 
     // Store table data for rebuilding forms (Form doesn't implement Clone)
@@ -404,7 +404,7 @@ pub async fn make_concurrent_requests(world: &mut FolioWorld, _method: String, e
 
 /// Step: Then all responses should have status code 200
 /// Verifies all concurrent responses have the expected status code.
-pub async fn check_all_status_codes(world: &mut FolioWorld, expected: u16) {
+pub async fn check_all_status_codes(world: &mut PdfBroWorld, expected: u16) {
     let responses = world.concurrent_responses.as_ref().expect("No concurrent responses available");
 
     for (i, (status, _)) in responses.iter().enumerate() {
@@ -414,7 +414,7 @@ pub async fn check_all_status_codes(world: &mut FolioWorld, expected: u16) {
 
 /// Step: When I make a "GET" request to "/health" with basic auth "user":"pass"
 pub async fn make_request_with_basic_auth(
-    world: &mut FolioWorld,
+    world: &mut PdfBroWorld,
     method: String,
     endpoint: String,
     username: String,

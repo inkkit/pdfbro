@@ -236,7 +236,7 @@
       "feature": "chromium_convert_html",
       "scenario": "POST /forms/chromium/convert/html (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "chromium_convert_html",
@@ -247,7 +247,7 @@
       "feature": "chromium_convert_html",
       "scenario": "POST /foo/forms/chromium/convert/html (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "chromium_convert_html",
@@ -420,7 +420,7 @@
       "feature": "chromium_convert_markdown",
       "scenario": "POST /forms/chromium/convert/markdown (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "chromium_convert_markdown",
@@ -431,7 +431,7 @@
       "feature": "chromium_convert_markdown",
       "scenario": "POST /foo/forms/chromium/convert/markdown (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "chromium_convert_markdown",
@@ -669,7 +669,7 @@
       "feature": "chromium_convert_url",
       "scenario": "POST /forms/chromium/convert/url (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "chromium_convert_url",
@@ -680,7 +680,7 @@
       "feature": "chromium_convert_url",
       "scenario": "POST /foo/forms/chromium/convert/url (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "chromium_convert_url",
@@ -751,7 +751,7 @@
       "feature": "chromium_screenshot_html",
       "scenario": "POST /forms/chromium/screenshot/html (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "chromium_screenshot_html",
@@ -762,7 +762,7 @@
       "feature": "chromium_screenshot_html",
       "scenario": "POST /foo/forms/chromium/screenshot/html (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "chromium_screenshot_html",
@@ -793,7 +793,7 @@
       "feature": "chromium_screenshot_markdown",
       "scenario": "POST /forms/chromium/screenshot/markdown (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "chromium_screenshot_markdown",
@@ -804,7 +804,7 @@
       "feature": "chromium_screenshot_markdown",
       "scenario": "POST /foo/forms/chromium/screenshot/markdown (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "chromium_screenshot_url",
@@ -835,7 +835,7 @@
       "feature": "chromium_screenshot_url",
       "scenario": "POST /forms/chromium/screenshot/url (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "chromium_screenshot_url",
@@ -846,49 +846,49 @@
       "feature": "chromium_screenshot_url",
       "scenario": "POST /foo/forms/chromium/screenshot/url (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "debug",
       "scenario": "GET /debug (Disabled)",
       "status": "skip",
-      "reason": "Folio has no pprof or Go debug endpoints"
+      "reason": "pdfbro has no pprof or Go debug endpoints"
     },
     {
       "feature": "debug",
       "scenario": "GET /debug (Enabled)",
       "status": "skip",
-      "reason": "Folio has no pprof or Go debug endpoints"
+      "reason": "pdfbro has no pprof or Go debug endpoints"
     },
     {
       "feature": "debug",
       "scenario": "GET /debug (Environment based timezone)",
       "status": "skip",
-      "reason": "Folio has no pprof or Go debug endpoints"
+      "reason": "pdfbro has no pprof or Go debug endpoints"
     },
     {
       "feature": "debug",
       "scenario": "GET /debug (No Debug Data)",
       "status": "skip",
-      "reason": "Folio has no pprof or Go debug endpoints"
+      "reason": "pdfbro has no pprof or Go debug endpoints"
     },
     {
       "feature": "debug",
       "scenario": "GET /debug (Gotenberg Trace)",
       "status": "skip",
-      "reason": "Folio has no pprof or Go debug endpoints"
+      "reason": "pdfbro has no pprof or Go debug endpoints"
     },
     {
       "feature": "debug",
       "scenario": "GET /debug (Basic Auth)",
       "status": "skip",
-      "reason": "Folio has no pprof or Go debug endpoints"
+      "reason": "pdfbro has no pprof or Go debug endpoints"
     },
     {
       "feature": "debug",
       "scenario": "GET /foo/debug (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "health",
@@ -914,7 +914,7 @@
       "feature": "health",
       "scenario": "GET /foo/health (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "health",
@@ -940,7 +940,7 @@
       "feature": "health",
       "scenario": "HEAD /foo/health (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "libreoffice_convert",
@@ -1083,7 +1083,7 @@
       "feature": "libreoffice_convert",
       "scenario": "POST /forms/libreoffice/convert (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "libreoffice_convert",
@@ -1094,7 +1094,7 @@
       "feature": "libreoffice_convert",
       "scenario": "POST /foo/forms/libreoffice/convert (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "libreoffice_convert",
@@ -1207,13 +1207,13 @@
       "feature": "pdfengines_bookmarks",
       "scenario": "POST /forms/pdfengines/bookmarks/write (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "pdfengines_bookmarks",
       "scenario": "POST /forms/pdfengines/bookmarks/read (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "pdfengines_bookmarks",
@@ -1229,7 +1229,7 @@
       "feature": "pdfengines_bookmarks",
       "scenario": "POST /foo/forms/pdfengines/bookmarks/{write|read} (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "pdfengines_convert",
@@ -1291,7 +1291,7 @@
       "feature": "pdfengines_convert",
       "scenario": "POST /forms/pdfengines/convert (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "pdfengines_convert",
@@ -1302,7 +1302,7 @@
       "feature": "pdfengines_convert",
       "scenario": "POST /foo/forms/pdfengines/convert (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "pdfengines_embed",
@@ -1326,7 +1326,7 @@
       "feature": "pdfengines_embed",
       "scenario": "POST /forms/pdfengines/embed (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "pdfengines_embed",
@@ -1337,7 +1337,7 @@
       "feature": "pdfengines_embed",
       "scenario": "POST /foo/forms/pdfengines/embed (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "pdfengines_encrypt",
@@ -1363,13 +1363,13 @@
       "feature": "pdfengines_encrypt",
       "scenario": "POST /forms/pdfengines/encrypt (PDFtk - user password only)",
       "status": "skip",
-      "reason": "Folio uses lopdf/qpdf, not pdftk"
+      "reason": "pdfbro uses lopdf/qpdf, not pdftk"
     },
     {
       "feature": "pdfengines_encrypt",
       "scenario": "POST /forms/pdfengines/encrypt (PDFtk - both user and owner passwords)",
       "status": "skip",
-      "reason": "Folio uses lopdf/qpdf, not pdftk"
+      "reason": "pdfbro uses lopdf/qpdf, not pdftk"
     },
     {
       "feature": "pdfengines_encrypt",
@@ -1411,7 +1411,7 @@
       "feature": "pdfengines_encrypt",
       "scenario": "POST /forms/pdfengines/encrypt (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "pdfengines_encrypt",
@@ -1422,7 +1422,7 @@
       "feature": "pdfengines_encrypt",
       "scenario": "POST /foo/forms/pdfengines/encrypt (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "pdfengines_encrypt",
@@ -1474,7 +1474,7 @@
       "feature": "pdfengines_flatten",
       "scenario": "POST /forms/pdfengines/flatten (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "pdfengines_flatten",
@@ -1485,7 +1485,7 @@
       "feature": "pdfengines_flatten",
       "scenario": "POST /foo/forms/pdfengines/flatten (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "pdfengines_flatten",
@@ -1506,7 +1506,7 @@
       "feature": "pdfengines_merge",
       "scenario": "POST /forms/pdfengines/merge (PDFtk)",
       "status": "skip",
-      "reason": "Folio uses lopdf/qpdf, not pdftk"
+      "reason": "pdfbro uses lopdf/qpdf, not pdftk"
     },
     {
       "feature": "pdfengines_merge",
@@ -1589,7 +1589,7 @@
       "feature": "pdfengines_merge",
       "scenario": "POST /forms/pdfengines/merge (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "pdfengines_merge",
@@ -1600,7 +1600,7 @@
       "feature": "pdfengines_merge",
       "scenario": "POST /foo/forms/pdfengines/merge (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "pdfengines_merge",
@@ -1698,13 +1698,13 @@
       "feature": "pdfengines_metadata",
       "scenario": "POST /forms/pdfengines/metadata/write (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "pdfengines_metadata",
       "scenario": "POST /forms/pdfengines/metadata/read (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "pdfengines_metadata",
@@ -1720,7 +1720,7 @@
       "feature": "pdfengines_metadata",
       "scenario": "POST /foo/forms/pdfengines/metadata/{write|read} (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "pdfengines_metadata",
@@ -1756,13 +1756,13 @@
       "feature": "pdfengines_rotate",
       "scenario": "POST /forms/pdfengines/rotate (90 - All Pages - pdftk)",
       "status": "skip",
-      "reason": "Folio uses lopdf/qpdf, not pdftk"
+      "reason": "pdfbro uses lopdf/qpdf, not pdftk"
     },
     {
       "feature": "pdfengines_rotate",
       "scenario": "POST /forms/pdfengines/rotate (Specific Pages - pdftk unsupported)",
       "status": "skip",
-      "reason": "Folio uses lopdf/qpdf, not pdftk"
+      "reason": "pdfbro uses lopdf/qpdf, not pdftk"
     },
     {
       "feature": "pdfengines_rotate",
@@ -1798,7 +1798,7 @@
       "feature": "pdfengines_rotate",
       "scenario": "POST /forms/pdfengines/rotate (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "pdfengines_rotate",
@@ -1809,7 +1809,7 @@
       "feature": "pdfengines_rotate",
       "scenario": "POST /foo/forms/pdfengines/rotate (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "pdfengines_rotate",
@@ -1840,7 +1840,7 @@
       "feature": "pdfengines_split",
       "scenario": "POST /forms/pdfengines/split (Pages & Unify - PDFtk)",
       "status": "skip",
-      "reason": "Folio uses lopdf/qpdf, not pdftk"
+      "reason": "pdfbro uses lopdf/qpdf, not pdftk"
     },
     {
       "feature": "pdfengines_split",
@@ -1923,7 +1923,7 @@
       "feature": "pdfengines_split",
       "scenario": "POST /forms/pdfengines/split (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "pdfengines_split",
@@ -1934,7 +1934,7 @@
       "feature": "pdfengines_split",
       "scenario": "POST /foo/forms/pdfengines/split (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "pdfengines_split",
@@ -1985,13 +1985,13 @@
       "feature": "pdfengines_stamp",
       "scenario": "POST /forms/pdfengines/stamp (PDF - pdftk)",
       "status": "skip",
-      "reason": "Folio uses lopdf/qpdf, not pdftk"
+      "reason": "pdfbro uses lopdf/qpdf, not pdftk"
     },
     {
       "feature": "pdfengines_stamp",
       "scenario": "POST /forms/pdfengines/stamp (Text - pdftk unsupported)",
       "status": "skip",
-      "reason": "Folio uses lopdf/qpdf, not pdftk"
+      "reason": "pdfbro uses lopdf/qpdf, not pdftk"
     },
     {
       "feature": "pdfengines_stamp",
@@ -2049,7 +2049,7 @@
       "feature": "pdfengines_stamp",
       "scenario": "POST /forms/pdfengines/stamp (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "pdfengines_stamp",
@@ -2060,7 +2060,7 @@
       "feature": "pdfengines_stamp",
       "scenario": "POST /foo/forms/pdfengines/stamp (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "pdfengines_watermark",
@@ -2091,13 +2091,13 @@
       "feature": "pdfengines_watermark",
       "scenario": "POST /forms/pdfengines/watermark (PDF - pdftk)",
       "status": "skip",
-      "reason": "Folio uses lopdf/qpdf, not pdftk"
+      "reason": "pdfbro uses lopdf/qpdf, not pdftk"
     },
     {
       "feature": "pdfengines_watermark",
       "scenario": "POST /forms/pdfengines/watermark (Text - pdftk unsupported)",
       "status": "skip",
-      "reason": "Folio uses lopdf/qpdf, not pdftk"
+      "reason": "pdfbro uses lopdf/qpdf, not pdftk"
     },
     {
       "feature": "pdfengines_watermark",
@@ -2155,7 +2155,7 @@
       "feature": "pdfengines_watermark",
       "scenario": "POST /forms/pdfengines/watermark (Webhook)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "pdfengines_watermark",
@@ -2166,7 +2166,7 @@
       "feature": "pdfengines_watermark",
       "scenario": "POST /foo/forms/pdfengines/watermark (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "prometheus_metrics",
@@ -2207,7 +2207,7 @@
       "feature": "prometheus_metrics",
       "scenario": "GET /foo/prometheus/metrics (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "root",
@@ -2228,7 +2228,7 @@
       "feature": "root",
       "scenario": "GET /foo/ (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "root",
@@ -2249,7 +2249,7 @@
       "feature": "root",
       "scenario": "GET /foo/favicon.ico (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "version",
@@ -2270,49 +2270,49 @@
       "feature": "version",
       "scenario": "GET /foo/version (Root Path)",
       "status": "skip",
-      "reason": "Folio does not support configurable API root path prefix"
+      "reason": "pdfbro does not support configurable API root path prefix"
     },
     {
       "feature": "webhook",
       "scenario": "Default",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "webhook",
       "scenario": "Extra HTTP Headers",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "webhook",
       "scenario": "Synchronous",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "webhook",
       "scenario": "Webhook Events URL (Success)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "webhook",
       "scenario": "Webhook Events URL (Synchronous)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "webhook",
       "scenario": "Webhook Events URL Only (Success)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     },
     {
       "feature": "webhook",
       "scenario": "Webhook Events URL Only (Synchronous)",
       "status": "skip",
-      "reason": "Folio uses synchronous response API; no push webhook support"
+      "reason": "pdfbro uses synchronous response API; no push webhook support"
     }
   ]
 }

@@ -1,6 +1,6 @@
 //! `/openapi.json` route handler for serving the OpenAPI specification.
 //!
-//! This provides the API spec for Scalar interactive documentation.
+//! This provides the API spec for pdfbro Scalar interactive documentation.
 
 use axum::extract::State;
 use axum::Json;
@@ -33,18 +33,18 @@ fn resolve_server_url(state: &AppState) -> String {
     }
 }
 
-/// `GET /openapi.json` - Returns the OpenAPI 3.0 specification for Folio.
+/// `GET /openapi.json` - Returns the OpenAPI 3.0 specification for pdfbro.
 pub async fn openapi_spec(State(state): State<AppState>) -> Json<Value> {
     let server_url = resolve_server_url(&state);
     Json(json!({
         "openapi": "3.0.3",
         "info": {
-            "title": "Folio API",
+            "title": "pdfbro API",
             "description": "PDF generation and manipulation API (Gotenberg-compatible). Built with Rust + Chromium + LibreOffice.",
             "version": "0.1.0",
             "contact": {
-                "name": "Folio Team",
-                "url": "https://github.com/vel/folio"
+                "name": "pdfbro Team",
+                "url": "https://github.com/vel/pdfbro"
             }
         },
         "servers": [

@@ -1,4 +1,4 @@
-# BDD Test Gap Analysis: Folio vs Gotenberg
+# BDD Test Gap Analysis: pdfbro vs Gotenberg
 
 ## Test Execution Results
 
@@ -20,9 +20,9 @@
 
 ## Scenario Coverage Gap
 
-Gotenberg has **442 scenarios** across 26 feature files. Folio currently has **55 scenarios**.
+Gotenberg has **442 scenarios** across 26 feature files. pdfbro currently has **55 scenarios**.
 
-| Feature File | Gotenberg | Folio | Gap |
+| Feature File | Gotenberg | pdfbro | Gap |
 |--------------|-----------|-------|-----|
 | `chromium_concurrent.feature` | 2 | 1 | Missing: PDF-only concurrent test |
 | `chromium_convert_html.feature` | 50 | 2 | Missing: paper size, margins, landscape, scale, background, CSS page size, page ranges, header/footer, media type, wait conditions, cookies, extra headers, user agent, fail-on-status, skip network idle, PDF/A, single page, omit backgrounds, secret header, basic auth, root path, webhook, download-from |
@@ -55,7 +55,7 @@ Gotenberg has **442 scenarios** across 26 feature files. Folio currently has **5
 
 ## Missing Step Definitions
 
-The following Gotenberg Gherkin steps have **no Rust implementation** in Folio:
+The following Gotenberg Gherkin steps have **no Rust implementation** in pdfbro:
 
 ### Given (Setup)
 - `I have a (webhook|static) server` — requires test-local HTTP servers
@@ -85,9 +85,9 @@ The following Gotenberg Gherkin steps have **no Rust implementation** in Folio:
 
 ## Missing Routes / Features (No Feature File At All)
 
-These Gotenberg endpoints have **no corresponding feature file** in Folio because the server routes themselves are missing or unimplemented:
+These Gotenberg endpoints have **no corresponding feature file** in pdfbro because the server routes themselves are missing or unimplemented:
 
-| Gotenberg Endpoint | Status in Folio |
+| Gotenberg Endpoint | Status in pdfbro |
 |--------------------|-----------------|
 | `POST /forms/pdfengines/embed` | Route missing — currently tests go through `/forms/pdfengines/convert` with `embedFiles` field |
 | `POST /forms/chromium/convert/html` — `downloadFrom` field | Not implemented |
@@ -112,11 +112,11 @@ These Gotenberg endpoints have **no corresponding feature file** in Folio becaus
 
 ## Structural Differences
 
-### Folio Simplifications
+### pdfbro Simplifications
 
-1. **Step text:** Folio uses `"/forms/chromium/convert/html"` (bare path); Gotenberg uses `"Gotenberg at the "/forms/chromium/convert/html" endpoint"` (full phrase)
-2. **File paths:** Folio uses bare filenames (`index.html`, `page_1.pdf`); Gotenberg uses `testdata/` prefix (`testdata/index.html`, `testdata/page_1.pdf`)
-3. **Container model:** Folio spawns server binary directly (no Docker); Gotenberg uses `testcontainers-go`
-4. **Auth:** No basic-auth tests implemented in Folio step definitions
+1. **Step text:** pdfbro uses `"/forms/chromium/convert/html"` (bare path); Gotenberg uses `"Gotenberg at the "/forms/chromium/convert/html" endpoint"` (full phrase)
+2. **File paths:** pdfbro uses bare filenames (`index.html`, `page_1.pdf`); Gotenberg uses `testdata/` prefix (`testdata/index.html`, `testdata/page_1.pdf`)
+3. **Container model:** pdfbro spawns server binary directly (no Docker); Gotenberg uses `testcontainers-go`
+4. **Auth:** No basic-auth tests implemented in pdfbro step definitions
 5. **Webhooks:** Partially implemented (`Gotenberg-Async` header returns 202) but no actual webhook server or delivery verification
 6. **PDF validation:** No `verapdf`, `pdfinfo`, or `pdftotext` integration for deep PDF assertions

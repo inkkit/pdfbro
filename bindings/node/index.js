@@ -1,15 +1,15 @@
 'use strict';
 
-const { Folio: NativeFolio } = require('./_native.js');
+const { PdfBro: NativePdfBro } = require('./_native.js');
 
-class FolioError extends Error { constructor(m){ super(m); this.name='FolioError'; } }
-class ChromeNotFoundError extends FolioError { constructor(m){ super(m); this.name='ChromeNotFoundError'; } }
-class ChromeFetchError extends FolioError { constructor(m){ super(m); this.name='ChromeFetchError'; } }
-class ChromiumError extends FolioError { constructor(m){ super(m); this.name='ChromiumError'; } }
-class OfficeError extends FolioError { constructor(m){ super(m); this.name='OfficeError'; } }
-class EngineDisabledError extends FolioError { constructor(m){ super(m); this.name='EngineDisabledError'; } }
-class TimeoutError extends FolioError { constructor(m){ super(m); this.name='TimeoutError'; } }
-class ValidationError extends FolioError { constructor(m){ super(m); this.name='ValidationError'; } }
+class PdfBroError extends Error { constructor(m){ super(m); this.name='PdfBroError'; } }
+class ChromeNotFoundError extends PdfBroError { constructor(m){ super(m); this.name='ChromeNotFoundError'; } }
+class ChromeFetchError extends PdfBroError { constructor(m){ super(m); this.name='ChromeFetchError'; } }
+class ChromiumError extends PdfBroError { constructor(m){ super(m); this.name='ChromiumError'; } }
+class OfficeError extends PdfBroError { constructor(m){ super(m); this.name='OfficeError'; } }
+class EngineDisabledError extends PdfBroError { constructor(m){ super(m); this.name='EngineDisabledError'; } }
+class TimeoutError extends PdfBroError { constructor(m){ super(m); this.name='TimeoutError'; } }
+class ValidationError extends PdfBroError { constructor(m){ super(m); this.name='ValidationError'; } }
 
 const tagMap = {
   ChromeNotFound: ChromeNotFoundError,
@@ -40,21 +40,21 @@ function wrapMethod(fn) {
   };
 }
 
-class Folio {
+class PdfBro {
   constructor(inner) { this._inner = inner; }
   static async create(opts) {
     try {
-      const inner = await NativeFolio.create(opts);
-      return new Folio(inner);
+      const inner = await NativePdfBro.create(opts);
+      return new PdfBro(inner);
     } catch (e) { throw decorate(e); }
   }
 }
 for (const m of ['htmlToPdf', 'urlToPdf', 'markdownToPdf', 'officeToPdf', 'close']) {
-  Folio.prototype[m] = wrapMethod(function(...args) { return this._inner[m](...args); });
+  PdfBro.prototype[m] = wrapMethod(function(...args) { return this._inner[m](...args); });
 }
 
 module.exports = {
-  Folio,
-  FolioError, ChromeNotFoundError, ChromeFetchError, ChromiumError,
+  PdfBro,
+  PdfBroError, ChromeNotFoundError, ChromeFetchError, ChromiumError,
   OfficeError, EngineDisabledError, TimeoutError, ValidationError,
 };

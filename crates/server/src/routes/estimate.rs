@@ -73,8 +73,8 @@ pub struct Comparison {
     pub gotenberg_mb: f64,
     /// Estimated wkhtmltopdf size (MB).
     pub wkhtmltopdf_mb: f64,
-    /// Size factor vs Folio estimate.
-    pub factor_vs_folio: f64,
+    /// Size factor vs pdfbro estimate.
+    pub factor_vs_pdfbro: f64,
 }
 
 /// Batch estimation request.
@@ -220,7 +220,7 @@ pub async fn estimate(
     let comparison = Some(Comparison {
         gotenberg_mb: estimated_mb * 1.5, // Gotenberg typically larger
         wkhtmltopdf_mb: estimated_mb * 0.7, // wkhtmltopdf typically smaller
-        factor_vs_folio: 1.0,
+        factor_vs_pdfbro: 1.0,
     });
 
     info!(

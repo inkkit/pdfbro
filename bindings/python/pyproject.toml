@@ -3,9 +3,9 @@ requires = ["maturin>=1.7,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "folio"
+name = "pdfbro"
 version = "0.1.0"
-description = "Folio: Rust-native PDF conversion, embeddable in Python."
+description = "pdfbro: Rust-native PDF conversion, embeddable in Python."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.8"
@@ -16,12 +16,12 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/vel/folio"
-Repository = "https://github.com/vel/folio"
+Homepage = "https://github.com/vel/pdfbro"
+Repository = "https://github.com/vel/pdfbro"
 
 [tool.maturin]
 manifest-path = "../../crates/py/Cargo.toml"
-module-name = "folio._native"
+module-name = "pdfbro._native"
 features = ["pyo3/extension-module"]
 python-source = "."
 strip = true

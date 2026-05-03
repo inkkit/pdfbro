@@ -3,10 +3,10 @@ name = "js"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Folio Node.js bindings (napi-rs)"
+description = "pdfbro Node.js bindings (napi-rs)"
 
 [lib]
-name = "folio_js"
+name = "pdfbro_js"
 crate-type = ["cdylib"]
 
 [features]

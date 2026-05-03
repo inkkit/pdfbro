@@ -60,6 +60,6 @@ All tests now pass! 🎉
 
 **Command to run all tests:**
 ```bash
-docker build -f Dockerfile.test -t folio-test-runner .
-docker run --rm folio-test-runner cargo test --release -- --ignored --test-threads=1
+docker build -f Dockerfile.test -t pdfbro-test-runner .
+docker run --rm pdfbro-test-runner cargo test --release -- --ignored --test-threads=1
 ```

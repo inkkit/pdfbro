@@ -31,7 +31,7 @@ pub use watermark::{Position, WatermarkKind, WatermarkOptions, watermark};
 
 /// Producer string written to every output PDF.
 pub(crate) fn producer_string() -> String {
-    format!("folio/{}", env!("CARGO_PKG_VERSION"))
+    format!("pdfbro/{}", env!("CARGO_PKG_VERSION"))
 }
 
 /// Parse an input byte stream and uniformly reject encrypted documents.
@@ -56,7 +56,7 @@ pub(crate) fn finalize(doc: Document) -> EngineResult<Vec<u8>> {
 
 /// Like [`finalize`] but allows overriding the `/Producer` field. When
 /// `producer_override` is `Some(s)`, `s` is stamped instead of the default
-/// `folio/<version>` string. Pass `None` to use the default.
+/// `pdfbro/<version>` string. Pass `None` to use the default.
 pub(crate) fn finalize_with_producer(
     mut doc: Document,
     producer_override: Option<&str>,

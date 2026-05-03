@@ -1,46 +1,46 @@
-# Folio vs Gotenberg — In-Depth Feature Comparison
+# pdfbro vs Gotenberg — In-Depth Feature Comparison
 
 > **Snapshot date:** 2026-05-01
-> **Folio commit:** `spec/operator-console` (HEAD: `209a444`)
+> **pdfbro commit:** `spec/operator-console` (HEAD: `209a444`)
 > **Gotenberg snapshot:** vendored at `tmp/gotenberg/`
 > **Companion:** `docs/markdown-plus.md` (the new Markdown variation
 > referenced in this comparison's recommendations).
 
 This document is an audit, not a sales sheet. It records what each project
-does *today*, what Folio has chosen not to do (deliberately or not), and
+does *today*, what pdfbro has chosen not to do (deliberately or not), and
 what is missing relative to Gotenberg parity. It is structured so that any
-single section can be read in isolation by someone deciding whether Folio
+single section can be read in isolation by someone deciding whether pdfbro
 is ready for their workload.
 
 ---
 
 ## 0. TL;DR
 
-| Axis                                    | Folio                              | Gotenberg                          | Verdict                |
+| Axis                                    | pdfbro                              | Gotenberg                          | Verdict                |
 |-----------------------------------------|------------------------------------|------------------------------------|------------------------|
 | Core conversions (HTML/URL/MD/Office)   | ✅ Implemented                     | ✅ Implemented                     | **Parity**             |
 | Screenshot routes (PNG/JPEG/WebP)       | ✅ Implemented                     | ✅ Implemented                     | **Parity**             |
-| PDF ops (merge/split/flatten/rotate/…)  | ✅ Implemented (single backend)    | ✅ Implemented (multi backend)     | Folio behind on choice |
+| PDF ops (merge/split/flatten/rotate/…)  | ✅ Implemented (single backend)    | ✅ Implemented (multi backend)     | pdfbro behind on choice |
 | PDF/A & PDF/UA                          | ✅ via Ghostscript                 | ✅ via LibreOffice + engines       | Different paths, OK    |
 | Metadata read/write                     | ✅                                 | ✅                                 | **Parity**             |
 | Bookmarks read/write                    | ✅                                 | ✅                                 | **Parity**             |
 | Encrypt                                 | ✅                                 | ✅                                 | **Parity**             |
-| Watermark / stamp                       | ✅ (watermark) / partial (stamp)   | ✅ both                            | Folio behind on stamp  |
-| Webhook async delivery                  | 🚧 Scaffolded, callback TODO       | ✅ Production-grade                | **Folio missing**      |
-| Batch API                               | 🚧 Endpoints + worker, ZIP TODO    | ❌ Not offered                     | Folio ahead (in spec)  |
+| Watermark / stamp                       | ✅ (watermark) / partial (stamp)   | ✅ both                            | pdfbro behind on stamp  |
+| Webhook async delivery                  | 🚧 Scaffolded, callback TODO       | ✅ Production-grade                | **pdfbro missing**      |
+| Batch API                               | 🚧 Endpoints + worker, ZIP TODO    | ❌ Not offered                     | pdfbro ahead (in spec)  |
 | Prometheus metrics                      | ✅ Rich set                        | ✅ Standard set                    | **Parity**             |
 | Structured logs                         | ✅ JSON/text + request IDs         | ✅ slog                            | **Parity**             |
 | OpenTelemetry traces                    | ✅ OTLP HTTP                       | ✅ OTel SDK                        | **Parity**             |
-| Operator console (live UI)              | ✅ Svelte SPA, SSE, charts         | ❌ JSON only                       | **Folio ahead**        |
+| Operator console (live UI)              | ✅ Svelte SPA, SSE, charts         | ❌ JSON only                       | **pdfbro ahead**        |
 | Auth (Basic)                            | ✅                                 | ✅                                 | **Parity**             |
-| TLS                                     | ❌ (rely on reverse proxy)         | ✅ (cert/key flags)                | **Folio missing**      |
-| SSRF / download allow-deny              | partial                            | ✅ rich                            | **Folio behind**       |
-| Multi-engine fallback per op            | ❌ (lopdf only)                    | ✅ qpdf/pdfcpu/pdftk/exiftool      | **Folio missing**      |
+| TLS                                     | ❌ (rely on reverse proxy)         | ✅ (cert/key flags)                | **pdfbro missing**      |
+| SSRF / download allow-deny              | partial                            | ✅ rich                            | **pdfbro behind**       |
+| Multi-engine fallback per op            | ❌ (lopdf only)                    | ✅ qpdf/pdfcpu/pdftk/exiftool      | **pdfbro missing**      |
 | Python / Node bindings                  | ❌ Empty crates                    | ❌ Not offered                     | Both miss              |
-| CLI (convert/merge/split/…)             | ✅                                 | ❌ Not offered                     | **Folio ahead**        |
-| Library (Rust crate) usage              | ✅                                 | ❌ Server-only                     | **Folio ahead**        |
+| CLI (convert/merge/split/…)             | ✅                                 | ❌ Not offered                     | **pdfbro ahead**        |
+| Library (Rust crate) usage              | ✅                                 | ❌ Server-only                     | **pdfbro ahead**        |
 
-**Bottom line.** Folio reaches roughly **85% of Gotenberg's HTTP-surface
+**Bottom line.** pdfbro reaches roughly **85% of Gotenberg's HTTP-surface
 capability** while exceeding it on observability, in-process usage, and
 CLI ergonomics. The remaining 15% — webhook callback delivery, multi-engine
 fallback chains, TLS, fine-grained SSRF controls, advanced Chromium wait
@@ -63,19 +63,19 @@ clean drop-in replacement claim today.
 - **Distribution:** Single binary inside a Debian image with all engines
   preinstalled
 
-### 1.2 Folio
+### 1.2 pdfbro
 - **Language:** Rust
 - **Framework:** axum / tower
 - **Concurrency model:** Tokio tasks, semaphore-bounded; engines wrapped in
   `SupervisedEngine` with lazy-start / idle-shutdown
-- **Rendering:** Chromium via `chromiumoxide` (CDP) — Folio holds the
+- **Rendering:** Chromium via `chromiumoxide` (CDP) — pdfbro holds the
   client; LibreOffice via `soffice` subprocess
 - **Deployment shape:** Container *or* binary *or* Rust library *or* CLI
-- **Distribution:** Multi-target Dockerfile (`folio`, `folio-chromium`,
-  `folio-libreoffice`, `folio-cloudrun`, `folio-lambda`)
+- **Distribution:** Multi-target Dockerfile (`pdfbro`, `pdfbro-chromium`,
+  `pdfbro-libreoffice`, `pdfbro-cloudrun`, `pdfbro-lambda`)
 
 ### 1.3 What this means in practice
-Folio's choice to live as a *library* is the real architectural divergence
+pdfbro's choice to live as a *library* is the real architectural divergence
 — it is a strict superset of "PDF microservice", whereas Gotenberg only
 exists as the microservice form. That choice shapes a lot of what
 follows: the supervised-engine wrapper, the operator console, the CLI all
@@ -87,7 +87,7 @@ flow from "we are not married to the HTTP surface."
 
 ### 2.1 Endpoint matrix
 
-| Route                                             | Folio | Gotenberg | Notes |
+| Route                                             | pdfbro | Gotenberg | Notes |
 |---------------------------------------------------|-------|-----------|-------|
 | `POST /forms/chromium/convert/url`                | ✅    | ✅        | parity |
 | `POST /forms/chromium/convert/html`               | ✅    | ✅        | parity |
@@ -106,27 +106,27 @@ flow from "we are not married to the HTTP surface."
 | `POST /forms/pdfengines/bookmarks/read`           | ✅    | ✅        | parity |
 | `POST /forms/pdfengines/bookmarks/write`          | ✅    | ✅        | parity |
 | `POST /forms/pdfengines/encrypt`                  | ✅    | ✅        | parity |
-| `POST /forms/pdfengines/embed`                    | ❌    | ✅        | **Folio missing** — attach files inside PDF |
+| `POST /forms/pdfengines/embed`                    | ❌    | ✅        | **pdfbro missing** — attach files inside PDF |
 | `POST /forms/pdfengines/watermark`                | ✅    | ✅        | parity |
-| `POST /forms/pdfengines/stamp`                    | 🚧    | ✅        | **Folio partial** — overlay-on-pages variant |
-| `POST /forms/batch/submit`                        | 🚧    | ❌        | **Folio ahead in spec** |
-| `GET  /forms/batch/{id}/status`                   | 🚧    | ❌        | **Folio ahead in spec** |
-| `GET  /forms/batch/{id}/download`                 | 🚧    | ❌        | **Folio ahead in spec** |
+| `POST /forms/pdfengines/stamp`                    | 🚧    | ✅        | **pdfbro partial** — overlay-on-pages variant |
+| `POST /forms/batch/submit`                        | 🚧    | ❌        | **pdfbro ahead in spec** |
+| `GET  /forms/batch/{id}/status`                   | 🚧    | ❌        | **pdfbro ahead in spec** |
+| `GET  /forms/batch/{id}/download`                 | 🚧    | ❌        | **pdfbro ahead in spec** |
 | `GET  /health`                                    | ✅    | ✅        | parity |
-| `GET  /version`                                   | ✅    | ❌        | **Folio ahead** (Gotenberg ships version on root) |
+| `GET  /version`                                   | ✅    | ❌        | **pdfbro ahead** (Gotenberg ships version on root) |
 | `GET  /prometheus/metrics`                        | ✅    | ✅        | parity |
-| `GET  /_/`, `/_/sse`, `/_/metrics.json`           | ✅    | ❌        | **Folio ahead** — operator console |
-| Webhook headers (`Webhook-Url`, etc.)             | 🚧    | ✅        | callback delivery TODO in Folio |
+| `GET  /_/`, `/_/sse`, `/_/metrics.json`           | ✅    | ❌        | **pdfbro ahead** — operator console |
+| Webhook headers (`Webhook-Url`, etc.)             | 🚧    | ✅        | callback delivery TODO in pdfbro |
 
 **Visible gaps in HTTP surface:** `embed`, full `stamp`, complete webhook
 callback delivery, batch ZIP/merge output. Everything else exists.
 
 ### 2.2 Request/response shape
 
-Gotenberg insists on multipart/form-data for *every* conversion. Folio
+Gotenberg insists on multipart/form-data for *every* conversion. pdfbro
 follows the same convention for all core routes — operators using
 Gotenberg client SDKs (`gotenberg-php`, `gotenberg-js-client`,
-`gotenberg-go-client`) can point at Folio with only a base-URL change for
+`gotenberg-go-client`) can point at pdfbro with only a base-URL change for
 the parity routes. This is a deliberate compatibility choice, not an
 accident.
 
@@ -136,7 +136,7 @@ accident.
 
 ### 3.1 Chromium — PDF generation
 
-| Feature                                 | Folio | Gotenberg | Notes |
+| Feature                                 | pdfbro | Gotenberg | Notes |
 |-----------------------------------------|-------|-----------|-------|
 | Paper size (named + custom WxH)         | ✅    | ✅        | parity |
 | Margins (per side, inches)              | ✅    | ✅        | parity |
@@ -148,16 +148,16 @@ accident.
 | Page ranges                             | ✅    | ✅        | parity |
 | Custom header/footer HTML w/ tokens     | ✅    | ✅        | parity |
 | Prefer CSS page size                    | ✅    | ✅        | parity |
-| Tagged PDF / outline                    | partial | ✅      | Folio passes flags but limited testing |
+| Tagged PDF / outline                    | partial | ✅      | pdfbro passes flags but limited testing |
 | Cookies (with sameSite)                 | ✅    | ✅        | parity |
-| Extra HTTP headers (scoped)             | partial | ✅      | Folio: flat headers; Gotenberg: regex scope |
+| Extra HTTP headers (scoped)             | partial | ✅      | pdfbro: flat headers; Gotenberg: regex scope |
 | User-Agent override                     | ✅    | ✅        | parity |
 | Emulated media type                     | ✅    | ✅        | parity |
-| Emulated media features (color-scheme…) | ❌    | ✅        | **Folio missing** |
+| Emulated media features (color-scheme…) | ❌    | ✅        | **pdfbro missing** |
 
 ### 3.2 Chromium — wait / failure conditions
 
-| Feature                                          | Folio | Gotenberg |
+| Feature                                          | pdfbro | Gotenberg |
 |--------------------------------------------------|-------|-----------|
 | `waitDelay` (fixed)                              | ✅    | ✅        |
 | `waitForExpression` / custom JS predicate        | partial | ✅      |
@@ -178,7 +178,7 @@ been implemented past the stub. **Recommendation:** prioritise.
 ### 3.3 Chromium — Screenshots
 
 Both projects support PNG/JPEG/WebP, dimensions, JPEG quality, viewport
-clipping, optimize-for-speed. **Parity.** The only gap is that Folio's
+clipping, optimize-for-speed. **Parity.** The only gap is that pdfbro's
 "capture beyond viewport" code path has fewer integration tests covered
 than Gotenberg's.
 
@@ -187,14 +187,14 @@ than Gotenberg's.
 Both implementations are minimal. Both produce a wrapped HTML document and
 hand it to Chromium. Differences:
 
-- **Folio:** `pulldown_cmark` with `Options::all()` + a single embedded
+- **pdfbro:** `pulldown_cmark` with `Options::all()` + a single embedded
   `markdown.css`. No template injection point.
 - **Gotenberg:** `gomarkdown` + `bluemonday` (sanitised HTML). Requires
   the user to supply a wrapper HTML file (named `index.html` in the
   multipart) that pulls the rendered Markdown in via a documented
   mechanism, so the user can inject CSS/fonts/JS.
 
-Each has a different opinion: Folio is "we own the template, give us
+Each has a different opinion: pdfbro is "we own the template, give us
 markdown"; Gotenberg is "you own the template, give us markdown + a
 template."
 
@@ -209,7 +209,7 @@ Both projects exercise LibreOffice's full ~100-format input matrix (DOC,
 DOCX, ODT, ODS, ODP, XLS, XLSX, PPT, PPTX, RTF, CSV, EPUB, etc.). The
 difference is in **export options**:
 
-| Export option                               | Folio | Gotenberg |
+| Export option                               | pdfbro | Gotenberg |
 |---------------------------------------------|-------|-----------|
 | Landscape                                   | ✅    | ✅        |
 | Native page ranges                          | partial | ✅      |
@@ -234,7 +234,7 @@ explicit TODOs.
 
 Gotenberg's killer feature here is **per-operation engine selection with
 fallback chains**: `qpdf → pdfcpu → pdftk` for merge, etc. If qpdf
-chokes on a malformed PDF, pdfcpu retries transparently. Folio uses a
+chokes on a malformed PDF, pdfcpu retries transparently. pdfbro uses a
 single backend (`lopdf`, pure Rust) for *every* op, which is operationally
 simpler but means a malformed input has no recovery path other than
 "return an error and let the caller deal with it."
@@ -243,12 +243,12 @@ This is the largest pure-feature gap. Three options for closing it:
 
 - **(A) Re-implement engine fallback in Rust** by shelling out to qpdf /
   pdfcpu / pdftk binaries. Cheapest. Loses some of the "no external tools"
-  posture but Folio already shells out to `soffice` and `gs`, so the
+  posture but pdfbro already shells out to `soffice` and `gs`, so the
   posture is already mixed.
 - **(B) Stay single-backend and harden lopdf** — file upstream patches for
   the malformed-input cases that arise. Highest engineering cost, slowest
   return.
-- **(C) Punt** — say in the README that Folio is "well-formed PDF only"
+- **(C) Punt** — say in the README that pdfbro is "well-formed PDF only"
   and let users pre-validate. Honest, but caps the addressable workload.
 
 Spec (archived spec) exists and points at (A).
@@ -262,7 +262,7 @@ to a user-supplied URL with retry logic, allow/deny lists (literal and
 regex), private/public IP filtering for SSRF, configurable retry windows,
 sync vs async modes.
 
-Folio has the **shape** of this — `Webhook-Url` and friends parse,
+pdfbro has the **shape** of this — `Webhook-Url` and friends parse,
 `crates/server/src/webhook/` exists, the worker runs — but the actual
 callback delivery path is marked TODO. Until that lands, an operator
 sending `Webhook-Url` headers will see a 202 and then... nothing.
@@ -272,9 +272,9 @@ gap is implementation, not design.
 
 ---
 
-## 5. Batch API (Folio-only)
+## 5. Batch API (pdfbro-only)
 
-Folio has a server-side batch surface that Gotenberg has no equivalent
+pdfbro has a server-side batch surface that Gotenberg has no equivalent
 for: submit a JSON manifest of N jobs, get back a `batch_id`, poll for
 progress, download a ZIP when done. The endpoints exist; the worker runs;
 ZIP packaging and per-item-failure semantics are TODO.
@@ -283,15 +283,15 @@ This is a real differentiator, not just parity-plus. Worth finishing.
 
 ---
 
-## 6. Operator console (Folio-only)
+## 6. Operator console (pdfbro-only)
 
-This is where Folio is unambiguously ahead.
+This is where pdfbro is unambiguously ahead.
 
 Gotenberg gives you `/health` (JSON) and `/prometheus/metrics`
 (Prometheus text). That is the entire operability surface. To get any
 actual visibility you wire it into Grafana yourself.
 
-Folio ships a Svelte SPA at `/_/` driven by Server-Sent Events that
+pdfbro ships a Svelte SPA at `/_/` driven by Server-Sent Events that
 shows, live, in one screen:
 
 - RPS, p95 latency, error %, in-flight count
@@ -307,7 +307,7 @@ shows, live, in one screen:
 The recent commit history (last 30 commits, all dashboard-focused) shows
 this is the team's current focus and it is in active polish.
 
-This shifts the value proposition: Folio is not "Gotenberg in Rust", it
+This shifts the value proposition: pdfbro is not "Gotenberg in Rust", it
 is "Gotenberg-compatible PDF service that you can run without immediately
 needing a dashboards engineer."
 
@@ -316,10 +316,10 @@ needing a dashboards engineer."
 ## 7. Configuration / CLI flags
 
 Gotenberg has a wide and stable flag surface (api, webhook, pdfengines,
-prometheus, basic auth). Folio's flags cover the same axes but are
+prometheus, basic auth). pdfbro's flags cover the same axes but are
 narrower:
 
-| Knob                                        | Folio | Gotenberg |
+| Knob                                        | pdfbro | Gotenberg |
 |---------------------------------------------|-------|-----------|
 | API port / bind / TLS                       | port + bind ✅, TLS ❌ | ✅ |
 | Body limit (multipart)                      | ✅    | ✅        |
@@ -347,7 +347,7 @@ and SSRF flags. Spec (archived spec) already exists.
 
 ## 8. Auth & security posture
 
-| Concern                                    | Folio | Gotenberg |
+| Concern                                    | pdfbro | Gotenberg |
 |--------------------------------------------|-------|-----------|
 | HTTP Basic Auth                            | ✅    | ✅        |
 | Token / JWT auth                           | ❌    | ❌        |
@@ -361,9 +361,9 @@ and SSRF flags. Spec (archived spec) already exists.
 | Multipart body limit enforcement           | ✅    | ✅        |
 | Memory-safe core                           | ✅ (Rust) | ❌ (Go GC) |
 
-Folio's Rust core is a real security advantage at the parser level;
+pdfbro's Rust core is a real security advantage at the parser level;
 Gotenberg's mature SSRF/download/webhook filter stack is a real security
-advantage at the network edge. They are not the same thing and Folio
+advantage at the network edge. They are not the same thing and pdfbro
 should not pretend memory-safety substitutes for the network filters —
 both matter.
 
@@ -371,7 +371,7 @@ both matter.
 
 ## 9. Observability
 
-| Surface                              | Folio | Gotenberg |
+| Surface                              | pdfbro | Gotenberg |
 |--------------------------------------|-------|-----------|
 | Structured logs (JSON / text)        | ✅    | ✅        |
 | Request ID propagation               | ✅    | ✅        |
@@ -382,25 +382,25 @@ both matter.
 | SSE event stream                     | ✅    | ❌        |
 | Per-engine health endpoint detail    | ✅ (per-engine) | ✅ |
 
-**Parity, with Folio ahead on the live UI.** No gaps to call out here.
+**Parity, with pdfbro ahead on the live UI.** No gaps to call out here.
 
 ---
 
 ## 10. Distribution surfaces
 
-| Surface                          | Folio | Gotenberg |
+| Surface                          | pdfbro | Gotenberg |
 |----------------------------------|-------|-----------|
 | HTTP server (Docker)             | ✅    | ✅        |
 | HTTP server (raw binary)         | ✅    | ❌ (officially Docker-only) |
-| CLI binary (`folio convert …`)   | ✅    | ❌        |
+| CLI binary (`pdfbro convert …`)   | ✅    | ❌        |
 | Rust library (in-process)        | ✅    | ❌        |
 | Python bindings                  | ❌ (placeholder) | ❌ |
 | Node.js bindings                 | ❌ (placeholder) | ❌ |
-| Cloud Run image                  | ✅ (`folio-cloudrun`) | ❌ |
-| AWS Lambda image                 | ✅ (`folio-lambda`) | ❌ |
+| Cloud Run image                  | ✅ (`pdfbro-cloudrun`) | ❌ |
+| AWS Lambda image                 | ✅ (`pdfbro-lambda`) | ❌ |
 | Slim images (Chromium-only / LO-only) | ✅                | ❌ |
 
-Folio has done real work here that Gotenberg has explicitly said no to
+pdfbro has done real work here that Gotenberg has explicitly said no to
 (Gotenberg's stance is that it is a Docker product; everything else is
 the user's problem). The *empty* Python/Node bindings undercut that
 narrative — the placeholder crates (`crates/py/`, `crates/js/`) imply a
@@ -412,7 +412,7 @@ feature."
 
 ## 11. Test coverage
 
-- **Folio:** ~43 unit tests passing across types, engine, pdfops, routes;
+- **pdfbro:** ~43 unit tests passing across types, engine, pdfops, routes;
   ~25 BDD scenarios ported from Gotenberg (runner partially complete);
   5 e2e smoke tests; Docker-based PDF/A validation via verapdf.
   `TEST_STATUS.md` and `TEST_ISSUES.md` are surprisingly honest about
@@ -421,13 +421,13 @@ feature."
   years; thousands of cumulative production deployments worth of
   battle-testing.
 
-The maturity gap is real. Folio's BDD harness is the right move (re-using
+The maturity gap is real. pdfbro's BDD harness is the right move (re-using
 Gotenberg's scenarios is the cheapest path to credibility), it just needs
 to finish.
 
 ---
 
-## 12. What Folio did well, with credit
+## 12. What pdfbro did well, with credit
 
 - **Library-first architecture.** Being usable as a Rust crate, a CLI,
   and a server is a substantial superset of Gotenberg's positioning, and
@@ -447,7 +447,7 @@ to finish.
 - **Honest test status docs.** `TEST_STATUS.md` and `TEST_ISSUES.md`
   exist and are not propaganda. Easy to underestimate how rare this is.
 
-## 13. What Folio did not do, deliberately
+## 13. What pdfbro did not do, deliberately
 
 - **No multi-engine fallback** for PDF ops. Single backend (`lopdf`)
   keeps the dependency surface small. Defensible until you hit the first
@@ -463,7 +463,7 @@ to finish.
 - **No cross-request server-side state.** Includes resolve from the
   upload only. This is a security posture, not laziness.
 
-## 14. What Folio did not do, but should
+## 14. What pdfbro did not do, but should
 
 In rough priority order (cheapest-impact-per-LOC first):
 
@@ -491,17 +491,17 @@ In rough priority order (cheapest-impact-per-LOC first):
    Gotenberg parity, but uses the operator-console + observability
    investment as a foundation.
 
-## 15. What Folio did not do, and arguably should not
+## 15. What pdfbro did not do, and arguably should not
 
 - **TLS in-process.** Use a reverse proxy. Adding TLS to the binary adds
-  cert rotation, OCSP stapling, ALPN — none of which Folio is positioned
+  cert rotation, OCSP stapling, ALPN — none of which pdfbro is positioned
   to do better than nginx/Caddy/envoy. The current "not implemented"
   status is correct; it should be made *explicit* in the README.
 - **OAuth / JWT / RBAC.** PDF services are not where you want to be doing
   identity. Stay with Basic Auth + reverse-proxy auth headers; document
   the pattern.
 - **A workflow / DAG engine on top of batch.** Out of scope. Forever.
-- **A web-UI document editor.** Folio's UI is an operator console, not an
+- **A web-UI document editor.** pdfbro's UI is an operator console, not an
   end-user product. The line should stay there.
 
 ---
@@ -547,7 +547,7 @@ In rough priority order (cheapest-impact-per-LOC first):
 
 ### Should *not* be added
 - TLS in-process
-- Identity/RBAC inside Folio
+- Identity/RBAC inside pdfbro
 - Workflow/DAG engine on top of batch
 - A document editor
 - A second Markdown route that is "just like the first but with an

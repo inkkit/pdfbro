@@ -1,4 +1,4 @@
-//! Shared types and error model for the Folio engine.
+//! Shared types and error model for the pdfbro engine.
 //!
 //! Implementation of `docs/specs/10-engine-types.md`. All other engine
 //! submodules and downstream crates build on these types; nothing else

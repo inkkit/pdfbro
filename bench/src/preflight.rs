@@ -31,19 +31,19 @@ fn exec_in_container(container: &str, cmd: &[&str]) -> anyhow::Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
-pub fn check(folio_container: &str, gotenberg_container: &str) -> anyhow::Result<()> {
-    let folio = get_versions(folio_container)?;
+pub fn check(pdfbro_container: &str, gotenberg_container: &str) -> anyhow::Result<()> {
+    let pdfbro = get_versions(pdfbro_container)?;
     let gotenberg = get_versions(gotenberg_container)?;
 
-    println!("Folio     — Chrome: {}  LibreOffice: {}", folio.chrome, folio.libreoffice);
+    println!("pdfbro     — Chrome: {}  LibreOffice: {}", pdfbro.chrome, pdfbro.libreoffice);
     println!("Gotenberg — Chrome: {}  LibreOffice: {}", gotenberg.chrome, gotenberg.libreoffice);
 
-    let folio_major = major_version(&folio.chrome);
+    let pdfbro_major = major_version(&pdfbro.chrome);
     let gotenberg_major = major_version(&gotenberg.chrome);
-    if folio_major != gotenberg_major {
+    if pdfbro_major != gotenberg_major {
         anyhow::bail!(
-            "Chrome version mismatch: Folio={} Gotenberg={}. Aborting.",
-            folio.chrome, gotenberg.chrome
+            "Chrome version mismatch: pdfbro={} Gotenberg={}. Aborting.",
+            pdfbro.chrome, gotenberg.chrome
         );
     }
 

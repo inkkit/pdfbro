@@ -109,11 +109,11 @@ fn init_otel_layer(endpoint: &str) -> anyhow::Result<()> {
         .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
         .with_resource(Resource::new([KeyValue::new(
             "service.name",
-            "folio-server",
+            "pdfbro-server",
         )]))
         .build();
 
-    let tracer = provider.tracer("folio-server");
+    let tracer = provider.tracer("pdfbro-server");
     opentelemetry::global::set_tracer_provider(provider);
 
     let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);

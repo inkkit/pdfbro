@@ -1,8 +1,8 @@
-"""Folio — Rust-native PDF conversion."""
+"""pdfbro — Rust-native PDF conversion."""
 from ._native import (
-    Folio,
-    AsyncFolio,
-    FolioError,
+    PdfBro,
+    AsyncPdfBro,
+    PdfBroError,
     ChromeNotFoundError,
     ChromeFetchError,
     ChromiumError,
@@ -13,9 +13,9 @@ from ._native import (
 )
 
 __all__ = [
-    "Folio",
-    "AsyncFolio",
-    "FolioError",
+    "PdfBro",
+    "AsyncPdfBro",
+    "PdfBroError",
     "ChromeNotFoundError",
     "ChromeFetchError",
     "ChromiumError",

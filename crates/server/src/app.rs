@@ -292,7 +292,7 @@ pub fn build_router(state: AppState, config: &ServerConfig) -> Router {
     let scalar_config = json!({
         "url": "/openapi.json",
         "metaData": {
-            "title": "Folio API",
+            "title": "pdfbro API",
             "description": "PDF generation API (Gotenberg-compatible)",
             "favicon": "/favicon.ico"
         },

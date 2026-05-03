@@ -1,4 +1,4 @@
-//! CLI startup banner for `folio`.
+//! CLI startup banner for `pdfbro`.
 //!
 //! Prints a decorative ASCII logo and version on startup when
 //! stdout is a TTY and the log format is text.  Suppressed when
@@ -27,7 +27,7 @@ pub fn print(global: &GlobalOpts) {
     println!(
         "\n{}\n\n    {}  {}\n    {}: {}\n    {}\n",
         ascii_logo(),
-        color("Folio", "36;1", c),
+        color("pdfbro", "36;1", c),
         color("— A Rust-powered document-to-PDF API", "0", c),
         color("Version", "2", c),
         color(version, "0", c),

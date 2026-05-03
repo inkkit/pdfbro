@@ -80,7 +80,7 @@ fn producer_of(pdf: &[u8]) -> String {
 #[test]
 fn every_op_stamps_producer_and_accepts_others_output() {
     let base = make_multipage_pdf(3);
-    let producer_prefix = "folio/";
+    let producer_prefix = "pdfbro/";
 
     let after_merge = merge(&[&base, &base]).unwrap();
     assert!(producer_of(&after_merge).starts_with(producer_prefix));

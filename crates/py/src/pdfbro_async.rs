@@ -1,4 +1,4 @@
-//! `class AsyncFolio` — async facade returning Python awaitables.
+//! `class AsyncPdfBro` — async facade returning Python awaitables.
 //! Engine futures are bridged to the caller's running event loop via
 //! `pyo3_async_runtimes::tokio::future_into_py`.
 
@@ -16,8 +16,8 @@ use engine::LibreOfficeEngine;
 use crate::errors::{engine_to_py, EngineDisabledError};
 use crate::types::from_py;
 
-#[pyclass(name = "AsyncFolio", module = "folio")]
-pub struct AsyncFolio {
+#[pyclass(name = "AsyncPdfBro", module = "pdfbro")]
+pub struct AsyncPdfBro {
     #[cfg(feature = "chromium")]
     chromium: Option<Arc<ChromiumEngine>>,
     #[cfg(feature = "libreoffice")]
@@ -25,7 +25,7 @@ pub struct AsyncFolio {
 }
 
 #[pymethods]
-impl AsyncFolio {
+impl AsyncPdfBro {
     #[staticmethod]
     #[pyo3(signature = (engines = None, chrome_path = None, auto_download_chrome = true, chrome_cache_dir = None))]
     fn create<'py>(
@@ -66,7 +66,7 @@ impl AsyncFolio {
                 Ok::<PyObject, PyErr>(
                     Py::new(
                         py,
-                        AsyncFolio {
+                        AsyncPdfBro {
                             #[cfg(feature = "chromium")]
                             chromium,
                             #[cfg(feature = "libreoffice")]

@@ -1,4 +1,4 @@
-# Folio Test Status Report
+# pdfbro Test Status Report
 
 ## Current State (Branch: cleanup)
 
@@ -43,8 +43,8 @@ make run
 make test-integration
 
 # Or manually with Docker
-docker build -t folio-test .
-docker run --rm -e CHROME_PATH=/usr/bin/google-chrome folio-test \
+docker build -t pdfbro-test .
+docker run --rm -e CHROME_PATH=/usr/bin/google-chrome pdfbro-test \
   cargo test -p engine --test chromium_html -- --ignored
 ```
 

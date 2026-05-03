@@ -12,7 +12,7 @@ use tokio::sync::Semaphore;
 use crate::ServerConfig;
 use crate::backend::PdfBackend;
 use crate::console_store::ConsoleStore;
-use crate::metrics::FolioMetrics;
+use crate::metrics::PdfBroMetrics;
 use crate::routes::batch_state::BatchStateManager;
 use crate::supervised_engine::SupervisedLibreOfficeEngine;
 use crate::webhook::{WebhookQueue, WebhookUrlValidator};
@@ -37,7 +37,7 @@ pub struct AppState {
     /// Default validator (empty allow/deny lists) only enforces SSRF.
     pub webhook_validator: Arc<WebhookUrlValidator>,
     /// Prometheus metrics for monitoring.
-    pub metrics: Arc<FolioMetrics>,
+    pub metrics: Arc<PdfBroMetrics>,
     /// Batch state manager for batch API.
     pub batch_manager: Option<BatchStateManager>,
     /// Operator console store (ring buffers + SSE broadcast).

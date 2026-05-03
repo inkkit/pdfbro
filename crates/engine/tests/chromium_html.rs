@@ -364,7 +364,7 @@ async fn cookies_and_headers_round_trip() {
     extra_headers.insert("X-Test".into(), "marker-value".into());
 
     let request = RequestContext {
-        user_agent: Some("FolioTest/1.0".into()),
+        user_agent: Some("PdfBroTest/1.0".into()),
         extra_headers,
         cookies: vec![Cookie {
             name: "session".into(),
@@ -401,7 +401,7 @@ async fn cookies_and_headers_round_trip() {
         text.contains("marker-value"),
         "x-test header missing in text: {text}"
     );
-    assert!(text.contains("FolioTest/1.0"), "ua missing in text: {text}");
+    assert!(text.contains("PdfBroTest/1.0"), "ua missing in text: {text}");
 
     engine.shutdown().await.ok();
     let _ = shutdown.send(());

@@ -1,4 +1,4 @@
-//! `folio-server` binary entry point.
+//! `pdfbro-server` binary entry point.
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -51,7 +51,7 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
         request_timeout = ?config.request_timeout,
         otel_enabled = config.otel_enabled,
         otel_endpoint = %config.otel_endpoint,
-        "starting folio-server",
+        "starting pdfbro-server",
     );
 
     #[cfg(feature = "chromium")]
@@ -226,7 +226,7 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
         tracing::info!("OpenTelemetry tracer provider shut down");
     }
 
-    tracing::info!("folio-server exited cleanly");
+    tracing::info!("pdfbro-server exited cleanly");
     Ok(())
 }
 

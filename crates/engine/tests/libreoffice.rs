@@ -248,7 +248,7 @@ async fn convert_missing_input_io_error() {
     let Some(lo) = engine().await else { return; };
     let err = lo
         .convert(
-            Path::new("/nonexistent/__folio_no_input.docx"),
+            Path::new("/nonexistent/__pdfbro_no_input.docx"),
             &OfficeOptions::default(),
         )
         .await

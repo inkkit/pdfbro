@@ -123,7 +123,7 @@ pub(crate) async fn launch_with(config: BrowserConfig) -> EngineResult<ChromiumE
     // `/tmp/chromiumoxide-runner` (whose SingletonLock survives the
     // process if Chrome was SIGKILLed during shutdown).
     let user_data_dir = tempfile::Builder::new()
-        .prefix("folio-chromium-")
+        .prefix("pdfbro-chromium-")
         .tempdir()
         .map_err(|e| {
             EngineError::ChromeLaunch(format!("failed to create user-data-dir: {e}"))

@@ -3,10 +3,10 @@ use std::path::PathBuf;
 pub struct WorkloadDef {
     pub name: &'static str,
     pub description: &'static str,
-    pub folio_route: &'static str,
+    pub pdfbro_route: &'static str,
     pub gotenberg_route: &'static str,
     pub fixtures: Vec<PathBuf>,
-    /// Override the multipart field name for all fixtures (Folio/Gotenberg use "files").
+    /// Override the multipart field name for all fixtures (pdfbro/Gotenberg use "files").
     pub fixture_field: &'static str,
     /// Override the multipart filename for all fixtures (e.g. HTML endpoints require "index.html").
     pub fixture_filename: Option<&'static str>,
@@ -21,7 +21,7 @@ pub fn all_workloads() -> Vec<WorkloadDef> {
         WorkloadDef {
             name: "html-small",
             description: "Minimal HTML, no external assets",
-            folio_route: "/forms/chromium/convert/html",
+            pdfbro_route: "/forms/chromium/convert/html",
             gotenberg_route: "/forms/chromium/convert/html",
             fixtures: vec![fixtures_dir.join("html_small.html")],
             fixture_field: "files",
@@ -32,7 +32,7 @@ pub fn all_workloads() -> Vec<WorkloadDef> {
         WorkloadDef {
             name: "html-large",
             description: "HTML with web fonts and a data table",
-            folio_route: "/forms/chromium/convert/html",
+            pdfbro_route: "/forms/chromium/convert/html",
             gotenberg_route: "/forms/chromium/convert/html",
             fixtures: vec![fixtures_dir.join("html_large.html")],
             fixture_field: "files",
@@ -43,7 +43,7 @@ pub fn all_workloads() -> Vec<WorkloadDef> {
         WorkloadDef {
             name: "url-local",
             description: "Local axum fixture server URL (no real network)",
-            folio_route: "/forms/chromium/convert/url",
+            pdfbro_route: "/forms/chromium/convert/url",
             gotenberg_route: "/forms/chromium/convert/url",
             fixtures: vec![],
             fixture_field: "files",
@@ -54,7 +54,7 @@ pub fn all_workloads() -> Vec<WorkloadDef> {
         WorkloadDef {
             name: "libreoffice-docx",
             description: "50 KB DOCX file converted to PDF",
-            folio_route: "/forms/libreoffice/convert",
+            pdfbro_route: "/forms/libreoffice/convert",
             gotenberg_route: "/forms/libreoffice/convert",
             fixtures: vec![fixtures_dir.join("sample.docx")],
             fixture_field: "files",
@@ -65,7 +65,7 @@ pub fn all_workloads() -> Vec<WorkloadDef> {
         WorkloadDef {
             name: "pdfengines-merge",
             description: "5 × 20-page PDFs merged",
-            folio_route: "/forms/pdfengines/merge",
+            pdfbro_route: "/forms/pdfengines/merge",
             gotenberg_route: "/forms/pdfengines/merge",
             fixtures: vec![
                 fixtures_dir.join("page_1.pdf"),

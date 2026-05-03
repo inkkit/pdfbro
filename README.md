@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="./docs/assets/folio-logo.svg" alt="Folio" width="160"/>
+  <img src="./docs/assets/folio-logo.svg" alt="pdfbro" width="160"/>
 </p>
 
-<h1 align="center">Folio</h1>
+<h1 align="center">pdfbro</h1>
 
 <p align="center">
   <em>A Rust-native, Gotenberg-compatible PDF service — with a live operator console.</em>
@@ -16,12 +16,12 @@
 
 ---
 
-Folio converts **HTML, URLs, Markdown, and Office documents** into PDFs using
+pdfbro converts **HTML, URLs, Markdown, and Office documents** into PDFs using
 real Chrome under the hood. It speaks the same HTTP API as
 [Gotenberg](https://github.com/gotenberg/gotenberg), so most existing
-clients can point at Folio with only a base-URL change.
+clients can point at pdfbro with only a base-URL change.
 
-Unlike Gotenberg, Folio also runs as a **Rust library, a CLI, and a single
+Unlike Gotenberg, pdfbro also runs as a **Rust library, a CLI, and a single
 binary** — and ships with a live operator console at `/_/` so you can see
 what your PDF service is actually doing without wiring up Grafana first.
 
@@ -31,7 +31,7 @@ what your PDF service is actually doing without wiring up Grafana first.
 
 ---
 
-## Why Folio
+## Why pdfbro
 
 - **Gotenberg-compatible.** Same routes (`/forms/chromium/*`,
   `/forms/libreoffice/convert`, `/forms/pdfengines/*`), same multipart
@@ -56,7 +56,7 @@ what's ahead) read [`comparison.md`](./comparison.md).
 
 ```bash
 # Run the server (Docker, full image)
-docker run --rm -p 3000:3000 ghcr.io/vel/folio:latest
+docker run --rm -p 3000:3000 ghcr.io/vel/pdfbro:latest
 
 # Convert a URL to PDF
 curl -X POST http://localhost:3000/forms/chromium/convert/url \
@@ -77,11 +77,11 @@ split, watermark, etc.
 
 | Surface          | Command                                                       |
 |------------------|---------------------------------------------------------------|
-| Docker (full)    | `docker pull ghcr.io/vel/folio:latest`            |
-| Docker (slim)    | `docker pull ghcr.io/vel/folio:latest-chromium`   |
-| CLI (cargo)      | `cargo install --path crates/cli` → `folio --help`            |
+| Docker (full)    | `docker pull ghcr.io/vel/pdfbro:latest`            |
+| Docker (slim)    | `docker pull ghcr.io/vel/pdfbro:latest-chromium`   |
+| CLI (cargo)      | `cargo install --path crates/cli` → `pdfbro --help`            |
 | Server (cargo)   | `cargo run -p server -- serve --port 3000`                    |
-| Library          | `folio-engine = { path = "crates/engine" }` in `Cargo.toml`   |
+| Library          | `pdfbro-engine = { path = "crates/engine" }` in `Cargo.toml`   |
 
 **Prerequisites for non-Docker installs:** Rust 1.75+, Chrome/Chromium
 (auto-detected, or set `CHROME_PATH`), and optionally LibreOffice for
@@ -91,8 +91,8 @@ Office conversion.
 
 | Surface | Install |
 |---|---|
-| Python  | `pip install folio-py` — see `bindings/python/README.md` |
-| Node.js | `npm install @vel/folio` — see `bindings/node/README.md` |
+| Python  | `pip install pdfbro-py` — see `bindings/python/README.md` |
+| Node.js | `npm install @vel/pdfbro` — see `bindings/node/README.md` |
 
 Both bindings embed the Rust engine directly — no HTTP server needed.
 v1 supports HTML / URL / Markdown / Office → PDF. PDF ops and screenshots ship in v2.
@@ -137,20 +137,20 @@ For the gap analysis vs Gotenberg, see [`comparison.md`](./comparison.md).
 ## CLI
 
 ```bash
-folio convert --html  index.html         --output out.pdf
-folio convert --url   https://example.com --output out.pdf
-folio convert --markdown README.md       --output out.pdf
-folio convert --office report.docx       --output out.pdf
+pdfbro convert --html  index.html         --output out.pdf
+pdfbro convert --url   https://example.com --output out.pdf
+pdfbro convert --markdown README.md       --output out.pdf
+pdfbro convert --office report.docx       --output out.pdf
 
-folio merge   a.pdf b.pdf c.pdf --output combined.pdf
-folio split   input.pdf --mode uniform --span 1 --output-dir ./pages/
-folio flatten input.pdf                  --output flat.pdf
-folio rotate  input.pdf --angle 90       --output rotated.pdf
-folio metadata read  input.pdf
-folio metadata write input.pdf '{"Title":"Q2 Review"}'
+pdfbro merge   a.pdf b.pdf c.pdf --output combined.pdf
+pdfbro split   input.pdf --mode uniform --span 1 --output-dir ./pages/
+pdfbro flatten input.pdf                  --output flat.pdf
+pdfbro rotate  input.pdf --angle 90       --output rotated.pdf
+pdfbro metadata read  input.pdf
+pdfbro metadata write input.pdf '{"Title":"Q2 Review"}'
 ```
 
-Shell completions: `folio completion zsh > ~/.zfunc/_folio`.
+Shell completions: `pdfbro completion zsh > ~/.zfunc/_pdfbro`.
 
 ---
 
@@ -188,7 +188,7 @@ code path the server uses, just without an HTTP layer in front.
 - **Batches:** progress + per-item state for active batches
 - **Logs:** last 20 requests, last 10 errors
 
-This is the cleanest lead Folio has over Gotenberg today; it's where the
+This is the cleanest lead pdfbro has over Gotenberg today; it's where the
 last 30 commits have lived. If you've ever bolted Grafana onto Gotenberg
 just to see whether it's healthy — this replaces that step.
 
@@ -196,10 +196,10 @@ just to see whether it's healthy — this replaces that step.
 
 ## Configuration
 
-Common flags (every flag is also `FOLIO_*` env-overridable):
+Common flags (every flag is also `PDFBRO_*` env-overridable):
 
 ```bash
-folio-server serve \
+pdfbro-server serve \
   --host 0.0.0.0 --port 3000 \
   --concurrency 8 \
   --max-body-bytes 52428800 \      # 50 MiB
@@ -211,11 +211,11 @@ folio-server serve \
   --otel-enabled --otel-endpoint http://localhost:4318/v1/traces
 ```
 
-Run `folio-server serve --help` for the full flag reference.
+Run `pdfbro-server serve --help` for the full flag reference.
 
 **TLS is intentionally not handled in-process.** Put nginx, Caddy, or
 envoy in front. Cert rotation, OCSP stapling, and ALPN are not things
-Folio is positioned to do better than they do.
+pdfbro is positioned to do better than they do.
 
 ---
 
@@ -226,15 +226,15 @@ that does what you need.
 
 | Target                       | Contains             | Use case             |
 |------------------------------|----------------------|----------------------|
-| `folio`                      | Chromium + LO        | Default              |
-| `folio-chromium`             | Chromium             | HTML/URL/Markdown only (~30% smaller) |
-| `folio-libreoffice`          | LO                   | Office docs only (~40% smaller) |
-| `folio-cloudrun`             | Full + Cloud Run env | Google Cloud Run     |
-| `folio-lambda`               | Full + Lambda Web Adapter | AWS Lambda      |
-| `folio-{cloudrun,lambda}-{chromium,libreoffice}` | Slim + platform | Mix-and-match |
+| `pdfbro`                      | Chromium + LO        | Default              |
+| `pdfbro-chromium`             | Chromium             | HTML/URL/Markdown only (~30% smaller) |
+| `pdfbro-libreoffice`          | LO                   | Office docs only (~40% smaller) |
+| `pdfbro-cloudrun`             | Full + Cloud Run env | Google Cloud Run     |
+| `pdfbro-lambda`               | Full + Lambda Web Adapter | AWS Lambda      |
+| `pdfbro-{cloudrun,lambda}-{chromium,libreoffice}` | Slim + platform | Mix-and-match |
 
 ```bash
-docker build --target folio-chromium -t folio:chromium .
+docker build --target pdfbro-chromium -t pdfbro:chromium .
 make docker-push-all DOCKER_REGISTRY=ghcr.io/me VERSION=1.0.0
 ```
 
@@ -261,7 +261,7 @@ TLS in-process (use a reverse proxy) · OAuth/JWT/RBAC (use a reverse
 proxy) · workflow/DAG engine on top of batch (out of scope).
 
 **Embeddable bindings (v1 shipped):**
-Python (`pip install folio-py`) · Node.js (`npm install @vel/folio`) — HTML / URL / Markdown / Office → PDF in-process.
+Python (`pip install pdfbro-py`) · Node.js (`npm install @vel/pdfbro`) — HTML / URL / Markdown / Office → PDF in-process.
 
 ---
 
@@ -271,7 +271,7 @@ Benchmarked on a 2-CPU / 2 GB Docker cgroup, 4 concurrent clients, 60 s warm-up 
 
 ### Latency (ms) & throughput
 
-| Workload | p50 Folio | p50 Gotenberg | p95 Folio | p95 Gotenberg | RPS Folio | RPS Gotenberg |
+| Workload | p50 pdfbro | p50 Gotenberg | p95 pdfbro | p95 Gotenberg | RPS pdfbro | RPS Gotenberg |
 |---|---|---|---|---|---|---|
 | HTML → PDF (small) | **195** | 302 | **250** | 489 | **19.9** | 12.3 |
 | HTML → PDF (large) | **213** | 299 | **271** | 421 | **17.9** | 11.9 |
@@ -281,7 +281,7 @@ Benchmarked on a 2-CPU / 2 GB Docker cgroup, 4 concurrent clients, 60 s warm-up 
 
 ### Peak memory (MiB)
 
-| Workload | Folio | Gotenberg |
+| Workload | pdfbro | Gotenberg |
 |---|---|---|
 | HTML → PDF (small) | 340 | **320** |
 | HTML → PDF (large) | 457 | **327** |
@@ -309,7 +309,7 @@ Benchmarked on a 2-CPU / 2 GB Docker cgroup, 4 concurrent clients, 60 s warm-up 
 ## Development
 
 ```bash
-git clone https://github.com/vel/folio.git && cd folio
+git clone https://github.com/vel/pdfbro.git && cd pdfbro
 
 cargo build --release        # build everything
 cargo test                   # unit + integration (skips gracefully if Chrome missing)
@@ -327,7 +327,7 @@ make test-integration        # BDD scenarios in Docker
 | `make fmt` / `make lint`| `cargo fmt` / `cargo clippy`          |
 
 **Useful env vars:** `CHROME_PATH`, `LIBREOFFICE_PATH`, `RUST_LOG`,
-`FOLIO_PORT`, `FOLIO_CONCURRENCY`, `OTEL_EXPORTER_OTLP_ENDPOINT`.
+`PDFBRO_PORT`, `PDFBRO_CONCURRENCY`, `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
 ---
 
@@ -346,7 +346,7 @@ before code.
 
 ## Acknowledgements
 
-- [Gotenberg](https://github.com/gotenberg/gotenberg) — the API contract Folio implements
+- [Gotenberg](https://github.com/gotenberg/gotenberg) — the API contract pdfbro implements
 - [chromiumoxide](https://github.com/mattsse/chromiumoxide) — Chrome DevTools Protocol client
 - [lopdf](https://github.com/J-F-Liu/lopdf) — pure-Rust PDF manipulation
 - [axum](https://github.com/tokio-rs/axum) — HTTP server

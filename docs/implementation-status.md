@@ -1,4 +1,4 @@
-# Folio Implementation Status (Ground Truth)
+# pdfbro Implementation Status (Ground Truth)
 
 > **Single source of truth** derived from direct code inspection.  
 > Last audited: 2026-04-29.  
@@ -30,7 +30,7 @@
 | 16 | PDF Bookmarks | ❌ Not Started | **✅ Done** ⚠️ | `crates/engine/src/bookmarks/mod.rs` (397 lines) | Full read/write/flatten with `lopdf`. Routes `/forms/pdfengines/bookmarks/{read,write}` wired. **README is wrong.** |
 | 17 | Watermark | ✅ Done | ✅ Done | Via spec 13 | — |
 | 18 | Screenshots | ✅ Done / 🚧 Mixed | ✅ Done | `crates/engine/src/chromium/screenshot.rs` | PNG, JPEG, **WebP** all supported. Server routes wired. Tests present. |
-| 19 | PDF Encryption | ✅ Done | **✅ Done** | `crates/engine/src/encrypt/mod.rs` (326 lines) | AES-128/256 via qpdf. CLI `folio encrypt/decrypt`, server routes `/forms/pdfengines/{encrypt,decrypt}` wired. BDD tests + engine integration tests. |
+| 19 | PDF Encryption | ✅ Done | **✅ Done** | `crates/engine/src/encrypt/mod.rs` (326 lines) | AES-128/256 via qpdf. CLI `pdfbro encrypt/decrypt`, server routes `/forms/pdfengines/{encrypt,decrypt}` wired. BDD tests + engine integration tests. |
 
 ---
 
@@ -91,7 +91,7 @@
 1. **`README.md` spec table** — Claims specs 14, 16, 19 are `❌ Not Done`. They are `✅ Done`.
 2. **`README.md` screenshot status** — Usage Modes table shows 🚧 for screenshot endpoints; engine and routes are implemented.
 3. **`docs/specs/20-missing-features-roadmap.md`** — Claims screenshots, bookmarks, encrypt, watermark/stamp, PDF/A, Prometheus, webhooks are all `❌ Missing`. This document is **dangerously stale** and should either be archived or rewritten.
-5. **`README.md` badges** — Badges point to `ghcr.io/vel/folio` — update when org is created.
+5. **`README.md` badges** — Badges point to `ghcr.io/vel/pdfbro` — update when org is created.
 6. **`README.md` project structure** — Shows root `tests/` directory; actual tests live inside crate directories (`crates/*/tests/`).
 7. **`README.md` BDD test count** — Claims "52 Gherkin scenarios". There are 25 `.feature` files; total scenario count unverified.
 

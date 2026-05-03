@@ -1,4 +1,4 @@
-//! `assert_cmd`-driven integration tests for the `folio` binary.
+//! `assert_cmd`-driven integration tests for the `pdfbro` binary.
 //!
 //! Tests that need real Chrome / `soffice` skip gracefully when the
 //! dependency is missing. The non-gated tests cover usage / clap error
@@ -60,8 +60,8 @@ fn make_multipage_pdf(num_pages: u32) -> Vec<u8> {
     bytes
 }
 
-fn folio() -> Command {
-    Command::cargo_bin("folio").expect("locate folio binary")
+fn pdfbro() -> Command {
+    Command::cargo_bin("pdfbro").expect("locate pdfbro binary")
 }
 
 fn page_count(pdf: &[u8]) -> usize {
@@ -107,16 +107,16 @@ fn have_soffice() -> bool {
 
 #[test]
 fn version_subcommand_outputs_semver_string() {
-    folio()
+    pdfbro()
         .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::is_match(r"^folio \d+\.\d+\.\d+\b").unwrap());
+        .stdout(predicate::str::is_match(r"^pdfbro \d+\.\d+\.\d+\b").unwrap());
 }
 
 #[test]
 fn root_help_lists_all_subcommands() {
-    folio()
+    pdfbro()
         .arg("--help")
         .assert()
         .success()
@@ -131,16 +131,16 @@ fn root_help_lists_all_subcommands() {
 
 #[test]
 fn completions_emits_bash_script() {
-    folio()
+    pdfbro()
         .args(["completions", "bash"])
         .assert()
         .success()
-        .stdout(predicate::str::starts_with("_folio()"));
+        .stdout(predicate::str::starts_with("_pdfbro()"));
 }
 
 #[test]
 fn completions_emits_zsh_script() {
-    folio()
+    pdfbro()
         .args(["completions", "zsh"])
         .assert()
         .success()
@@ -153,7 +153,7 @@ fn completions_emits_zsh_script() {
 
 #[test]
 fn convert_requires_one_input_source() {
-    folio()
+    pdfbro()
         .args(["convert", "--output", "/tmp/none.pdf"])
         .assert()
         .code(2);
@@ -161,7 +161,7 @@ fn convert_requires_one_input_source() {
 
 #[test]
 fn convert_rejects_two_input_sources() {
-    folio()
+    pdfbro()
         .args([
             "convert",
             "--html",
@@ -177,7 +177,7 @@ fn convert_rejects_two_input_sources() {
 
 #[test]
 fn convert_requires_output() {
-    folio()
+    pdfbro()
         .args(["convert", "--html", "a.html"])
         .assert()
         .code(2);
@@ -185,7 +185,7 @@ fn convert_requires_output() {
 
 #[test]
 fn merge_with_no_inputs_exits_2() {
-    folio()
+    pdfbro()
         .args(["merge", "--output", "/tmp/m.pdf"])
         .assert()
         .code(2);
@@ -193,7 +193,7 @@ fn merge_with_no_inputs_exits_2() {
 
 #[test]
 fn merge_with_two_stdins_exits_2() {
-    folio()
+    pdfbro()
         .args(["merge", "--output", "/tmp/m.pdf", "-", "-"])
         .assert()
         .code(2);
@@ -201,12 +201,12 @@ fn merge_with_two_stdins_exits_2() {
 
 #[test]
 fn unknown_subcommand_exits_2() {
-    folio().arg("nonsense").assert().code(2);
+    pdfbro().arg("nonsense").assert().code(2);
 }
 
 #[test]
 fn invalid_paper_value_exits_2() {
-    folio()
+    pdfbro()
         .args([
             "convert",
             "--html",
@@ -222,7 +222,7 @@ fn invalid_paper_value_exits_2() {
 
 #[test]
 fn invalid_cookie_value_exits_2() {
-    folio()
+    pdfbro()
         .args([
             "convert",
             "--html",
@@ -238,7 +238,7 @@ fn invalid_cookie_value_exits_2() {
 
 #[test]
 fn invalid_wait_empty_selector_exits_2() {
-    folio()
+    pdfbro()
         .args([
             "convert",
             "--html",
@@ -254,7 +254,7 @@ fn invalid_wait_empty_selector_exits_2() {
 
 #[test]
 fn invalid_margin_two_values_exits_2() {
-    folio()
+    pdfbro()
         .args([
             "convert",
             "--html",
@@ -279,7 +279,7 @@ fn split_default_mode_one_per_page() {
     std::fs::write(&pdf, make_multipage_pdf(3)).unwrap();
     let outdir = dir.path().join("out");
 
-    folio()
+    pdfbro()
         .args([
             "split",
             pdf.to_str().unwrap(),
@@ -311,7 +311,7 @@ fn split_with_explicit_prefix() {
     std::fs::write(&pdf, make_multipage_pdf(2)).unwrap();
     let outdir = dir.path().join("out");
 
-    folio()
+    pdfbro()
         .args([
             "split",
             pdf.to_str().unwrap(),
@@ -335,7 +335,7 @@ fn flatten_idempotent_via_cli() {
     let out2 = dir.path().join("out2.pdf");
     std::fs::write(&in_pdf, make_blank_pdf()).unwrap();
 
-    folio()
+    pdfbro()
         .args([
             "flatten",
             in_pdf.to_str().unwrap(),
@@ -344,7 +344,7 @@ fn flatten_idempotent_via_cli() {
         ])
         .assert()
         .success();
-    folio()
+    pdfbro()
         .args([
             "flatten",
             out1.to_str().unwrap(),
@@ -365,7 +365,7 @@ fn merge_single_input_round_trips() {
     let out = dir.path().join("out.pdf");
     std::fs::write(&in_pdf, make_blank_pdf()).unwrap();
 
-    folio()
+    pdfbro()
         .args([
             "merge",
             "--output",
@@ -387,7 +387,7 @@ fn merge_two_inputs_concatenates() {
     std::fs::write(&a, make_multipage_pdf(2)).unwrap();
     std::fs::write(&b, make_multipage_pdf(3)).unwrap();
 
-    folio()
+    pdfbro()
         .args([
             "merge",
             "--output",
@@ -408,7 +408,7 @@ fn metadata_read_round_trips_via_write() {
     let out = dir.path().join("out.pdf");
     std::fs::write(&in_pdf, make_blank_pdf()).unwrap();
 
-    folio()
+    pdfbro()
         .args([
             "metadata",
             "write",
@@ -423,7 +423,7 @@ fn metadata_read_round_trips_via_write() {
         .assert()
         .success();
 
-    folio()
+    pdfbro()
         .args(["metadata", "read", out.to_str().unwrap()])
         .assert()
         .success()
@@ -437,7 +437,7 @@ fn metadata_read_outputs_json() {
     let in_pdf = dir.path().join("in.pdf");
     std::fs::write(&in_pdf, make_blank_pdf()).unwrap();
 
-    let assertion = folio()
+    let assertion = pdfbro()
         .args(["metadata", "read", in_pdf.to_str().unwrap()])
         .assert()
         .success();
@@ -453,7 +453,7 @@ fn metadata_read_outputs_json() {
 #[test]
 fn convert_html_with_missing_file_exits_5() {
     let dir = tempdir().unwrap();
-    folio()
+    pdfbro()
         .args([
             "convert",
             "--html",
@@ -471,10 +471,10 @@ fn engine_error_path_exits_3_on_bad_chrome_executable() {
     let html = dir.path().join("in.html");
     std::fs::write(&html, "<p>hi</p>").unwrap();
 
-    folio()
+    pdfbro()
         .args([
             "--chrome",
-            "/definitely/no/chrome/here-__folio__",
+            "/definitely/no/chrome/here-__pdfbro__",
             "convert",
             "--html",
             html.to_str().unwrap(),
@@ -490,7 +490,7 @@ fn metadata_read_garbage_exits_3() {
     let dir = tempdir().unwrap();
     let p = dir.path().join("not.pdf");
     std::fs::write(&p, b"NOT A PDF").unwrap();
-    folio()
+    pdfbro()
         .args(["metadata", "read", p.to_str().unwrap()])
         .assert()
         .code(3);
@@ -507,7 +507,7 @@ fn log_format_json_emits_valid_json_per_line() {
     std::fs::write(&in_pdf, make_blank_pdf()).unwrap();
     let outdir = dir.path().join("out");
 
-    let assertion = folio()
+    let assertion = pdfbro()
         .args([
             "-vv",
             "--log-format",
@@ -536,7 +536,7 @@ fn log_format_text_does_not_emit_color_when_piped() {
     std::fs::write(&in_pdf, make_blank_pdf()).unwrap();
     let outdir = dir.path().join("out");
 
-    let assertion = folio()
+    let assertion = pdfbro()
         .args([
             "-vv",
             "--log-format",
@@ -569,7 +569,7 @@ fn convert_html_to_stdout_pipes_bytes() {
     let html = dir.path().join("in.html");
     std::fs::write(&html, "<p>hi</p>").unwrap();
 
-    let assertion = folio()
+    let assertion = pdfbro()
         .args(["convert", "--html", html.to_str().unwrap(), "--output", "-"])
         .assert()
         .success();
@@ -588,7 +588,7 @@ fn convert_markdown_to_pdf_via_cli() {
     std::fs::write(&md, "# Hello\n\nWorld").unwrap();
     let out = dir.path().join("out.pdf");
 
-    folio()
+    pdfbro()
         .args([
             "convert",
             "--markdown",
@@ -617,7 +617,7 @@ fn batch_smoke_two_files_into_two_pdfs() {
     std::fs::write(in_dir.join("a.html"), "<p>A</p>").unwrap();
     std::fs::write(in_dir.join("b.html"), "<p>B</p>").unwrap();
 
-    folio()
+    pdfbro()
         .args([
             "batch",
             "--input-dir",
@@ -651,7 +651,7 @@ fn batch_skip_on_error_exits_6_with_summary() {
     // Force a per-file failure by writing zero-byte file with html ext.
     std::fs::write(in_dir.join("broken.html"), [0u8; 0]).unwrap();
 
-    let assertion = folio()
+    let assertion = pdfbro()
         .args([
             "batch",
             "--input-dir",
@@ -681,7 +681,7 @@ fn convert_office_writer_doc() {
     }
     let dir = tempdir().unwrap();
     let out = dir.path().join("out.pdf");
-    folio()
+    pdfbro()
         .args([
             "convert",
             "--office",
@@ -708,7 +708,7 @@ fn convert_office_with_pdf_a_2b() {
     }
     let dir = tempdir().unwrap();
     let out = dir.path().join("out.pdf");
-    folio()
+    pdfbro()
         .args([
             "convert",
             "--office",

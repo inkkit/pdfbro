@@ -1,4 +1,4 @@
-//! Prometheus metrics for Folio monitoring.
+//! Prometheus metrics for pdfbro monitoring.
 //!
 //! Exposes conversion counts, latencies, error rates, queue depths,
 //! and engine health metrics in Prometheus text format.
@@ -8,15 +8,15 @@ use prometheus::{self, CounterVec, Encoder, Gauge, HistogramOpts, HistogramVec, 
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Global metrics instance - only registered once.
-pub static METRICS: Lazy<FolioMetrics> = Lazy::new(|| {
-    let metrics = FolioMetrics::new().expect("Failed to create Prometheus metrics");
+pub static METRICS: Lazy<PdfBroMetrics> = Lazy::new(|| {
+    let metrics = PdfBroMetrics::new().expect("Failed to create Prometheus metrics");
     metrics.init();
     metrics
 });
 
-/// All Prometheus metrics for the Folio server.
+/// All Prometheus metrics for the pdfbro server.
 #[derive(Clone)]
-pub struct FolioMetrics {
+pub struct PdfBroMetrics {
     /// Total conversions by engine, endpoint, and status.
     pub conversions_total: CounterVec,
     /// Conversion duration in seconds.
@@ -57,12 +57,12 @@ pub struct FolioMetrics {
     pub process_virtual_memory: Gauge,
 }
 
-impl FolioMetrics {
+impl PdfBroMetrics {
     /// Create and register all metrics with the default Prometheus registry.
     pub fn new() -> Result<Self, prometheus::Error> {
         let conversions_total = {
             let opts = prometheus::opts!(
-                "folio_conversions_total",
+                "pdfbro_conversions_total",
                 "Total conversions by engine, endpoint, and status"
             );
             let metric = CounterVec::new(opts, &["engine", "endpoint", "status"])?;
@@ -72,7 +72,7 @@ impl FolioMetrics {
 
         let conversion_duration = {
             let opts = HistogramOpts::new(
-                "folio_conversion_duration_seconds",
+                "pdfbro_conversion_duration_seconds",
                 "Conversion duration in seconds",
             )
             .buckets(vec![0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0]);
@@ -83,7 +83,7 @@ impl FolioMetrics {
 
         let conversion_bytes = {
             let opts = prometheus::opts!(
-                "folio_conversion_bytes_total",
+                "pdfbro_conversion_bytes_total",
                 "Total bytes processed by engine and endpoint"
             );
             let metric = CounterVec::new(opts, &["engine", "endpoint"])?;
@@ -92,20 +92,20 @@ impl FolioMetrics {
         };
 
         let queue_size = {
-            let metric = Gauge::new("folio_queue_size", "Current queue size")?;
+            let metric = Gauge::new("pdfbro_queue_size", "Current queue size")?;
             register(Box::new(metric.clone()))?;
             metric
         };
 
         let queue_processing = {
-            let metric = Gauge::new("folio_queue_processing", "Currently processing jobs")?;
+            let metric = Gauge::new("pdfbro_queue_processing", "Currently processing jobs")?;
             register(Box::new(metric.clone()))?;
             metric
         };
 
         let queue_completed = {
             let opts = prometheus::opts!(
-                "folio_queue_completed_total",
+                "pdfbro_queue_completed_total",
                 "Completed jobs by status"
             );
             let metric = CounterVec::new(opts, &["status"])?;
@@ -115,7 +115,7 @@ impl FolioMetrics {
 
         let queue_wait = {
             let opts = HistogramOpts::new(
-                "folio_queue_wait_seconds",
+                "pdfbro_queue_wait_seconds",
                 "Time spent in queue",
             )
             .buckets(vec![0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0]);
@@ -126,7 +126,7 @@ impl FolioMetrics {
 
         let chromium_healthy = {
             let metric = Gauge::new(
-                "folio_chromium_healthy",
+                "pdfbro_chromium_healthy",
                 "Chromium health status (1=up, 0=down)",
             )?;
             register(Box::new(metric.clone()))?;
@@ -135,7 +135,7 @@ impl FolioMetrics {
 
         let libreoffice_healthy = {
             let metric = Gauge::new(
-                "folio_libreoffice_healthy",
+                "pdfbro_libreoffice_healthy",
                 "LibreOffice health status (1=up, 0=down)",
             )?;
             register(Box::new(metric.clone()))?;
@@ -144,7 +144,7 @@ impl FolioMetrics {
 
         let chromium_conversions = {
             let opts = prometheus::opts!(
-                "folio_chromium_conversions_total",
+                "pdfbro_chromium_conversions_total",
                 "Chromium conversion count"
             );
             let metric = CounterVec::new(opts, &["endpoint"])?;
@@ -154,7 +154,7 @@ impl FolioMetrics {
 
         let libreoffice_conversions = {
             let opts = prometheus::opts!(
-                "folio_libreoffice_conversions_total",
+                "pdfbro_libreoffice_conversions_total",
                 "LibreOffice conversion count"
             );
             let metric = CounterVec::new(opts, &["endpoint"])?;
@@ -164,7 +164,7 @@ impl FolioMetrics {
 
         let http_requests = {
             let opts = prometheus::opts!(
-                "folio_http_requests_total",
+                "pdfbro_http_requests_total",
                 "Total HTTP requests by method, route, and status"
             );
             let metric = CounterVec::new(opts, &["method", "route", "status"])?;
@@ -174,7 +174,7 @@ impl FolioMetrics {
 
         let http_request_duration = {
             let opts = HistogramOpts::new(
-                "folio_http_request_duration_seconds",
+                "pdfbro_http_request_duration_seconds",
                 "HTTP request duration in seconds",
             )
             .buckets(vec![0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]);
@@ -184,14 +184,14 @@ impl FolioMetrics {
         };
 
         let http_active_requests = {
-            let metric = Gauge::new("folio_http_active_requests", "Active HTTP requests")?;
+            let metric = Gauge::new("pdfbro_http_active_requests", "Active HTTP requests")?;
             register(Box::new(metric.clone()))?;
             metric
         };
 
         let process_start_time = {
             let metric = Gauge::new(
-                "folio_process_start_time_seconds",
+                "pdfbro_process_start_time_seconds",
                 "Process start time as Unix timestamp",
             )?;
             register(Box::new(metric.clone()))?;
@@ -200,7 +200,7 @@ impl FolioMetrics {
 
         let process_resident_memory = {
             let metric = Gauge::new(
-                "folio_process_resident_memory_bytes",
+                "pdfbro_process_resident_memory_bytes",
                 "Resident memory size in bytes (RSS)",
             )?;
             register(Box::new(metric.clone()))?;
@@ -209,7 +209,7 @@ impl FolioMetrics {
 
         let process_virtual_memory = {
             let metric = Gauge::new(
-                "folio_process_virtual_memory_bytes",
+                "pdfbro_process_virtual_memory_bytes",
                 "Virtual memory size in bytes",
             )?;
             register(Box::new(metric.clone()))?;

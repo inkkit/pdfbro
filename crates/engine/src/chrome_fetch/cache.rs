@@ -2,22 +2,22 @@
 
 use std::path::{Path, PathBuf};
 
-/// Default cache root for Folio's downloaded Chrome.
+/// Default cache root for pdfbro's downloaded Chrome.
 ///
-/// - macOS: `~/Library/Caches/folio/chromium`
-/// - Linux: `$XDG_CACHE_HOME/folio/chromium` (falls back to `~/.cache`)
-/// - Windows: `%LOCALAPPDATA%\folio\chromium`
+/// - macOS: `~/Library/Caches/pdfbro/chromium`
+/// - Linux: `$XDG_CACHE_HOME/pdfbro/chromium` (falls back to `~/.cache`)
+/// - Windows: `%LOCALAPPDATA%\pdfbro\chromium`
 ///
-/// Override via `FOLIO_CHROME_CACHE` env var; constructor argument wins
+/// Override via `PDFBRO_CHROME_CACHE` env var; constructor argument wins
 /// over both.
 pub fn cache_dir() -> PathBuf {
-    if let Ok(env) = std::env::var("FOLIO_CHROME_CACHE") {
+    if let Ok(env) = std::env::var("PDFBRO_CHROME_CACHE") {
         if !env.is_empty() {
             return PathBuf::from(env);
         }
     }
     let base = dirs::cache_dir().unwrap_or_else(|| PathBuf::from("."));
-    base.join("folio").join("chromium")
+    base.join("pdfbro").join("chromium")
 }
 
 /// Returns `Some(path)` if a cached Chrome for `version` exists and the
@@ -57,10 +57,10 @@ mod tests {
     #[test]
     fn cache_dir_respects_env_override() {
         // SAFETY: test mutates env in a non-overlapping way.
-        unsafe { std::env::set_var("FOLIO_CHROME_CACHE", "/tmp/folio-test-cache"); }
-        assert_eq!(cache_dir(), PathBuf::from("/tmp/folio-test-cache"));
+        unsafe { std::env::set_var("PDFBRO_CHROME_CACHE", "/tmp/pdfbro-test-cache"); }
+        assert_eq!(cache_dir(), PathBuf::from("/tmp/pdfbro-test-cache"));
         // SAFETY: justified above.
-        unsafe { std::env::remove_var("FOLIO_CHROME_CACHE"); }
+        unsafe { std::env::remove_var("PDFBRO_CHROME_CACHE"); }
     }
 
     #[test]

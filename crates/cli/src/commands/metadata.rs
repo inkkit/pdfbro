@@ -1,4 +1,4 @@
-//! `folio metadata read` / `write`.
+//! `pdfbro metadata read` / `write`.
 
 use anyhow::{Context, anyhow};
 use engine::pdfops::{self, Metadata};

@@ -1,7 +1,7 @@
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 #![recursion_limit = "256"]
-//! Folio HTTP server — Gotenberg-compatible facade over the [`engine`] crate.
+//! pdfbro HTTP server — Gotenberg-compatible facade over the [`engine`] crate.
 //!
 //! See `docs/specs/30-server.md` for the wire contract. Public entry points
 //! live in [`app`] (router construction), [`state`] (`AppState`), and

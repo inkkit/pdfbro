@@ -13,31 +13,31 @@ CHROME_VERSION=stable
 
 .PHONY: build
 build: ## Build full image for local platform (fast, for local testing)
-	docker build --target folio -t folio:latest -f Dockerfile .
+	docker build --target pdfbro -t pdfbro:latest -f Dockerfile .
 
 .PHONY: build-amd64
 build-amd64: ## Build full image for linux/amd64 (required for Fly.io deploy)
-	docker buildx build --platform linux/amd64 --target folio -t folio:amd64 -f Dockerfile .
+	docker buildx build --platform linux/amd64 --target pdfbro -t pdfbro:amd64 -f Dockerfile .
 
 .PHONY: build-chromium
 build-chromium: ## Build Chromium-only image
-	docker build --target folio-chromium -t folio:chromium -f Dockerfile .
+	docker build --target pdfbro-chromium -t pdfbro:chromium -f Dockerfile .
 
 .PHONY: build-libreoffice
 build-libreoffice: ## Build LibreOffice-only image
-	docker build --target folio-libreoffice -t folio:libreoffice -f Dockerfile .
+	docker build --target pdfbro-libreoffice -t pdfbro:libreoffice -f Dockerfile .
 
 .PHONY: run
 run: ## Run full image (Chromium + LibreOffice) via Docker Compose
-	docker compose up folio
+	docker compose up pdfbro
 
 .PHONY: run-chromium
 run-chromium: ## Run Chromium-only image via Docker Compose
-	docker compose --profile chromium up folio-chromium
+	docker compose --profile chromium up pdfbro-chromium
 
 .PHONY: run-libreoffice
 run-libreoffice: ## Run LibreOffice-only image via Docker Compose
-	docker compose --profile libreoffice up folio-libreoffice
+	docker compose --profile libreoffice up pdfbro-libreoffice
 
 # FLY_APP is read from fly.toml; override with: make deploy FLY_APP=myapp
 FLY_APP ?= $(shell grep '^app' fly.toml 2>/dev/null | sed "s/app = '//;s/'//")
@@ -45,7 +45,7 @@ FLY_APP ?= $(shell grep '^app' fly.toml 2>/dev/null | sed "s/app = '//;s/'//")
 .PHONY: deploy
 deploy: ## Build linux/amd64 image and deploy to Fly.io
 	fly auth docker
-	docker buildx build --platform linux/amd64 --target folio \
+	docker buildx build --platform linux/amd64 --target pdfbro \
 		-t registry.fly.io/$(FLY_APP):latest \
 		--load -f Dockerfile .
 	docker push registry.fly.io/$(FLY_APP):latest
@@ -113,18 +113,18 @@ clean: ## Clean build artifacts
 
 .PHONY: shell
 shell: ## Open a shell in the running container
-	docker compose exec folio /bin/bash || docker exec -it $$(docker ps -qf name=folio) /bin/bash
+	docker compose exec pdfbro /bin/bash || docker exec -it $$(docker ps -qf name=pdfbro) /bin/bash
 
 .PHONY: logs
 logs: ## View container logs
-	docker compose logs -f folio
+	docker compose logs -f pdfbro
 
 .PHONY: health
-health: ## Check Folio health endpoint
+health: ## Check pdfbro health endpoint
 	@curl -s http://localhost:$(API_PORT)/health | jq . || curl -s http://localhost:$(API_PORT)/health
 
 .PHONY: version
-version: ## Check Folio version
+version: ## Check pdfbro version
 	@curl -s http://localhost:$(API_PORT)/version || cargo run -p server -- version
 
 .PHONY: build-release
@@ -136,7 +136,7 @@ ui-build: ## Build the operator console UI (requires Node in ui/)
 	cd ui && npm run build
 
 .PHONY: ui-dev
-ui-dev: ## Start UI dev server with hot reload (run alongside folio-server)
+ui-dev: ## Start UI dev server with hot reload (run alongside pdfbro-server)
 	cd ui && npm run dev
 
 .PHONY: build-with-ui
@@ -144,11 +144,11 @@ build-with-ui: ui-build build-release ## Build UI then Rust binary (for local te
 
 .PHONY: docker-test
 docker-test: ## Run tests inside Docker container (with Chrome + LibreOffice)
-	docker build -t folio-test -f Dockerfile .
+	docker build -t pdfbro-test -f Dockerfile .
 	docker run --rm \
 		-e CHROME_PATH=/usr/bin/google-chrome \
 		-e LIBREOFFICE_PATH=/usr/bin/soffice \
-		folio-test \
+		pdfbro-test \
 		cargo test --release -- --ignored
 
 # Export all variables
@@ -161,17 +161,17 @@ export
 #
 #   Target name               Tag suffix        Description
 #   ─────────────────────     ──────────────    ──────────────────────────────
-#   folio                     (none)            Full: Chromium + LibreOffice
-#   folio-chromium            -chromium         Chromium only (~30% smaller)
-#   folio-libreoffice         -libreoffice      LibreOffice only (~40% smaller)
-#   folio-cloudrun            -cloudrun         Full + Cloud Run env vars
-#   folio-cloudrun-chromium   -chromium-cloudrun  Chromium + Cloud Run
-#   folio-cloudrun-libreoffice -libreoffice-cloudrun LibreOffice + Cloud Run
-#   folio-lambda              -lambda           Full + Lambda Web Adapter
-#   folio-lambda-chromium     -chromium-lambda  Chromium + Lambda Web Adapter
-#   folio-lambda-libreoffice  -libreoffice-lambda LibreOffice + Lambda Web Adapter
+#   pdfbro                    (none)            Full: Chromium + LibreOffice
+#   pdfbro-chromium           -chromium         Chromium only (~30% smaller)
+#   pdfbro-libreoffice        -libreoffice      LibreOffice only (~40% smaller)
+#   pdfbro-cloudrun           -cloudrun         Full + Cloud Run env vars
+#   pdfbro-cloudrun-chromium  -chromium-cloudrun  Chromium + Cloud Run
+#   pdfbro-cloudrun-libreoffice -libreoffice-cloudrun LibreOffice + Cloud Run
+#   pdfbro-lambda             -lambda           Full + Lambda Web Adapter
+#   pdfbro-lambda-chromium    -chromium-lambda  Chromium + Lambda Web Adapter
+#   pdfbro-lambda-libreoffice -libreoffice-lambda LibreOffice + Lambda Web Adapter
 #
-# Override registry:   make docker-build-all DOCKER_REGISTRY=myrepo/folio
+# Override registry:   make docker-build-all DOCKER_REGISTRY=myrepo/pdfbro
 # =============================================================================
 
 DOCKER_REGISTRY ?= deesh2025/no-name
@@ -191,40 +191,40 @@ endef
 
 .PHONY: docker-build
 docker-build: ## Build full image (Chromium + LibreOffice)
-	$(call docker_build,folio,)
+	$(call docker_build,pdfbro,)
 	docker tag $(DOCKER_REGISTRY):latest $(DOCKER_REGISTRY):v$(VERSION)
 
 .PHONY: docker-build-chromium
 docker-build-chromium: ## Build Chromium-only image
-	$(call docker_build,folio-chromium,-chromium)
+	$(call docker_build,pdfbro-chromium,-chromium)
 
 .PHONY: docker-build-libreoffice
 docker-build-libreoffice: ## Build LibreOffice-only image
-	$(call docker_build,folio-libreoffice,-libreoffice)
+	$(call docker_build,pdfbro-libreoffice,-libreoffice)
 
 .PHONY: docker-build-cloudrun
 docker-build-cloudrun: ## Build Cloud Run full image
-	$(call docker_build,folio-cloudrun,-cloudrun)
+	$(call docker_build,pdfbro-cloudrun,-cloudrun)
 
 .PHONY: docker-build-cloudrun-chromium
 docker-build-cloudrun-chromium: ## Build Cloud Run Chromium-only image
-	$(call docker_build,folio-cloudrun-chromium,-chromium-cloudrun)
+	$(call docker_build,pdfbro-cloudrun-chromium,-chromium-cloudrun)
 
 .PHONY: docker-build-cloudrun-libreoffice
 docker-build-cloudrun-libreoffice: ## Build Cloud Run LibreOffice-only image
-	$(call docker_build,folio-cloudrun-libreoffice,-libreoffice-cloudrun)
+	$(call docker_build,pdfbro-cloudrun-libreoffice,-libreoffice-cloudrun)
 
 .PHONY: docker-build-lambda
 docker-build-lambda: ## Build AWS Lambda full image (Lambda Web Adapter)
-	$(call docker_build,folio-lambda,-lambda)
+	$(call docker_build,pdfbro-lambda,-lambda)
 
 .PHONY: docker-build-lambda-chromium
 docker-build-lambda-chromium: ## Build AWS Lambda Chromium-only image
-	$(call docker_build,folio-lambda-chromium,-chromium-lambda)
+	$(call docker_build,pdfbro-lambda-chromium,-chromium-lambda)
 
 .PHONY: docker-build-lambda-libreoffice
 docker-build-lambda-libreoffice: ## Build AWS Lambda LibreOffice-only image
-	$(call docker_build,folio-lambda-libreoffice,-libreoffice-lambda)
+	$(call docker_build,pdfbro-lambda-libreoffice,-libreoffice-lambda)
 
 .PHONY: docker-build-all
 docker-build-all: ## Build all 9 variants sequentially

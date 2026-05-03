@@ -9,11 +9,11 @@ use crate::{driver, preflight, quality, report, rss, stats, workload};
 #[derive(Args)]
 pub struct PerfArgs {
     #[arg(long, default_value = "http://localhost:3001")]
-    pub folio_url: String,
+    pub pdfbro_url: String,
     #[arg(long, default_value = "http://localhost:3002")]
     pub gotenberg_url: String,
-    #[arg(long, default_value = "bench-folio")]
-    pub folio_container: String,
+    #[arg(long, default_value = "bench-pdfbro")]
+    pub pdfbro_container: String,
     #[arg(long, default_value = "bench-gotenberg")]
     pub gotenberg_container: String,
     #[arg(long, default_value_t = 4)]
@@ -35,7 +35,7 @@ pub struct PerfArgs {
 
 pub async fn run_perf(args: PerfArgs) -> anyhow::Result<()> {
     if !args.skip_preflight {
-        preflight::check(&args.folio_container, &args.gotenberg_container)?;
+        preflight::check(&args.pdfbro_container, &args.gotenberg_container)?;
     }
 
     let timestamp = Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
@@ -53,8 +53,8 @@ pub async fn run_perf(args: PerfArgs) -> anyhow::Result<()> {
         }
         println!("\n=== {} — {} ===", w.name, w.description);
 
-        let folio_result = run_workload(
-            w, &args.folio_url, w.folio_route, &args.folio_container,
+        let pdfbro_result = run_workload(
+            w, &args.pdfbro_url, w.pdfbro_route, &args.pdfbro_container,
             args.concurrency, args.warmup_secs, args.duration_secs, args.repetitions,
         ).await?;
 
@@ -65,7 +65,7 @@ pub async fn run_perf(args: PerfArgs) -> anyhow::Result<()> {
 
         all_results.push(report::WorkloadResult {
             workload: w.name.to_string(),
-            folio: folio_result,
+            pdfbro: pdfbro_result,
             gotenberg: gotenberg_result,
         });
     }

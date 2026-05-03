@@ -1,6 +1,6 @@
 #![deny(rust_2018_idioms)]
 #![forbid(unsafe_code)]
-//! `folio` — Folio's command-line entry point.
+//! `pdfbro` — pdfbro's command-line entry point.
 //!
 //! `main` is intentionally tiny: install a tracing subscriber configured
 //! against the user's chosen log format, build a multi-thread tokio

@@ -515,7 +515,7 @@ impl Default for BatchConfig {
             retention_minutes: DEFAULT_RETENTION_MINUTES,
             concurrency_per_batch: 4,
             max_active_batches: 10,
-            storage_path: std::path::PathBuf::from("/tmp/folio-batches"),
+            storage_path: std::path::PathBuf::from("/tmp/pdfbro-batches"),
         }
     }
 }

@@ -3,10 +3,10 @@ name = "cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Folio CLI"
+description = "pdfbro CLI"
 
 [[bin]]
-name = "folio"
+name = "pdfbro"
 path = "src/main.rs"
 
 [dependencies]

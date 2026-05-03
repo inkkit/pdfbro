@@ -1,4 +1,4 @@
-//! `clap` derive structs for the entire `folio` binary surface.
+//! `clap` derive structs for the entire `pdfbro` binary surface.
 //!
 //! Each subcommand has its own `*Args` struct; PDF / RequestContext /
 //! Office options are factored into reusable `*Flags` structs that are
@@ -17,10 +17,10 @@ use crate::parse;
 // Top-level
 // ---------------------------------------------------------------------------
 
-/// Folio command-line interface.
+/// pdfbro command-line interface.
 #[derive(Debug, Parser)]
 #[command(
-    name = "folio",
+    name = "pdfbro",
     version,
     about = "Convert HTML / URL / Markdown / Office to PDF, and post-process PDFs",
     propagate_version = true

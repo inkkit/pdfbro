@@ -1,4 +1,4 @@
-//! Startup banner for `folio-server`.
+//! Startup banner for `pdfbro-server`.
 //!
 //! Prints a decorative ASCII logo, version, and a capability matrix on
 //! startup when the log format is text and stdout is a TTY.  The output
@@ -33,7 +33,7 @@ pub fn print(config: &ServerConfig, chromium_ready: bool, libreoffice_ready: boo
             chromium  = if chromium_ready  { "ready" } else { "unavailable" },
             libreoffice = if libreoffice_ready { "ready" } else { "unavailable" },
             engines = "merge,split,flatten,metadata,convert,bookmarks,watermark,stamp,encrypt,decrypt,rotate",
-            "folio server ready",
+            "pdfbro server ready",
         );
         return;
     }
@@ -91,7 +91,7 @@ pub fn print(config: &ServerConfig, chromium_ready: bool, libreoffice_ready: boo
     println!(
         "\n{}\n\n{LEFT_MARGIN}{}  {}\n{LEFT_MARGIN}{}: {}\n{LEFT_MARGIN}{}\n\n{LEFT_MARGIN}{}\n{}\n\n{LEFT_MARGIN}{}\n{}\n\n{LEFT_MARGIN}{}\n{LEFT_MARGIN}{SECTION_INDENT}http://{}:{}\n",
         ascii_logo(),
-        color("Folio", "36;1", c),      // cyan bold
+        color("pdfbro", "36;1", c),      // cyan bold
         color("— A Rust-powered document-to-PDF API", "0", c),
         color("Version", "2", c),         // dim
         color(version, "0", c),
@@ -192,7 +192,7 @@ mod tests {
             batch_concurrency: 4,
             batch_max_active: 10,
             batch_retention_minutes: 60,
-            batch_storage_path: std::path::PathBuf::from("/tmp/folio-batches"),
+            batch_storage_path: std::path::PathBuf::from("/tmp/pdfbro-batches"),
             // OpenTelemetry
             otel_enabled: false,
             otel_endpoint: "http://localhost:4318/v1/traces".to_string(),

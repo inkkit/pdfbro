@@ -6,7 +6,7 @@
 //! - Chrome on PATH (or via $CHROME_PATH) for Chromium tests
 //! - soffice on PATH (or via $LIBREOFFICE_PATH) for LibreOffice tests
 //!
-//! Each test spawns an instance of the full `folio-server` router on a
+//! Each test spawns an instance of the full `pdfbro-server` router on a
 //! dynamically-allocated localhost port, performs HTTP requests against it
 //! via `reqwest`, and asserts on the response shape.
 
@@ -91,7 +91,7 @@ fn test_config() -> ServerConfig {
         batch_concurrency: 4,
         batch_max_active: 10,
         batch_retention_minutes: 60,
-        batch_storage_path: std::path::PathBuf::from("/tmp/folio-batches"),
+        batch_storage_path: std::path::PathBuf::from("/tmp/pdfbro-batches"),
         otel_enabled: false,
         otel_endpoint: "http://localhost:4318/v1/traces".to_string(),
         chromium_lazy_start: false,
@@ -205,7 +205,7 @@ async fn e2e_chromium_html() {
 
     let form = Form::new().part(
         "files",
-        Part::bytes(b"<html><body><h1>folio</h1></body></html>".to_vec())
+        Part::bytes(b"<html><body><h1>pdfbro</h1></body></html>".to_vec())
             .file_name("index.html")
             .mime_str("text/html")
             .unwrap(),
@@ -282,7 +282,7 @@ async fn e2e_libreoffice_docx() {
     // A trivial RTF qualifies as a `writer` LibreOffice input. We emit
     // RTF rather than DOCX so the test does not depend on a binary
     // fixture; the engine spec guarantees RTF -> writer_pdf_Export.
-    let rtf = b"{\\rtf1\\ansi folio test\\par}".to_vec();
+    let rtf = b"{\\rtf1\\ansi pdfbro test\\par}".to_vec();
     let form = Form::new().part(
         "files",
         Part::bytes(rtf)

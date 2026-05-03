@@ -1,7 +1,7 @@
-# Folio Markdown+ — A New Markdown→PDF Variation
+# pdfbro Markdown+ — A New Markdown→PDF Variation
 
 > **Status:** Design proposal. Companion to `comparison.md` at the repo root.
-> **Scope:** Defines a third Markdown rendering route for Folio that sits
+> **Scope:** Defines a third Markdown rendering route for pdfbro that sits
 > alongside the existing `/forms/chromium/convert/markdown` (basic) and the
 > Gotenberg-compatible template-based path. Targets document-quality output
 > (reports, dossiers, technical writing) rather than the raw GFM-in-a-box
@@ -11,7 +11,7 @@
 
 ## 1. Why a new variation?
 
-Today Folio offers a single Markdown pipeline (`crates/engine/src/chromium/markdown.rs`):
+Today pdfbro offers a single Markdown pipeline (`crates/engine/src/chromium/markdown.rs`):
 
 - `pulldown_cmark` with `Options::all()` (tables, strikethrough, task lists,
   footnotes, smart punctuation).
@@ -27,7 +27,7 @@ generated dossiers, customer-facing one-pagers, weekly digests.
 Gaps observed against both the current code and Gotenberg's
 `/forms/chromium/convert/markdown`:
 
-| Need                                  | Current Folio | Gotenberg | Gap            |
+| Need                                  | Current pdfbro | Gotenberg | Gap            |
 |---------------------------------------|---------------|-----------|----------------|
 | YAML / TOML front-matter for metadata | ❌            | ❌        | both miss      |
 | Math (KaTeX / MathJax) rendering      | ❌            | ❌        | both miss      |
@@ -36,10 +36,10 @@ Gaps observed against both the current code and Gotenberg's
 | Admonitions / callouts                | ❌            | ❌        | both miss      |
 | Auto table-of-contents                | ❌            | ❌        | both miss      |
 | Themed templates (named styles)       | ❌            | ❌        | both miss      |
-| Header/footer driven by front-matter  | ❌            | partial   | folio behind   |
+| Header/footer driven by front-matter  | ❌            | partial   | pdfbro behind   |
 | Cover page generation                 | ❌            | ❌        | both miss      |
 | Cross-document includes (`@include`)  | ❌            | ❌        | both miss      |
-| Asset upload + relative paths         | partial       | ✅        | folio behind   |
+| Asset upload + relative paths         | partial       | ✅        | pdfbro behind   |
 
 The "new variation" — **Markdown+** — targets the bottom half of that table
 in a single coherent route. It is *not* a replacement for the basic route;
@@ -84,7 +84,7 @@ A document opens with a fenced front-matter block:
 ```markdown
 ---
 title: Q2 Reliability Review
-author: Folio SRE
+author: pdfbro SRE
 date: 2026-04-30
 classification: internal
 toc: true
@@ -134,7 +134,7 @@ markdown bytes
    ├── KaTeX/Mermaid/Prism JS bundles inlined (or skipped if extension off)
    │
    └── Chromium render with extended waitFunction:
-         () => window.__folioReady === true
+         () => window.__pdfbroReady === true
        set after KaTeX + Mermaid finish.
 ```
 
@@ -150,7 +150,7 @@ markdown_plus/
 ├── toc.rs          // heading walk + injection
 ├── theme.rs        // named themes (embedded CSS)
 ├── assets.rs       // KaTeX / Mermaid / Prism inlining
-└── ready.rs        // window.__folioReady wait protocol
+└── ready.rs        // window.__pdfbroReady wait protocol
 ```
 
 This mirrors the existing module layout (`launch.rs`, `render.rs`,
@@ -180,10 +180,10 @@ $$
 ````markdown
 ```mermaid
 sequenceDiagram
-    Client->>Folio: POST /markdown-plus
-    Folio->>Chromium: rendered HTML
-    Chromium-->>Folio: PDF bytes
-    Folio-->>Client: 200 OK
+    Client->>pdfbro: POST /markdown-plus
+    pdfbro->>Chromium: rendered HTML
+    Chromium-->>pdfbro: PDF bytes
+    pdfbro-->>Client: 200 OK
 ```
 ````
 
@@ -191,7 +191,7 @@ sequenceDiagram
 
 ```markdown
 > [!NOTE]
-> Folio does not require LibreOffice for this route.
+> pdfbro does not require LibreOffice for this route.
 
 > [!WARNING]
 > Mermaid renders client-side; render times scale with diagram count.
@@ -242,9 +242,9 @@ Markdown+ is louder than the basic route, so it earns its own observability
 labels. No new metric *types* — just additional label values on the
 existing histograms and counters:
 
-- `folio_conversions_total{engine="chromium",endpoint="markdown_plus", ...}`
-- `folio_conversion_duration_seconds{...,endpoint="markdown_plus"}`
-- New histogram `folio_markdown_plus_stage_duration_seconds{stage}` with
+- `pdfbro_conversions_total{engine="chromium",endpoint="markdown_plus", ...}`
+- `pdfbro_conversion_duration_seconds{...,endpoint="markdown_plus"}`
+- New histogram `pdfbro_markdown_plus_stage_duration_seconds{stage}` with
   stages: `frontmatter`, `include`, `parse`, `toc`, `theme`, `assets`,
   `chromium`. This is genuinely new information — KaTeX or Mermaid blow-ups
   are otherwise invisible inside the chromium total.
@@ -260,17 +260,17 @@ crate.
 ## 6. What this variation deliberately does *not* do
 
 - **No HTML sanitisation regression.** Raw `<script>` is dropped at the
-  parser level (Folio's basic route inlines it but Chrome refuses to run
+  parser level (pdfbro's basic route inlines it but Chrome refuses to run
   it; Markdown+ tightens this — `<script>` becomes a comment, no
   exceptions).
 - **No template engine.** Front-matter substitution is `{key}` only; no
   Mustache/Handlebars/Liquid. People who want full templating compose two
-  passes: render a Liquid template themselves, then POST to Folio.
+  passes: render a Liquid template themselves, then POST to pdfbro.
 - **No multi-file output.** One Markdown+ request → one PDF. Bulk
   rendering belongs in the (separate) batch API.
 - **No cross-request state.** Includes resolve from the upload only — never
   from a server-side library. Templating-by-stealth is an exfiltration
-  vector and Folio is opinionated against it.
+  vector and pdfbro is opinionated against it.
 
 ---
 
@@ -295,7 +295,7 @@ crate.
 4. pulldown-cmark event-stream extensions (math, mermaid, admonitions).
 5. TOC walker + injector.
 6. Theme bundle + asset inliner (KaTeX, Prism, Mermaid as opt-in features).
-7. `window.__folioReady` ready-protocol; extend `wait.rs`.
+7. `window.__pdfbroReady` ready-protocol; extend `wait.rs`.
 8. New route in `crates/server/src/routes/chromium.rs`.
 9. Stage-duration histogram in `metrics.rs`.
 10. Operator console panel (Svelte component, gated on observed traffic).

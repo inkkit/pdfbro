@@ -3,7 +3,7 @@ name = "py"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Folio Python bindings (PyO3)"
+description = "pdfbro Python bindings (PyO3)"
 
 [lib]
 name = "_native"

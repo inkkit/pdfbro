@@ -1171,7 +1171,7 @@ mod tests {
     #[test]
     fn request_context_round_trip_basic() {
         let map = fm(&[
-            ("userAgent", "Mozilla/5.0 folio-test"),
+            ("userAgent", "Mozilla/5.0 pdfbro-test"),
             ("extraHttpHeaders", r#"{"X-Trace":"abc"}"#),
             (
                 "cookies",
@@ -1180,7 +1180,7 @@ mod tests {
             ("failOnHttpStatusCodes", "[500,503]"),
         ]);
         let ctx = parse_request_context(&map).unwrap();
-        assert_eq!(ctx.user_agent.as_deref(), Some("Mozilla/5.0 folio-test"));
+        assert_eq!(ctx.user_agent.as_deref(), Some("Mozilla/5.0 pdfbro-test"));
         assert_eq!(
             ctx.extra_headers.get("X-Trace").map(String::as_str),
             Some("abc")

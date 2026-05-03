@@ -1,21 +1,21 @@
 {
-  "name": "@folio/folio",
+  "name": "@vel/pdfbro",
   "version": "0.1.0",
-  "description": "Folio: Rust-native PDF conversion, embeddable in Node.",
+  "description": "pdfbro: Rust-native PDF conversion, embeddable in Node.",
   "main": "index.js",
   "types": "index.d.ts",
   "license": "MIT",
   "engines": { "node": ">= 18" },
   "napi": {
-    "name": "folio-node",
+    "name": "pdfbro-node",
     "triples": {
       "defaults": true,
       "additional": ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
     }
   },
   "scripts": {
-    "build": "napi build --platform --release --cargo-cwd ../../crates/js --cargo-name folio_js --js _native.js --dts _native.d.ts",
-    "build:debug": "napi build --platform --cargo-cwd ../../crates/js --cargo-name folio_js --js _native.js --dts _native.d.ts",
+    "build": "napi build --platform --release --cargo-cwd ../../crates/js --cargo-name pdfbro_js --js _native.js --dts _native.d.ts",
+    "build:debug": "napi build --platform --cargo-cwd ../../crates/js --cargo-name pdfbro_js --js _native.js --dts _native.d.ts",
     "test": "vitest run"
   },
   "devDependencies": {

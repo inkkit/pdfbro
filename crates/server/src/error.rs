@@ -656,7 +656,7 @@ fn engine_status_and_code(e: &EngineError) -> (StatusCode, &'static str) {
 
 /// Generate documentation links for error codes.
 fn documentation_link(error_code: &str) -> String {
-    let base_url = "https://folio.dev/docs";
+    let base_url = "https://pdfbro.dev/docs";
     let path = match error_code {
         "NAVIGATION" => "/troubleshooting#navigation-failed",
         "TIMEOUT" => "/troubleshooting#timeout",
@@ -739,7 +739,7 @@ mod tests {
         assert_eq!(body["details"]["reason"], "net::ERR_NAME_NOT_RESOLVED");
         // Also verify suggestion and documentation are present
         assert!(body["suggestion"].is_string());
-        assert!(body["documentation"].as_str().unwrap().contains("folio.dev"));
+        assert!(body["documentation"].as_str().unwrap().contains("pdfbro.dev"));
     }
 
     #[test]
@@ -811,7 +811,7 @@ mod tests {
         let (_, body) = body_value(ApiError::MissingField("url"));
         assert!(body["documentation"].is_string(), "documentation field should be present");
         let doc = body["documentation"].as_str().unwrap();
-        assert!(doc.starts_with("https://folio.dev/docs"), "documentation should link to folio docs: {doc}");
+        assert!(doc.starts_with("https://pdfbro.dev/docs"), "documentation should link to pdfbro docs: {doc}");
     }
 
     #[test]

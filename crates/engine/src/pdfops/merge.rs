@@ -181,7 +181,7 @@ mod tests {
         let pdf = make_blank_pdf();
         let out = merge(&[&pdf]).unwrap();
         assert_eq!(page_count(&out), 1);
-        assert!(producer_of(&out).starts_with("folio/"));
+        assert!(producer_of(&out).starts_with("pdfbro/"));
     }
 
     #[test]
@@ -214,13 +214,13 @@ mod tests {
     }
 
     #[test]
-    fn merge_producer_set_to_folio_version() {
+    fn merge_producer_set_to_pdfbro_version() {
         let a = make_blank_pdf();
         let b = make_blank_pdf();
         let out = merge(&[&a, &b]).unwrap();
         assert_eq!(
             producer_of(&out),
-            format!("folio/{}", env!("CARGO_PKG_VERSION"))
+            format!("pdfbro/{}", env!("CARGO_PKG_VERSION"))
         );
     }
 }

@@ -1,5 +1,5 @@
 import os, pathlib, pytest
-import folio
+import pdfbro
 
 E2E = os.environ.get("FOLIO_E2E") == "1"
 pytestmark = pytest.mark.skipif(not E2E, reason="FOLIO_E2E not set")
@@ -7,25 +7,25 @@ pytestmark = pytest.mark.skipif(not E2E, reason="FOLIO_E2E not set")
 FIXTURE = pathlib.Path(__file__).resolve().parents[2] / "fixtures" / "hello.html"
 
 def test_html_to_pdf_sync():
-    with folio.Folio(engines=["chromium"]) as f:
+    with pdfbro.PdfBro(engines=["chromium"]) as f:
         pdf = f.html_to_pdf(FIXTURE.read_text())
     assert pdf[:4] == b"%PDF"
 
 def test_url_to_pdf_sync():
-    with folio.Folio(engines=["chromium"]) as f:
+    with pdfbro.PdfBro(engines=["chromium"]) as f:
         pdf = f.url_to_pdf("about:blank")
     assert pdf[:4] == b"%PDF"
 
 def test_markdown_to_pdf_sync():
-    with folio.Folio(engines=["chromium"]) as f:
-        pdf = f.markdown_to_pdf("# hello\n\nfolio e2e")
+    with pdfbro.PdfBro(engines=["chromium"]) as f:
+        pdf = f.markdown_to_pdf("# hello\n\npdfbro e2e")
     assert pdf[:4] == b"%PDF"
 
 import asyncio
 
 def test_html_to_pdf_async():
     async def run():
-        f = await folio.AsyncFolio.create(engines=["chromium"])
+        f = await pdfbro.AsyncPdfBro.create(engines=["chromium"])
         try:
             pdf = await f.html_to_pdf(FIXTURE.read_text())
         finally:

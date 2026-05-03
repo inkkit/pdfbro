@@ -3,7 +3,7 @@ name = "engine"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Folio core engine: ChromiumEngine, LibreOfficeEngine, PdfOperations"
+description = "pdfbro core engine: ChromiumEngine, LibreOfficeEngine, PdfOperations"
 
 [features]
 default = ["chromium", "libreoffice"]

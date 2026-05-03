@@ -4,7 +4,7 @@ use crate::stats::LatencyStats;
 
 pub struct WorkloadResult {
     pub workload: String,
-    pub folio: RunResult,
+    pub pdfbro: RunResult,
     pub gotenberg: RunResult,
 }
 
@@ -19,7 +19,7 @@ pub fn write(results: &[WorkloadResult], output_dir: &PathBuf) -> anyhow::Result
     let path = output_dir.join("perf.md");
 
     let mut md = String::new();
-    md.push_str("# Folio vs Gotenberg — Performance Report\n\n");
+    md.push_str("# pdfbro vs Gotenberg — Performance Report\n\n");
     md.push_str(&format!(
         "Generated: {}\n\n",
         chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ")
@@ -30,9 +30,9 @@ pub fn write(results: &[WorkloadResult], output_dir: &PathBuf) -> anyhow::Result
     md.push_str("|----------|--------|-----|-----|-----|-----|--------|\n");
     for r in results {
         md.push_str(&format!(
-            "| {} | folio | {} | {} | {} | {:.1} | {:.1}% |\n",
-            r.workload, r.folio.stats.p50_ms, r.folio.stats.p95_ms,
-            r.folio.stats.p99_ms, r.folio.stats.rps, r.folio.stats.error_rate * 100.0,
+            "| {} | pdfbro | {} | {} | {} | {:.1} | {:.1}% |\n",
+            r.workload, r.pdfbro.stats.p50_ms, r.pdfbro.stats.p95_ms,
+            r.pdfbro.stats.p99_ms, r.pdfbro.stats.rps, r.pdfbro.stats.error_rate * 100.0,
         ));
         md.push_str(&format!(
             "| {} | gotenberg | {} | {} | {} | {:.1} | {:.1}% |\n",
@@ -42,21 +42,21 @@ pub fn write(results: &[WorkloadResult], output_dir: &PathBuf) -> anyhow::Result
     }
 
     md.push_str("\n## Peak RSS (MiB)\n\n");
-    md.push_str("| Workload | Folio | Gotenberg |\n");
+    md.push_str("| Workload | pdfbro | Gotenberg |\n");
     md.push_str("|----------|-------|-----------|\n");
     for r in results {
         md.push_str(&format!(
             "| {} | {} | {} |\n",
             r.workload,
-            r.folio.peak_rss_mib.map_or("N/A".to_string(), |v| v.to_string()),
+            r.pdfbro.peak_rss_mib.map_or("N/A".to_string(), |v| v.to_string()),
             r.gotenberg.peak_rss_mib.map_or("N/A".to_string(), |v| v.to_string()),
         ));
     }
 
     let mut cv_warnings = Vec::new();
     for r in results {
-        if r.folio.stats.cv > 15.0 {
-            cv_warnings.push(format!("- folio/{}: CV={:.1}% (unstable)", r.workload, r.folio.stats.cv));
+        if r.pdfbro.stats.cv > 15.0 {
+            cv_warnings.push(format!("- pdfbro/{}: CV={:.1}% (unstable)", r.workload, r.pdfbro.stats.cv));
         }
         if r.gotenberg.stats.cv > 15.0 {
             cv_warnings.push(format!("- gotenberg/{}: CV={:.1}% (unstable)", r.workload, r.gotenberg.stats.cv));

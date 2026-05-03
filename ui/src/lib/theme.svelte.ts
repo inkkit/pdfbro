@@ -39,13 +39,13 @@ export const themeStore = new ThemeStore();
 
 // Persist dark mode in localStorage (client-side only)
 if (typeof window !== 'undefined') {
-    themeStore.dark = localStorage.getItem('folio-dark') === 'true';
+    themeStore.dark = localStorage.getItem('pdfbro-dark') === 'true';
 }
 
 $effect.root(() => {
     $effect(() => {
         if (typeof window !== 'undefined') {
-            localStorage.setItem('folio-dark', String(themeStore.dark));
+            localStorage.setItem('pdfbro-dark', String(themeStore.dark));
             document.documentElement.classList.toggle('dark', themeStore.dark);
         }
     });

@@ -1,4 +1,4 @@
-//! `folio merge` / `split` / `flatten` — pure pdfops over byte buffers.
+//! `pdfbro merge` / `split` / `flatten` — pure pdfops over byte buffers.
 
 use anyhow::{Context, anyhow};
 use engine::PageRanges;
@@ -8,7 +8,7 @@ use crate::args::{FlattenArgs, MergeArgs, SplitArgs};
 use crate::exit::UsageError;
 use crate::io_helpers::{is_stdin, read_input_sync, write_output};
 
-/// `folio merge --output FILE INPUT...`
+/// `pdfbro merge --output FILE INPUT...`
 pub(crate) fn run_merge(args: &MergeArgs) -> anyhow::Result<()> {
     let stdin_count = args.inputs.iter().filter(|s| is_stdin(s)).count();
     if stdin_count > 1 {
@@ -25,7 +25,7 @@ pub(crate) fn run_merge(args: &MergeArgs) -> anyhow::Result<()> {
     write_output(&args.output, &pdf)
 }
 
-/// `folio split INPUT --output-dir DIR --mode SPEC --prefix STR`
+/// `pdfbro split INPUT --output-dir DIR --mode SPEC --prefix STR`
 pub(crate) fn run_split(args: &SplitArgs) -> anyhow::Result<()> {
     let pdf_bytes =
         std::fs::read(&args.input).with_context(|| format!("reading {}", args.input.display()))?;
@@ -62,7 +62,7 @@ pub(crate) fn run_split(args: &SplitArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// `folio flatten INPUT --output FILE`
+/// `pdfbro flatten INPUT --output FILE`
 pub(crate) fn run_flatten(args: &FlattenArgs) -> anyhow::Result<()> {
     let pdf_bytes = read_input_sync(&args.input)?;
     let out = pdfops::flatten(&pdf_bytes).context("flattening PDF")?;

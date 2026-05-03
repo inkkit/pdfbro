@@ -1,4 +1,4 @@
-//! `folio encrypt` / `folio decrypt` — PDF password protection.
+//! `pdfbro encrypt` / `pdfbro decrypt` — PDF password protection.
 
 use anyhow::Context;
 use engine::encrypt::{EncryptionAlgorithm, Permissions, decrypt_pdf, encrypt_pdf};
@@ -6,7 +6,7 @@ use engine::encrypt::{EncryptionAlgorithm, Permissions, decrypt_pdf, encrypt_pdf
 use crate::args::{DecryptArgs, EncryptAlgorithm, EncryptArgs};
 use crate::io_helpers::{read_input_sync, write_output};
 
-/// `folio encrypt INPUT --output FILE [--user-password PASS] [--owner-password PASS]`
+/// `pdfbro encrypt INPUT --output FILE [--user-password PASS] [--owner-password PASS]`
 pub(crate) async fn run_encrypt(args: &EncryptArgs) -> anyhow::Result<()> {
     let pdf_bytes = read_input_sync(&args.input)?;
 
@@ -29,7 +29,7 @@ pub(crate) async fn run_encrypt(args: &EncryptArgs) -> anyhow::Result<()> {
     write_output(&args.output, &encrypted)
 }
 
-/// `folio decrypt INPUT --output FILE --password PASS`
+/// `pdfbro decrypt INPUT --output FILE --password PASS`
 pub(crate) async fn run_decrypt(args: &DecryptArgs) -> anyhow::Result<()> {
     let pdf_bytes = read_input_sync(&args.input)?;
 

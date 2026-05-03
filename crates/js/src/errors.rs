@@ -16,7 +16,7 @@ pub fn engine_to_napi(err: EngineError) -> Error {
             (Status::InvalidArg, format!("[Validation] {err}")),
         EngineError::ChromeLaunch(_) | EngineError::Cdp(_) | EngineError::Navigation { .. } =>
             (Status::GenericFailure, format!("[Chromium] {err}")),
-        // No specific Office variant; route everything else to FolioError on the JS side.
+        // No specific Office variant; route everything else to PdfBroError on the JS side.
         _ => (Status::GenericFailure, err.to_string()),
     };
     Error::new(status, msg)

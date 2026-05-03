@@ -32,7 +32,7 @@ static SHARED_PID: AtomicU32 = AtomicU32::new(0);
 /// Test state shared across BDD steps.
 #[derive(Debug, World)]
 #[world(init = Self::new)]
-pub struct FolioWorld {
+pub struct PdfBroWorld {
     /// HTTP client for requests
     pub client: Client,
 
@@ -66,7 +66,7 @@ pub struct FolioWorld {
     pub server_process: Option<Child>,
 }
 
-impl FolioWorld {
+impl PdfBroWorld {
     /// Create new World instance.
     fn new() -> Self {
         Self {
@@ -83,18 +83,18 @@ impl FolioWorld {
         }
     }
 
-    /// Locate the `folio-server` binary.
+    /// Locate the `pdfbro-server` binary.
     ///
     /// Resolution order:
-    /// 1. `CARGO_BIN_EXE_folio-server` — set by cargo (and cargo-llvm-cov) when
+    /// 1. `CARGO_BIN_EXE_pdfbro-server` — set by cargo (and cargo-llvm-cov) when
     ///    building integration tests; points to the correct instrumented binary.
     /// 2. Fallback: walk `target/{debug,release}` relative to the workspace root,
     ///    preferring whichever profile matches the running test binary.
-    fn find_folio_server_binary() -> std::path::PathBuf {
+    fn find_pdfbro_server_binary() -> std::path::PathBuf {
         // Prefer the env var: works with cargo test, cargo-llvm-cov, cargo-nextest.
         // cargo-llvm-cov places instrumented binaries in target/llvm-cov-target/,
         // which the path-walk below would miss.
-        if let Ok(path) = std::env::var("CARGO_BIN_EXE_folio-server") {
+        if let Ok(path) = std::env::var("CARGO_BIN_EXE_pdfbro-server") {
             let p = std::path::PathBuf::from(&path);
             if p.exists() {
                 return p;
@@ -120,14 +120,14 @@ impl FolioWorld {
             ["debug", "release"]
         };
         for profile in preferred {
-            let candidate = workspace_root.join("target").join(profile).join("folio-server");
+            let candidate = workspace_root.join("target").join(profile).join("pdfbro-server");
             if candidate.exists() {
                 return candidate;
             }
         }
 
         panic!(
-            "folio-server binary not found. Run `cargo build --bin folio-server` first, \
+            "pdfbro-server binary not found. Run `cargo build --bin pdfbro-server` first, \
              or use `cargo llvm-cov --workspace` which builds it automatically."
         );
     }
@@ -139,7 +139,7 @@ impl FolioWorld {
         listener.local_addr().unwrap().port()
     }
 
-    /// Start Folio server with environment variables.
+    /// Start pdfbro server with environment variables.
     ///
     /// The first call to this method across all scenarios acquires the
     /// [`SHARED_SERVER`] mutex, spawns the binary, waits for it to become
@@ -170,9 +170,9 @@ impl FolioWorld {
         let port = Self::find_free_port();
         let base_url = format!("http://localhost:{}", port);
 
-        let bin_path = Self::find_folio_server_binary();
+        let bin_path = Self::find_pdfbro_server_binary();
         eprintln!(
-            "[BDD] Spawning folio-server on port {} ({})",
+            "[BDD] Spawning pdfbro-server on port {} ({})",
             port,
             bin_path.display()
         );
@@ -190,8 +190,8 @@ impl FolioWorld {
 
         let mut child = cmd.spawn().unwrap_or_else(|e| {
             panic!(
-                "Failed to spawn folio-server at {}. \
-                 Build it first with `cargo build --bin folio-server`: {}",
+                "Failed to spawn pdfbro-server at {}. \
+                 Build it first with `cargo build --bin pdfbro-server`: {}",
                 bin_path.display(),
                 e
             )

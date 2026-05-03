@@ -313,7 +313,7 @@ pub async fn pdfengines_split(
 }
 
 fn parse_split_mode(map: &HashMap<String, String>) -> ApiResult<SplitMode> {
-    // Accept both `splitMode` (Folio) and `mode` (Gotenberg).
+    // Accept both `splitMode` (pdfbro) and `mode` (Gotenberg).
     let raw = map
         .get("splitMode")
         .or_else(|| map.get("mode"))
@@ -1008,7 +1008,7 @@ pub async fn pdfengines_watermark(
     }
 
     // Gotenberg API: watermarkSource=text, watermarkExpression=TEXT
-    // Legacy Folio API: watermark=TEXT or text=TEXT
+    // Legacy pdfbro API: watermark=TEXT or text=TEXT
     let source = form.map.get("watermarkSource").map(|s| s.as_str()).unwrap_or("text");
 
     let kind = match source {
@@ -1093,7 +1093,7 @@ pub async fn pdfengines_stamp(
     }
 
     // Gotenberg API: stampSource=text, stampExpression=TEXT
-    // Legacy Folio API: stamp=TEXT or text=TEXT
+    // Legacy pdfbro API: stamp=TEXT or text=TEXT
     let source = form.map.get("stampSource").map(|s| s.as_str()).unwrap_or("text");
 
     let kind = match source {

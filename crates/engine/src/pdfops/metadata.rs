@@ -50,7 +50,7 @@ pub struct Metadata {
     #[serde(rename = "Creator", skip_serializing_if = "Option::is_none")]
     pub creator: Option<String>,
     /// Producer string. Always overwritten by the common `finalize` step
-    /// to `folio/<crate-version>`; values supplied via `write_metadata`
+    /// to `pdfbro/<crate-version>`; values supplied via `write_metadata`
     /// are silently superseded.
     #[serde(rename = "Producer", skip_serializing_if = "Option::is_none")]
     pub producer: Option<String>,
@@ -550,7 +550,7 @@ mod tests {
             author: Some("Alice".into()),
             subject: Some("Test".into()),
             keywords: Some(vec!["kw".to_string()]),
-            creator: Some("Folio".into()),
+            creator: Some("pdfbro".into()),
             ..Default::default()
         };
         let back = round_trip(&pdf, &meta);
@@ -558,7 +558,7 @@ mod tests {
         assert_eq!(back.author.as_deref(), Some("Alice"));
         assert_eq!(back.subject.as_deref(), Some("Test"));
         assert_eq!(back.keywords.as_deref(), Some(&["kw".to_string()][..]));
-        assert_eq!(back.creator.as_deref(), Some("Folio"));
+        assert_eq!(back.creator.as_deref(), Some("pdfbro"));
     }
 
     #[test]
