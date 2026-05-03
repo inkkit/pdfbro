@@ -301,6 +301,36 @@ async fn convert_corrupted_returns_corrupted_error() {
 }
 
 #[tokio::test]
+async fn lazy_start_defers_lok_init_until_first_convert() {
+    // Don't reuse the SHARED engine here — we need a fresh lazy one.
+    let lo = match LibreOfficeEngine::launch(LibreOfficeConfig {
+        lazy_start: true,
+        ..LibreOfficeConfig::default()
+    })
+    .await
+    {
+        Ok(e) => e,
+        Err(_) => return, // LOK runtime not present — skip
+    };
+
+    // Immediately after launch, the worker is NOT initialised.
+    assert!(!lo.healthy().await, "lazy launch should leave healthy=false");
+
+    // First convert triggers init.
+    let bytes = lo
+        .convert(&writer_fixture(), &OfficeOptions::default())
+        .await
+        .expect("first convert");
+    assert!(bytes.starts_with(b"%PDF-"));
+
+    // After init, healthy is true.
+    assert!(lo.healthy().await, "engine should be healthy after first convert");
+
+    // Clean up so the worker thread doesn't outlive the test.
+    lo.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test]
 async fn z_shutdown_drains_then_rejects_new_requests() {
     let Some(lo) = engine().await else { return; };
 
