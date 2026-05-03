@@ -47,11 +47,23 @@ pub struct LibreOfficeEngine {
 }
 
 struct Inner {
-    /// Work queue to the dedicated LOK thread.
-    tx: mpsc::SyncSender<ConvertRequest>,
-    /// Set to `false` when the worker thread exits.
-    healthy: AtomicBool,
+    /// Work queue to the dedicated LOK thread. `None` until `init_worker()`
+    /// runs (eager start in `launch()`, or first `convert()` in lazy mode).
+    tx: parking_lot::Mutex<Option<mpsc::SyncSender<ConvertRequest>>>,
+    /// Join handle for the worker thread. Taken by `shutdown()` (Task 5).
+    worker_handle: parking_lot::Mutex<Option<std::thread::JoinHandle<()>>>,
+    /// Set to `true` after the worker has successfully initialised and is
+    /// ready to accept requests. Flips to `false` on timeout / wedge / exit.
+    healthy: Arc<AtomicBool>,
+    /// Per-conversion timeout.
     timeout: Duration,
+    /// Cached LOK program directory; lazy init reuses it on first `convert()`.
+    install_path: PathBuf,
+    /// `true` when the engine was constructed with `lazy_start = true`.
+    lazy_start: bool,
+    /// Single-flight guard: prevents two concurrent first-`convert()` callers
+    /// from spawning two worker threads.
+    init_lock: tokio::sync::Mutex<()>,
 }
 
 struct ConvertRequest {
@@ -93,7 +105,9 @@ impl LibreOfficeEngine {
         Self::launch(LibreOfficeConfig::default()).await
     }
 
-    /// Launch the engine, spawning the LOK worker thread.
+    /// Launch the engine. With `lazy_start = false` (default) the LOK worker
+    /// thread is spawned and LOK initialised before this returns. With
+    /// `lazy_start = true` the worker is deferred until the first `convert()`.
     pub async fn launch(config: LibreOfficeConfig) -> EngineResult<Self> {
         use libreofficekit::Office;
 
@@ -103,43 +117,80 @@ impl LibreOfficeEngine {
             .or_else(Office::find_install_path)
             .ok_or_else(|| {
                 EngineError::Internal(
-                    "LibreOffice not found — set LOK_PROGRAM_PATH or install LibreOffice".into(),
+                    "LibreOffice not found — set LO_PROGRAM_PATH or install LibreOffice".into(),
                 )
             })?;
 
-        info!(path = %install_path.display(), "Launching LibreOffice engine via LOK");
+        info!(
+            path = %install_path.display(),
+            lazy = config.lazy_start,
+            "Configuring LibreOffice engine via LOK"
+        );
 
-        // Bounded channel — back-pressure when the worker falls behind.
+        let engine = Self {
+            inner: Arc::new(Inner {
+                tx: parking_lot::Mutex::new(None),
+                worker_handle: parking_lot::Mutex::new(None),
+                healthy: Arc::new(AtomicBool::new(false)),
+                timeout: config.timeout,
+                install_path,
+                lazy_start: config.lazy_start,
+                init_lock: tokio::sync::Mutex::new(()),
+            }),
+        };
+
+        if !config.lazy_start {
+            engine.init_worker().await?;
+        }
+
+        // Idle-shutdown watcher (Task 8 fills in the body).
+        if let Some(d) = config.idle_shutdown_timeout {
+            engine.spawn_idle_watcher(d);
+        }
+
+        Ok(engine)
+    }
+
+    /// Single-flight worker spawn. Idempotent — concurrent callers serialise
+    /// on `init_lock` and the second one observes `tx.is_some()` and
+    /// short-circuits.
+    async fn init_worker(&self) -> EngineResult<()> {
+        let _guard = self.inner.init_lock.lock().await;
+        if self.inner.tx.lock().is_some() {
+            return Ok(()); // already initialised
+        }
+
         let (tx, rx) = mpsc::sync_channel::<ConvertRequest>(64);
-
-        // Startup rendezvous: worker sends Ok(()) once Office::new() succeeds.
         let (startup_tx, startup_rx) = tokio::sync::oneshot::channel::<EngineResult<()>>();
 
-        let healthy = Arc::new(AtomicBool::new(false));
-        let healthy_worker = Arc::clone(&healthy);
+        let install_path = self.inner.install_path.clone();
+        let healthy_worker = Arc::clone(&self.inner.healthy);
 
-        std::thread::Builder::new()
+        let handle = std::thread::Builder::new()
             .name("lok-worker".into())
             .spawn(move || {
                 lok_worker_thread(install_path, rx, startup_tx, healthy_worker);
             })
             .map_err(|e| EngineError::Internal(format!("failed to spawn LOK thread: {e}")))?;
 
-        // Wait up to 120 s for LibreOffice to initialise.
+        // Wait up to 120 s for LOK init.
         tokio::time::timeout(Duration::from_secs(120), startup_rx)
             .await
             .map_err(|_| EngineError::Timeout(Duration::from_secs(120)))?
             .map_err(|_| EngineError::Internal("LOK worker exited during startup".into()))??;
 
-        info!("LibreOffice engine ready");
+        // Worker is up; commit the tx + handle to Inner. Healthy is already
+        // set to true inside the worker thread before sending the startup ack.
+        *self.inner.tx.lock() = Some(tx);
+        *self.inner.worker_handle.lock() = Some(handle);
 
-        Ok(Self {
-            inner: Arc::new(Inner {
-                tx,
-                healthy: AtomicBool::new(true),
-                timeout: config.timeout,
-            }),
-        })
+        info!("LibreOffice engine ready");
+        Ok(())
+    }
+
+    /// Stub — body filled in by Task 8.
+    fn spawn_idle_watcher(&self, _timeout: Duration) {
+        // Intentionally empty until Task 8.
     }
 
     // ------------------------------------------------------------------
@@ -151,9 +202,10 @@ impl LibreOfficeEngine {
     pub async fn convert(&self, input: &Path, opts: &OfficeOptions) -> EngineResult<Vec<u8>> {
         opts.validate()?;
 
-        // Existence check before queueing: LOK FFI calls cannot be cancelled, so
-        // a missing-file request should not have to wait its turn behind a slow
-        // (or wedged) conversion already in flight on the worker thread.
+        // Existence check before queueing: LOK FFI calls cannot be
+        // cancelled, so a missing-file request should not have to wait
+        // its turn behind a slow (or wedged) conversion already in
+        // flight on the worker thread.
         if !input.exists() {
             return Err(EngineError::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
@@ -161,8 +213,16 @@ impl LibreOfficeEngine {
             )));
         }
 
-        // Fail fast if the worker is already known-wedged or exited — a previous
-        // timed-out conversion is likely still occupying the LOK thread.
+        // Lazy init on first call. Concurrent first-callers serialise on
+        // `init_lock` inside `init_worker`, so we never double-spawn.
+        if self.inner.lazy_start && self.inner.tx.lock().is_none() {
+            self.init_worker().await?;
+        }
+
+        // Fail fast if the worker is already known-wedged or exited — a
+        // previous timed-out conversion may still be occupying the LOK
+        // thread inside an uncancellable FFI call. Letting new requests
+        // queue here would just multiply the wait.
         if !self.inner.healthy.load(Ordering::SeqCst) {
             return Err(EngineError::Internal(
                 "LOK engine is unhealthy (worker exited or wedged) — restart required".into(),
@@ -173,29 +233,41 @@ impl LibreOfficeEngine {
 
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
 
-        self.inner
-            .tx
-            .try_send(ConvertRequest {
-                input: input.to_path_buf(),
-                opts: opts.clone(),
-                reply: reply_tx,
-            })
-            .map_err(|e| match e {
-                mpsc::TrySendError::Full(_) => {
-                    EngineError::Internal("LOK request queue full".into())
+        // Hold the parking_lot guard only across the synchronous
+        // `try_send`. Never across `.await` — parking_lot is not
+        // async-aware, and shutdown() needs to be able to acquire this
+        // same mutex to drop tx.
+        let send_result = {
+            let guard = self.inner.tx.lock();
+            match guard.as_ref() {
+                None => {
+                    return Err(EngineError::Internal(
+                        "LOK engine has been shut down".into(),
+                    ));
                 }
-                mpsc::TrySendError::Disconnected(_) => {
-                    self.inner.healthy.store(false, Ordering::SeqCst);
-                    EngineError::Internal("LOK worker thread has exited".into())
-                }
-            })?;
+                Some(tx) => tx.try_send(ConvertRequest {
+                    input: input.to_path_buf(),
+                    opts: opts.clone(),
+                    reply: reply_tx,
+                }),
+            }
+        };
+
+        send_result.map_err(|e| match e {
+            mpsc::TrySendError::Full(_) => EngineError::Internal("LOK request queue full".into()),
+            mpsc::TrySendError::Disconnected(_) => {
+                self.inner.healthy.store(false, Ordering::SeqCst);
+                EngineError::Internal("LOK worker thread has exited".into())
+            }
+        })?;
 
         tokio::time::timeout(self.inner.timeout, reply_rx)
             .await
             .map_err(|_| {
-                // The async timeout fires, but the synchronous LOK call inside
-                // the worker thread cannot be cancelled. Treat the engine as
-                // wedged so subsequent requests don't pile up behind it.
+                // The async timeout fires, but the synchronous LOK call
+                // inside the worker thread cannot be cancelled. Treat
+                // the engine as wedged so subsequent requests don't
+                // pile up behind it.
                 self.inner.healthy.store(false, Ordering::SeqCst);
                 EngineError::Timeout(self.inner.timeout)
             })?
@@ -241,8 +313,8 @@ fn lok_worker_thread(
 
     let office = match Office::new(&install_path) {
         Ok(o) => {
-            let _ = startup_tx.send(Ok(()));
             healthy.store(true, Ordering::SeqCst);
+            let _ = startup_tx.send(Ok(()));
             o
         }
         Err(e) => {
@@ -257,12 +329,16 @@ fn lok_worker_thread(
 
     for req in rx {
         let result = lok_convert(&office, &req.input, &req.opts);
-        // If the receiver was dropped (timeout fired), send() will simply fail.
         let _ = req.reply.send(result);
     }
 
     healthy.store(false, Ordering::SeqCst);
-    info!("LOK worker exiting");
+    info!("LOK worker exiting; leaking Office to bypass LO ≥ 6.5 atexit teardown bug");
+
+    // Skip Office::Drop -> lok_destroy entirely. LO ≥ 6.5 segfaults during
+    // teardown; the process is already exiting (or about to be replaced
+    // via shutdown()) so the kernel reclaims memory either way.
+    std::mem::forget(office);
 }
 
 /// Execute a single document→PDF conversion synchronously on the worker thread.
