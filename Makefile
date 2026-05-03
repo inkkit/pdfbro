@@ -144,14 +144,12 @@ build-with-ui: ui-build build-release ## Build UI then Rust binary (for local te
 
 .PHONY: docker-test
 docker-test: ## Run tests inside Docker container (with Chrome + LibreOffice)
-	docker build --target builder-full -t pdfbro-test-builder -f Dockerfile .
+	docker build --target tester -t pdfbro-tester -f Dockerfile .
 	docker run --rm \
-		--no-healthcheck \
-		-e CHROME_PATH=/usr/bin/chromium \
 		-e LIBREOFFICE_PATH=/usr/bin/soffice \
 		-e NO_SANDBOX=true \
-		pdfbro-test-builder \
-		cargo test --release --features "chromium libreoffice" -- --ignored
+		pdfbro-tester \
+		cargo test --release --features "chromium libreoffice"
 
 # Export all variables
 export
