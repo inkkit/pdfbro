@@ -55,7 +55,7 @@ RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
 ENV CHROME_PATH=/usr/bin/chromium
 ENV CHROME_BIN=/usr/bin/chromium
 # Required so Chromium can run as root inside the container
-ENV FOLIO_NO_SANDBOX=true
+ENV NO_SANDBOX=true
 ENV SAL_USE_VCLPLUGIN=svp
 ENV RUST_LOG=info
 

@@ -71,33 +71,6 @@ RUN cargo build --release --no-default-features --features libreoffice && \
     strip target/release/pdfbro
 
 # =============================================================================
-# Stage: tester — builder-full + Chromium + LibreOffice for `make docker-test`
-# =============================================================================
-FROM builder-full AS tester
-
-RUN apt-get update -qq && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-        chromium chromium-sandbox \
-        qpdf ghostscript \
-        poppler-utils \
-        curl ca-certificates \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-RUN echo "deb http://deb.debian.org/debian bookworm-backports main" \
-      > /etc/apt/sources.list.d/backports.list && \
-    apt-get update -qq && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -t bookworm-backports --no-install-recommends \
-        libreoffice-writer libreoffice-calc libreoffice-impress libreoffice-draw \
-        python3-uno && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        python3-minimal python3-pip && \
-    pip3 install --no-cache-dir --break-system-packages unoserver==2.2.1 && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-ENV CHROME_PATH=/usr/bin/chromium
-ENV SAL_USE_VCLPLUGIN=svp
-
-# =============================================================================
 # Stage: common — non-root user, tini, fonts, PDF tools (no engines yet)
 # =============================================================================
 FROM debian:bookworm-slim AS common
