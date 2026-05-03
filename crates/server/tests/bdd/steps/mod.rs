@@ -94,6 +94,15 @@ async fn check_json_body(world: &mut PdfBroWorld, step: &Step) {
     http::check_json_body(world, expected).await;
 }
 
+#[then(regex = r#"the response body should contain "(.+)""#)]
+async fn response_body_should_contain(world: &mut PdfBroWorld, expected: String) {
+    let body = String::from_utf8_lossy(world.body.as_deref().unwrap_or(&[]));
+    assert!(
+        body.contains(&*expected),
+        "Expected response body to contain {expected:?}, got: {body}"
+    );
+}
+
 // =================================================================
 // PDF assertion steps (Then)
 // =================================================================
