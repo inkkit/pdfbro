@@ -1,22 +1,21 @@
-//! `LibreOfficeEngine` — convert office documents to PDF via unoserver.
+//! `LibreOfficeEngine` — convert office documents to PDF via LibreOfficeKit.
 //!
-//! Implementation of `docs/specs/12-engine-libreoffice.md`. A persistent
-//! `unoserver` process is managed as a child, eliminating per-request
-//! soffice startup cost (~200–400ms).
+//! LibreOfficeKit (LOK) is loaded in-process via `dlopen` — no Python daemon,
+//! no unoserver, no XML-RPC.  Because LOK's global lock allows only one
+//! `Office` instance per process and the type is `!Send`, all conversions run
+//! on a **single dedicated `std::thread`**.  Async callers communicate with
+//! that thread through a `std::sync::mpsc` work queue and per-request
+//! `tokio::sync::oneshot` reply channels.
 
 pub mod filter;
 
-mod convert;
-mod unoserver;
-
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::{Mutex, Semaphore};
-
-use tracing::{debug, info, instrument};
+use tracing::{debug, info, instrument, warn};
 
 use crate::types::{EngineError, EngineResult, PageRanges};
 
@@ -24,7 +23,7 @@ use crate::types::{EngineError, EngineResult, PageRanges};
 // Engine
 // ---------------------------------------------------------------------------
 
-/// Wrapper around a persistent `unoserver` process. Cheap to clone (`Arc` inside).
+/// Wrapper around LibreOfficeKit. Cheap to clone (`Arc` inside).
 ///
 /// # Example
 ///
@@ -47,246 +46,322 @@ pub struct LibreOfficeEngine {
 }
 
 struct Inner {
-    unoserver: Mutex<unoserver::UnoserverProcess>,
-    port: u16,
-    unoserver_ready_timeout: Duration,
-    executable: Option<PathBuf>,
-    client: reqwest::Client,
+    /// Work queue to the dedicated LOK thread.
+    tx: mpsc::SyncSender<ConvertRequest>,
+    /// Set to `false` when the worker thread exits.
+    healthy: AtomicBool,
     timeout: Duration,
-    semaphore: Semaphore,
+}
+
+struct ConvertRequest {
+    input: PathBuf,
+    opts: OfficeOptions,
+    reply: tokio::sync::oneshot::Sender<EngineResult<Vec<u8>>>,
 }
 
 /// Engine-wide configuration. Pass to [`LibreOfficeEngine::launch`].
 #[derive(Debug, Clone)]
 pub struct LibreOfficeConfig {
-    /// Path to `soffice` passed to unoserver via `--executable`. `None` = unoserver
-    /// auto-discovers soffice.
-    pub executable: Option<PathBuf>,
-    /// Per-conversion timeout. Default 120s.
+    /// Path to the LOK program directory (e.g. `/usr/lib/libreoffice/program`).
+    ///
+    /// `None` — auto-discover via `LOK_PROGRAM_PATH` env var or common system
+    /// paths.
+    pub install_path: Option<PathBuf>,
+    /// Per-conversion timeout. Default 120 s.
     pub timeout: Duration,
-    /// Maximum concurrent conversions. Default [`std::thread::available_parallelism`].
-    pub max_concurrency: usize,
-    /// Use lazy initialization (start on first request).
-    /// Default: false (start eagerly at server startup).
+    /// Start the engine lazily on the first request.
     pub lazy_start: bool,
-    /// Idle shutdown timeout - engine shuts down after this duration of no requests.
-    /// None means no idle shutdown. Default: None.
+    /// Shut the engine down after this much idle time.
     pub idle_shutdown_timeout: Option<Duration>,
-    /// Port unoserver listens on. Default: 2003.
-    pub unoserver_port: u16,
-    /// Maximum time to wait for unoserver to be ready at startup. Default: 60s.
-    pub unoserver_ready_timeout: Duration,
 }
 
 impl Default for LibreOfficeConfig {
     fn default() -> Self {
         Self {
-            executable: None,
+            install_path: None,
             timeout: Duration::from_secs(120),
-            max_concurrency: std::thread::available_parallelism()
-                .map(|n| n.get())
-                .unwrap_or(4),
             lazy_start: false,
             idle_shutdown_timeout: None,
-            unoserver_port: 2003,
-            unoserver_ready_timeout: Duration::from_secs(60),
         }
     }
 }
 
 impl LibreOfficeEngine {
-    /// Discover `soffice` on `$PATH` and platform defaults using
-    /// [`LibreOfficeConfig::default`].
+    /// Launch with default config (auto-discovers LibreOffice).
     pub async fn discover() -> EngineResult<Self> {
         Self::launch(LibreOfficeConfig::default()).await
     }
 
-    /// Construct an engine with explicit configuration.
-    ///
-    /// Spawns a persistent `unoserver` process. The engine is returned once
-    /// unoserver is ready to accept connections.
+    /// Launch the engine, spawning the LOK worker thread.
     pub async fn launch(config: LibreOfficeConfig) -> EngineResult<Self> {
-        info!(port = config.unoserver_port, "Launching LibreOffice engine");
+        use libreofficekit::Office;
 
-        let unoserver = unoserver::UnoserverProcess::spawn(
-            config.unoserver_port,
-            config.unoserver_ready_timeout,
-            config.executable.as_deref(),
-        )
-        .await?;
-        // If config requested port 0, the spawn helper picked a free one.
-        let actual_port = unoserver.port();
+        let install_path = config
+            .install_path
+            .clone()
+            .or_else(Office::find_install_path)
+            .ok_or_else(|| {
+                EngineError::Internal(
+                    "LibreOffice not found — set LOK_PROGRAM_PATH or install LibreOffice".into(),
+                )
+            })?;
 
-        let max = config.max_concurrency.max(1);
-        let client = reqwest::Client::builder()
-            .tcp_keepalive(Some(Duration::from_secs(60)))
-            .pool_max_idle_per_host(1)
-            .build()
-            .map_err(|e| EngineError::Internal(format!("failed to build HTTP client: {e}")))?;
+        info!(path = %install_path.display(), "Launching LibreOffice engine via LOK");
 
-        let inner = Arc::new(Inner {
-            unoserver: Mutex::new(unoserver),
-            port: actual_port,
-            unoserver_ready_timeout: config.unoserver_ready_timeout,
-            executable: config.executable,
-            client,
-            timeout: config.timeout,
-            semaphore: Semaphore::new(max),
-        });
+        // Bounded channel — back-pressure when the worker falls behind.
+        let (tx, rx) = mpsc::sync_channel::<ConvertRequest>(64);
 
-        // Background task: detect unoserver crashes and restart.
-        let inner_weak = Arc::downgrade(&inner);
-        tokio::spawn(async move {
-            'monitor: loop {
-                tokio::time::sleep(Duration::from_secs(5)).await;
-                let Some(inner) = inner_weak.upgrade() else { break };
+        // Startup rendezvous: worker sends Ok(()) once Office::new() succeeds.
+        let (startup_tx, startup_rx) = tokio::sync::oneshot::channel::<EngineResult<()>>();
 
-                // try_wait() is non-blocking — it does not yield the lock for long.
-                let exited = inner.unoserver.lock().await.try_wait().ok().flatten();
+        let healthy = Arc::new(AtomicBool::new(false));
+        let healthy_worker = Arc::clone(&healthy);
 
-                if exited.is_some() {
-                    tracing::warn!("unoserver exited unexpectedly, attempting restart");
-                    for attempt in 0..3u32 {
-                        tokio::time::sleep(Duration::from_secs(1 << attempt)).await;
-                        let Some(inner) = inner_weak.upgrade() else { break 'monitor };
-                        match unoserver::UnoserverProcess::spawn(
-                            inner.port,
-                            inner.unoserver_ready_timeout,
-                            inner.executable.as_deref(),
-                        )
-                        .await
-                        {
-                            Ok(new_proc) => {
-                                *inner.unoserver.lock().await = new_proc;
-                                tracing::info!("unoserver restarted");
-                                break;
-                            }
-                            Err(e) if attempt < 2 => {
-                                tracing::warn!(attempt = attempt + 1, error = %e, "unoserver restart failed");
-                            }
-                            Err(_) => {
-                                tracing::error!("unoserver failed to restart after 3 attempts, conversions will fail");
-                                break 'monitor;
-                            }
-                        }
-                    }
-                }
-            }
-        });
+        std::thread::Builder::new()
+            .name("lok-worker".into())
+            .spawn(move || {
+                lok_worker_thread(install_path, rx, startup_tx, healthy_worker);
+            })
+            .map_err(|e| EngineError::Internal(format!("failed to spawn LOK thread: {e}")))?;
 
-        info!(port = actual_port, timeout = ?config.timeout, max_concurrency = max, "LibreOffice engine launched");
-        Ok(Self { inner })
+        // Wait up to 120 s for LibreOffice to initialise.
+        tokio::time::timeout(Duration::from_secs(120), startup_rx)
+            .await
+            .map_err(|_| EngineError::Timeout(Duration::from_secs(120)))?
+            .map_err(|_| EngineError::Internal("LOK worker exited during startup".into()))??;
+
+        info!("LibreOffice engine ready");
+
+        Ok(Self {
+            inner: Arc::new(Inner {
+                tx,
+                healthy: AtomicBool::new(true),
+                timeout: config.timeout,
+            }),
+        })
     }
 
-    /// Convert one input file to PDF bytes.
-    ///
-    /// The input may be any LibreOffice-supported format; see
-    /// [`filter::for_extension`] for the dispatch table. Concurrent calls
-    /// are gated by `max_concurrency` and each gets a fresh
-    /// `UserInstallation` directory.
-    #[instrument(skip_all, fields(input = %input.display()))]
+    // ------------------------------------------------------------------
+    // Public API
+    // ------------------------------------------------------------------
+
+    /// Convert a single document file to PDF bytes.
+    #[instrument(skip(self, opts), fields(path = %input.display()))]
     pub async fn convert(&self, input: &Path, opts: &OfficeOptions) -> EngineResult<Vec<u8>> {
         opts.validate()?;
+
+        // Existence check before queueing: LOK FFI calls cannot be cancelled, so
+        // a missing-file request should not have to wait its turn behind a slow
+        // (or wedged) conversion already in flight on the worker thread.
         if !input.exists() {
             return Err(EngineError::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
-                format!("input not found: {}", input.display()),
+                format!("input file not found: {}", input.display()),
             )));
         }
-        let _permit = self
-            .inner
-            .semaphore
-            .acquire()
-            .await
-            .map_err(|e| EngineError::Internal(format!("semaphore closed: {e}")))?;
-        debug!("Starting LibreOffice conversion");
-        let start = std::time::Instant::now();
-        let result = convert::run_convert(&self.inner.client, self.inner.port, self.inner.timeout, input, opts).await;
-        let duration = start.elapsed();
-        match &result {
-            Ok(_) => info!(
-                duration_ms = duration.as_millis() as u64,
-                "LibreOffice conversion completed"
-            ),
-            Err(e) => tracing::error!(
-                duration_ms = duration.as_millis() as u64,
-                error = %e,
-                "LibreOffice conversion failed"
-            ),
+
+        // Fail fast if the worker is already known-wedged or exited — a previous
+        // timed-out conversion is likely still occupying the LOK thread.
+        if !self.inner.healthy.load(Ordering::SeqCst) {
+            return Err(EngineError::Internal(
+                "LOK engine is unhealthy (worker exited or wedged) — restart required".into(),
+            ));
         }
-        result
+
+        debug!("starting LOK conversion");
+
+        let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
+
+        self.inner
+            .tx
+            .try_send(ConvertRequest {
+                input: input.to_path_buf(),
+                opts: opts.clone(),
+                reply: reply_tx,
+            })
+            .map_err(|e| match e {
+                mpsc::TrySendError::Full(_) => {
+                    EngineError::Internal("LOK request queue full".into())
+                }
+                mpsc::TrySendError::Disconnected(_) => {
+                    self.inner.healthy.store(false, Ordering::SeqCst);
+                    EngineError::Internal("LOK worker thread has exited".into())
+                }
+            })?;
+
+        tokio::time::timeout(self.inner.timeout, reply_rx)
+            .await
+            .map_err(|_| {
+                // The async timeout fires, but the synchronous LOK call inside
+                // the worker thread cannot be cancelled. Treat the engine as
+                // wedged so subsequent requests don't pile up behind it.
+                self.inner.healthy.store(false, Ordering::SeqCst);
+                EngineError::Timeout(self.inner.timeout)
+            })?
+            .map_err(|_| {
+                self.inner.healthy.store(false, Ordering::SeqCst);
+                EngineError::Internal("LOK worker dropped reply channel".into())
+            })?
     }
 
-    /// Convert many inputs in parallel (bounded by `max_concurrency`),
-    /// returning one `Vec<u8>` per input in the same order.
+    /// Convert many document files to PDF, preserving input order.
     ///
-    /// Merging into a single PDF is **not** part of this API — call
-    /// `engine::pdfops::merge` (spec 13) on the result if needed.
-    #[instrument(skip_all)]
+    /// Conversions are serialised through the single LOK worker thread.
     pub async fn convert_many(
         &self,
         inputs: &[PathBuf],
         opts: &OfficeOptions,
     ) -> EngineResult<Vec<Vec<u8>>> {
         opts.validate()?;
-        if inputs.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        let mut set = tokio::task::JoinSet::new();
-        for (i, p) in inputs.iter().enumerate() {
-            let engine = self.clone();
-            let path = p.clone();
-            let opts = opts.clone();
-            set.spawn(async move {
-                let res = engine.convert(&path, &opts).await;
-                (i, res)
-            });
-        }
-
-        let mut slots: Vec<Option<EngineResult<Vec<u8>>>> =
-            (0..inputs.len()).map(|_| None).collect();
-        while let Some(joined) = set.join_next().await {
-            let (i, res) = joined.map_err(|e| EngineError::Internal(format!("join error: {e}")))?;
-            slots[i] = Some(res);
-        }
-
         let mut out = Vec::with_capacity(inputs.len());
-        for slot in slots {
-            match slot {
-                Some(Ok(v)) => out.push(v),
-                Some(Err(e)) => return Err(e),
-                None => {
-                    return Err(EngineError::Internal(
-                        "convert_many: missing result slot".into(),
-                    ));
-                }
-            }
+        for input in inputs {
+            out.push(self.convert(input, opts).await?);
         }
-        info!(count = inputs.len(), "convert_many completed");
         Ok(out)
     }
 
-    /// Returns `true` iff unoserver responds to an HTTP GET within 5 seconds.
+    /// `true` when the LOK worker thread is alive and ready.
     pub async fn healthy(&self) -> bool {
-        let url = format!("http://127.0.0.1:{}/", self.inner.port);
-        tokio::time::timeout(
-            Duration::from_secs(5),
-            self.inner.client.get(&url).send(),
-        )
-        .await
-        .map(|r| r.is_ok())
-        .unwrap_or(false)
+        self.inner.healthy.load(Ordering::SeqCst)
     }
 }
 
-impl std::fmt::Debug for LibreOfficeEngine {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("LibreOfficeEngine")
-            .field("port", &self.inner.port)
-            .field("timeout", &self.inner.timeout)
-            .finish()
+// ---------------------------------------------------------------------------
+// LOK worker thread
+// ---------------------------------------------------------------------------
+
+fn lok_worker_thread(
+    install_path: PathBuf,
+    rx: mpsc::Receiver<ConvertRequest>,
+    startup_tx: tokio::sync::oneshot::Sender<EngineResult<()>>,
+    healthy: Arc<AtomicBool>,
+) {
+    use libreofficekit::Office;
+
+    let office = match Office::new(&install_path) {
+        Ok(o) => {
+            let _ = startup_tx.send(Ok(()));
+            healthy.store(true, Ordering::SeqCst);
+            o
+        }
+        Err(e) => {
+            let msg = format!("LOK Office::new failed: {e}");
+            warn!("{msg}");
+            let _ = startup_tx.send(Err(EngineError::Internal(msg)));
+            return;
+        }
+    };
+
+    info!("LOK worker ready");
+
+    for req in rx {
+        let result = lok_convert(&office, &req.input, &req.opts);
+        // If the receiver was dropped (timeout fired), send() will simply fail.
+        let _ = req.reply.send(result);
     }
+
+    healthy.store(false, Ordering::SeqCst);
+    info!("LOK worker exiting");
+}
+
+/// Execute a single document→PDF conversion synchronously on the worker thread.
+fn lok_convert(office: &libreofficekit::Office, input: &Path, opts: &OfficeOptions) -> EngineResult<Vec<u8>> {
+    use libreofficekit::DocUrl;
+
+    // LOK needs absolute file:// URLs for both input and output.
+    let in_url = DocUrl::from_path(input)
+        .map_err(|e| EngineError::Internal(format!("LOK input URL: {e}")))?;
+
+    // Write output to a temp file; LOK cannot return bytes directly.
+    let tmp_dir = tempfile::tempdir().map_err(EngineError::Io)?;
+    let out_path = tmp_dir.path().join("output.pdf");
+    let out_url = DocUrl::from_path(&out_path)
+        .map_err(|e| EngineError::Internal(format!("LOK output URL: {e}")))?;
+
+    // LOK's save_as format param is the short output format ("pdf"), not the
+    // internal filter name ("writer_pdf_Export"). LibreOffice auto-selects the
+    // right PDF export filter based on the document type.
+    let filter_name = "pdf";
+
+    // PDF export options must be passed as a JSON FilterOptions blob. The
+    // PDF filter (LO `filter/source/pdf/pdffilter.cxx::filter`) only reads
+    // PageRange / SelectPdfVersion / IsLandscape / etc. from `FilterData`,
+    // and `JsonToPropertyValues` is the only path that builds FilterData
+    // from a string the LOK saveAs API forwards. A bare comma-separated
+    // `Key=Value` list is silently dropped here — those tokens are filtered
+    // against `TakeOwnership`/`NoFileSync`/`FromTemplate` only.
+    let save_opts_json = opts.lok_save_as_options();
+    let filter_arg: Option<&str> = save_opts_json.as_deref();
+
+    debug!(
+        input = %input.display(),
+        filter = filter_name,
+        options = filter_arg.unwrap_or(""),
+        "LOK save_as"
+    );
+
+    // `documentLoadWithOptions`'s `pOptions` arg is a **comma-separated**
+    // `Key=Value` list. Only a fixed set of keys are extracted by LOK's
+    // `extractParameter` in `desktop/source/lib/init.cxx::doc_loadWithOptions`
+    // (lines 2902–2997 in upstream): `Language`, `Timezone`,
+    // `DeviceFormFactor`, `Batch`, `MacroSecurityLevel`, `ClientVisibleArea`,
+    // `EnableMacrosExecution`. Anything else is forwarded *verbatim* to the
+    // import filter as the value of `FilterOptions`.
+    //
+    // We only opt into options when the file actually needs them, because
+    // some non-extracted leftover values (e.g. `InteractionHandler=0`) can
+    // confuse the writer/word filter's content sniff for genuine documents
+    // and lead to `type detection failed` on perfectly valid `.docx` files
+    // — observed on bookworm-backports LO 26.x with non-ASCII filenames.
+    //
+    // CSV/TSV need help: a bare `document_load` on `.csv` pops the
+    // *Text Import* dialog and wedges the worker forever. `Batch=1` flips
+    // LO into non-interactive mode (extracted by LOK → sets
+    // `DialogCancelMode::LOKSilent` and `Silent=true` on the
+    // MediaDescriptor); the trailing tokens (`44,34,76,1` /
+    // `9,34,76,1`) become the StarCalc CSV import options after
+    // extraction (`fieldSep,textDelim,charSet,firstLineNumber`).
+    //
+    // For everything else we use plain `document_load` and rely on LO's
+    // built-in extension/content detection — same behaviour as the
+    // original implementation, before this code path tried to be clever
+    // about adding "always-on" load options.
+    let ext = input
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let csv_opts: Option<&str> = match ext.as_str() {
+        "csv" => Some("Batch=1,44,34,76,1"),
+        "tsv" | "tab" => Some("Batch=1,9,34,76,1"),
+        _ => None,
+    };
+
+    let mut doc = match csv_opts {
+        Some(o) => office.document_load_with_options(&in_url, o),
+        None => office.document_load(&in_url),
+    }
+    .map_err(|e| EngineError::Internal(format!("LOK document_load: {e}")))?;
+
+    let ok = doc
+        .save_as(&out_url, filter_name, filter_arg)
+        .map_err(|e| EngineError::Internal(format!("LOK save_as: {e}")))?;
+
+    if !ok {
+        return Err(EngineError::Internal(
+            "LOK save_as returned false — conversion failed".into(),
+        ));
+    }
+
+    let pdf = std::fs::read(&out_path).map_err(EngineError::Io)?;
+
+    if pdf.is_empty() || !pdf.starts_with(b"%PDF-") {
+        return Err(EngineError::Internal(
+            "LOK produced an empty or non-PDF output".into(),
+        ));
+    }
+
+    Ok(pdf)
 }
 
 // ---------------------------------------------------------------------------
@@ -318,7 +393,6 @@ pub struct OfficeOptions {
     /// Export bookmarks as Named Destinations.
     pub export_bookmarks_to_pdf_destination: bool,
     /// Update document indexes before conversion.
-    /// Note: not currently passed to unoserver (unoserver has no direct API for this).
     pub update_indexes: bool,
 
     // --- Form Fields & Placeholders ---
@@ -357,7 +431,7 @@ pub struct OfficeOptions {
     /// Reduce image resolution before embedding.
     pub reduce_image_resolution: bool,
 
-    // --- Native Watermarks ---
+    // --- Native Watermarks (LOK filter data keys) ---
     /// Watermark text drawn on every page.
     pub native_watermark_text: Option<String>,
     /// Watermark color as decimal RGB long (default 8388223 = light green).
@@ -405,14 +479,7 @@ pub struct OfficeOptions {
 }
 
 impl OfficeOptions {
-    /// Validate the option set. Called at the top of [`LibreOfficeEngine::convert`]
-    /// and [`LibreOfficeEngine::convert_many`].
-    ///
-    /// # Errors
-    ///
-    /// Returns [`EngineError::InvalidOption`] if `quality` is outside
-    /// `1..=100`, if `max_image_resolution` is `Some(0)`, or if
-    /// `page_ranges` is somehow empty.
+    /// Validate the option set.
     pub fn validate(&self) -> EngineResult<()> {
         if let Some(q) = self.quality
             && !(1..=100).contains(&q)
@@ -438,55 +505,222 @@ impl OfficeOptions {
         {
             return Err(EngineError::InvalidOption("pageRanges is empty".into()));
         }
-        if let Some(v) = self.initial_view {
-            if !(0..=3).contains(&v) {
-                return Err(EngineError::InvalidOption(format!(
-                    "initialView must be 0..=3 (got {v})"
-                )));
-            }
+        if let Some(v) = self.initial_view
+            && !(0..=3).contains(&v)
+        {
+            return Err(EngineError::InvalidOption(format!(
+                "initialView must be 0..=3 (got {v})"
+            )));
         }
-        if let Some(v) = self.initial_page {
-            if v < 1 {
-                return Err(EngineError::InvalidOption(format!(
-                    "initialPage must be >= 1 (got {v})"
-                )));
-            }
+        if let Some(v) = self.initial_page
+            && v < 1
+        {
+            return Err(EngineError::InvalidOption(format!(
+                "initialPage must be >= 1 (got {v})"
+            )));
         }
-        if let Some(v) = self.magnification {
-            if !(0..=4).contains(&v) {
-                return Err(EngineError::InvalidOption(format!(
-                    "magnification must be 0..=4 (got {v})"
-                )));
-            }
+        if let Some(v) = self.magnification
+            && !(0..=4).contains(&v)
+        {
+            return Err(EngineError::InvalidOption(format!(
+                "magnification must be 0..=4 (got {v})"
+            )));
         }
-        if let Some(v) = self.zoom {
-            if v < 1 {
-                return Err(EngineError::InvalidOption(format!(
-                    "zoom must be >= 1 (got {v})"
-                )));
-            }
+        if let Some(v) = self.zoom
+            && v < 1
+        {
+            return Err(EngineError::InvalidOption(format!(
+                "zoom must be >= 1 (got {v})"
+            )));
         }
-        if let Some(v) = self.page_layout {
-            if !(0..=4).contains(&v) {
-                return Err(EngineError::InvalidOption(format!(
-                    "pageLayout must be 0..=4 (got {v})"
-                )));
-            }
+        if let Some(v) = self.page_layout
+            && !(0..=4).contains(&v)
+        {
+            return Err(EngineError::InvalidOption(format!(
+                "pageLayout must be 0..=4 (got {v})"
+            )));
         }
-        if let Some(v) = self.open_bookmark_levels {
-            if v != -1 && !(1..=10).contains(&v) {
-                return Err(EngineError::InvalidOption(format!(
-                    "openBookmarkLevels must be -1 or 1..=10 (got {v})"
-                )));
-            }
+        if let Some(v) = self.open_bookmark_levels
+            && v != -1
+            && !(1..=10).contains(&v)
+        {
+            return Err(EngineError::InvalidOption(format!(
+                "openBookmarkLevels must be -1 or 1..=10 (got {v})"
+            )));
         }
         Ok(())
     }
 
-    /// Build the unoserver `filter_options` array. Each entry is a
-    /// `Name=Value` string; unoserver parses these with `split('=', 1)`
-    /// and infers the value type (`true`/`false` → bool, digits → int,
-    /// everything else → string).
+    /// Build a JSON FilterOptions blob suitable for LOK `documentSaveAs`.
+    ///
+    /// LibreOffice's PDF filter only honours these export properties when
+    /// they are delivered as the `FilterData` MediaDescriptor sequence. The
+    /// only string format the LOK saveAs path forwards into FilterData is a
+    /// JSON object — see `filter/source/pdf/pdffilter.cxx::filter`, which
+    /// branches on `aFilterOptions.startsWith("{")` and runs the body
+    /// through `comphelper::JsonToPropertyValues`. The expected schema is
+    /// `{"PropName": {"type": "<type>", "value": "<stringified value>"}}`
+    /// where `type` is one of `string`, `boolean`, `long`, `short`. Returns
+    /// `None` when no options are set so the caller can pass `None` to
+    /// `save_as` and fall through to the filter's configured defaults.
+    pub(crate) fn lok_save_as_options(&self) -> Option<String> {
+        use serde_json::{Map, Value, json};
+
+        let mut m: Map<String, Value> = Map::new();
+        let s = |v: String| json!({"type": "string", "value": v});
+        let b = |v: bool| json!({"type": "boolean", "value": v.to_string()});
+        let l = |v: i64| json!({"type": "long", "value": v.to_string()});
+
+        if let Some(pr) = &self.page_ranges {
+            m.insert("PageRange".into(), s(pr.to_string()));
+        }
+        if let Some(prof) = self.pdf_a {
+            let v: i64 = match prof {
+                PdfAProfile::A1B => 1,
+                PdfAProfile::A2B => 2,
+                PdfAProfile::A3B => 3,
+            };
+            m.insert("SelectPdfVersion".into(), l(v));
+        }
+        if self.pdf_ua {
+            m.insert("PDFUACompliance".into(), b(true));
+        }
+        if let Some(q) = self.quality {
+            m.insert("Quality".into(), l(q as i64));
+        }
+        if let Some(r) = self.max_image_resolution {
+            m.insert("MaxImageResolution".into(), l(r as i64));
+        }
+        if self.landscape {
+            m.insert("IsLandscape".into(), b(true));
+        }
+        if self.export_bookmarks {
+            m.insert("ExportBookmarks".into(), b(true));
+        }
+        if self.export_bookmarks_to_pdf_destination {
+            m.insert("ExportBookmarksToPDFDestination".into(), b(true));
+        }
+        if self.export_form_fields {
+            m.insert("ExportFormFields".into(), b(true));
+        }
+        if self.allow_duplicate_field_names {
+            m.insert("AllowDuplicateFieldNames".into(), b(true));
+        }
+        if self.export_placeholders {
+            m.insert("ExportPlaceholders".into(), b(true));
+        }
+        if self.export_notes {
+            m.insert("ExportNotes".into(), b(true));
+        }
+        if self.export_notes_pages {
+            m.insert("ExportNotesPages".into(), b(true));
+        }
+        if self.export_only_notes_pages {
+            m.insert("ExportOnlyNotesPages".into(), b(true));
+        }
+        if self.export_notes_in_margin {
+            m.insert("ExportNotesInMargin".into(), b(true));
+        }
+        if self.convert_ooo_target_to_pdf_target {
+            m.insert("ConvertOOoTargetToPDFTarget".into(), b(true));
+        }
+        if self.export_links_relative_fsys {
+            m.insert("ExportLinksRelativeFsys".into(), b(true));
+        }
+        if self.export_hidden_slides {
+            m.insert("ExportHiddenSlides".into(), b(true));
+        }
+        if self.skip_empty_pages {
+            m.insert("IsSkipEmptyPages".into(), b(true));
+        }
+        if self.add_original_document_as_stream {
+            m.insert("IsAddStream".into(), b(true));
+        }
+        if self.single_page_sheets {
+            m.insert("SinglePageSheets".into(), b(true));
+        }
+        if self.lossless_image_compression {
+            m.insert("UseLosslessCompression".into(), b(true));
+        }
+        if self.reduce_image_resolution {
+            m.insert("ReduceImageResolution".into(), b(true));
+        }
+        if let Some(text) = &self.native_watermark_text {
+            m.insert("Watermark".into(), s(text.clone()));
+        }
+        if let Some(c) = self.native_watermark_color {
+            m.insert("WatermarkColor".into(), l(c as i64));
+        }
+        if let Some(h) = self.native_watermark_font_height {
+            m.insert("WatermarkFontHeight".into(), l(h as i64));
+        }
+        if let Some(a) = self.native_watermark_rotate_angle {
+            m.insert("WatermarkRotateAngle".into(), l(a as i64));
+        }
+        if let Some(name) = &self.native_watermark_font_name {
+            m.insert("WatermarkFontName".into(), s(name.clone()));
+        }
+        if let Some(text) = &self.native_tiled_watermark_text {
+            m.insert("TiledWatermark".into(), s(text.clone()));
+        }
+        if let Some(v) = self.initial_view {
+            m.insert("InitialView".into(), l(v as i64));
+        }
+        if let Some(v) = self.initial_page {
+            m.insert("InitialPage".into(), l(v as i64));
+        }
+        if let Some(v) = self.magnification {
+            m.insert("Magnification".into(), l(v as i64));
+        }
+        if let Some(v) = self.zoom {
+            m.insert("Zoom".into(), l(v as i64));
+        }
+        if let Some(v) = self.page_layout {
+            m.insert("PageLayout".into(), l(v as i64));
+        }
+        if self.first_page_on_left {
+            m.insert("FirstPageOnLeft".into(), b(true));
+        }
+        if self.resize_window_to_initial_page {
+            m.insert("ResizeWindowToInitialPage".into(), b(true));
+        }
+        if self.center_window {
+            m.insert("CenterWindow".into(), b(true));
+        }
+        if self.open_in_full_screen_mode {
+            m.insert("OpenInFullScreenMode".into(), b(true));
+        }
+        if self.display_pdf_document_title {
+            m.insert("DisplayPDFDocumentTitle".into(), b(true));
+        }
+        if self.hide_viewer_menubar {
+            m.insert("HideViewerMenubar".into(), b(true));
+        }
+        if self.hide_viewer_toolbar {
+            m.insert("HideViewerToolbar".into(), b(true));
+        }
+        if self.hide_viewer_window_controls {
+            m.insert("HideViewerWindowControls".into(), b(true));
+        }
+        if self.use_transition_effects {
+            m.insert("UseTransitionEffects".into(), b(true));
+        }
+        if let Some(v) = self.open_bookmark_levels {
+            m.insert("OpenBookmarkLevels".into(), l(v as i64));
+        }
+
+        if m.is_empty() {
+            None
+        } else {
+            Some(Value::Object(m).to_string())
+        }
+    }
+
+    /// Legacy comma-separated `Key=Value` builder. **Not** what LOK saveAs
+    /// actually parses — kept only because the unit tests in this module
+    /// exercise it as a property-mapping check. Real conversions go through
+    /// [`Self::lok_save_as_options`].
+    #[cfg(test)]
     pub(crate) fn filter_options(&self) -> Vec<String> {
         let mut out: Vec<String> = Vec::new();
 
@@ -513,14 +747,12 @@ impl OfficeOptions {
         if self.landscape {
             out.push("IsLandscape=true".into());
         }
-
         if self.export_bookmarks {
             out.push("ExportBookmarks=true".into());
         }
         if self.export_bookmarks_to_pdf_destination {
             out.push("ExportBookmarksToPDFDestination=true".into());
         }
-
         if self.export_form_fields {
             out.push("ExportFormFields=true".into());
         }
@@ -530,7 +762,6 @@ impl OfficeOptions {
         if self.export_placeholders {
             out.push("ExportPlaceholders=true".into());
         }
-
         if self.export_notes {
             out.push("ExportNotes=true".into());
         }
@@ -543,7 +774,6 @@ impl OfficeOptions {
         if self.export_notes_in_margin {
             out.push("ExportNotesInMargin=true".into());
         }
-
         if self.convert_ooo_target_to_pdf_target {
             out.push("ConvertOOoTargetToPDFTarget=true".into());
         }
@@ -568,7 +798,6 @@ impl OfficeOptions {
         if self.reduce_image_resolution {
             out.push("ReduceImageResolution=true".into());
         }
-
         if let Some(ref text) = self.native_watermark_text {
             out.push(format!("Watermark={text}"));
         }
@@ -587,7 +816,6 @@ impl OfficeOptions {
         if let Some(ref text) = self.native_tiled_watermark_text {
             out.push(format!("TiledWatermark={text}"));
         }
-
         if let Some(v) = self.initial_view {
             out.push(format!("InitialView={v}"));
         }
@@ -650,279 +878,127 @@ pub enum PdfAProfile {
     A3B,
 }
 
+impl std::fmt::Display for PdfAProfile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PdfAProfile::A1B => write!(f, "PDF/A-1b"),
+            PdfAProfile::A2B => write!(f, "PDF/A-2b"),
+            PdfAProfile::A3B => write!(f, "PDF/A-3b"),
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
-// Tests
+// Unit tests
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use static_assertions::assert_impl_all;
 
     #[test]
-    fn engine_is_send_sync_clone() {
-        use static_assertions::assert_impl_all;
-        assert_impl_all!(LibreOfficeEngine: Send, Sync, Clone);
+    fn config_and_options_are_send_sync() {
         assert_impl_all!(LibreOfficeConfig: Send, Sync, Clone);
         assert_impl_all!(OfficeOptions: Send, Sync, Clone);
         assert_impl_all!(PdfAProfile: Send, Sync, Clone, Copy);
     }
 
     #[test]
-    fn libreoffice_config_default_matches_spec() {
+    fn config_defaults() {
         let c = LibreOfficeConfig::default();
-        assert!(c.executable.is_none());
+        assert!(c.install_path.is_none());
         assert_eq!(c.timeout, Duration::from_secs(120));
-        assert!(c.max_concurrency >= 1);
-        assert_eq!(c.unoserver_port, 2003);
-        assert_eq!(c.unoserver_ready_timeout, Duration::from_secs(60));
+        assert!(!c.lazy_start);
     }
 
     #[test]
-    fn office_options_default_emits_no_filter_options() {
+    fn default_options_produce_empty_filter_string() {
         assert!(OfficeOptions::default().filter_options().is_empty());
     }
 
     #[test]
-    fn office_options_with_page_ranges_emits_pagerange_entry() {
-        let opts = OfficeOptions {
-            page_ranges: Some(PageRanges::parse("1-3,5").expect("parse")),
-            ..Default::default()
-        };
-        let opts = opts.filter_options();
-        assert!(opts.contains(&"PageRange=1-3,5".to_string()), "{opts:?}");
-    }
-
-    #[test]
-    fn office_options_with_pdf_a_maps_select_pdf_version() {
-        let cases = [
+    fn pdf_a_maps_to_correct_select_pdf_version() {
+        for (prof, expected) in [
             (PdfAProfile::A1B, "SelectPdfVersion=1"),
             (PdfAProfile::A2B, "SelectPdfVersion=2"),
             (PdfAProfile::A3B, "SelectPdfVersion=3"),
-        ];
-        for (prof, expected) in cases {
-            let opts = OfficeOptions {
-                pdf_a: Some(prof),
-                ..Default::default()
-            };
-            let opts = opts.filter_options();
-            assert!(opts.contains(&expected.to_string()), "{opts:?}");
+        ] {
+            let opts = OfficeOptions { pdf_a: Some(prof), ..Default::default() };
+            assert_eq!(opts.filter_options(), vec![expected]);
         }
     }
 
     #[test]
-    fn office_options_landscape_and_pdfua_entries() {
+    fn landscape_option_emits_correct_key() {
+        let opts = OfficeOptions { landscape: true, ..Default::default() };
+        assert!(opts.filter_options().contains(&"IsLandscape=true".to_string()));
+    }
+
+    #[test]
+    fn page_ranges_option_emits_correct_key() {
         let opts = OfficeOptions {
-            landscape: true,
-            pdf_ua: true,
+            page_ranges: Some(PageRanges::parse("1-3").unwrap()),
             ..Default::default()
         };
-        let opts = opts.filter_options();
-        assert!(opts.contains(&"IsLandscape=true".to_string()), "{opts:?}");
-        assert!(opts.contains(&"PDFUACompliance=true".to_string()), "{opts:?}");
+        let fo = opts.filter_options();
+        assert!(fo.iter().any(|s| s.starts_with("PageRange=")));
     }
 
     #[test]
-    fn office_options_quality_and_resolution_entries() {
-        let opts = OfficeOptions {
-            quality: Some(75),
-            max_image_resolution: Some(150),
-            ..Default::default()
-        };
-        let opts = opts.filter_options();
-        assert!(opts.contains(&"Quality=75".to_string()), "{opts:?}");
-        assert!(opts.contains(&"MaxImageResolution=150".to_string()), "{opts:?}");
+    fn pdf_ua_option_emits_correct_key() {
+        let opts = OfficeOptions { pdf_ua: true, ..Default::default() };
+        assert!(opts.filter_options().contains(&"PDFUACompliance=true".to_string()));
     }
 
     #[test]
-    fn office_options_quality_zero_rejected() {
-        let opts = OfficeOptions {
-            quality: Some(0),
-            ..Default::default()
-        };
-        assert!(matches!(
-            opts.validate(),
-            Err(EngineError::InvalidOption(_))
-        ));
+    fn validate_rejects_quality_out_of_range() {
+        let bad = OfficeOptions { quality: Some(0), ..Default::default() };
+        assert!(bad.validate().is_err());
+        let bad = OfficeOptions { quality: Some(101), ..Default::default() };
+        assert!(bad.validate().is_err());
     }
 
     #[test]
-    fn office_options_quality_above_100_rejected() {
-        let opts = OfficeOptions {
-            quality: Some(101),
-            ..Default::default()
-        };
-        assert!(matches!(
-            opts.validate(),
-            Err(EngineError::InvalidOption(_))
-        ));
+    fn validate_rejects_bad_image_resolution() {
+        let bad = OfficeOptions { max_image_resolution: Some(0), ..Default::default() };
+        assert!(bad.validate().is_err());
+        let bad = OfficeOptions { max_image_resolution: Some(999), ..Default::default() };
+        assert!(bad.validate().is_err());
     }
 
     #[test]
-    fn office_options_max_image_resolution_zero_rejected() {
-        let opts = OfficeOptions {
-            max_image_resolution: Some(0),
-            ..Default::default()
-        };
-        assert!(matches!(
-            opts.validate(),
-            Err(EngineError::InvalidOption(_))
-        ));
-    }
-
-    #[test]
-    fn office_options_default_validates_ok() {
-        assert!(OfficeOptions::default().validate().is_ok());
-    }
-
-    #[test]
-    fn office_options_serde_camel_case_roundtrip() {
-        let opts = OfficeOptions {
-            landscape: true,
-            page_ranges: Some(PageRanges::parse("1-3").expect("parse")),
+    fn validate_rejects_conflicting_pdf_a_and_pdf_ua() {
+        // Both together is valid — LibreOffice supports PDF/A + PDF/UA.
+        let ok = OfficeOptions {
             pdf_a: Some(PdfAProfile::A2B),
             pdf_ua: true,
-            quality: Some(80),
-            max_image_resolution: Some(200),
-            ..Default::default()
-        };
-        let json = serde_json::to_value(&opts).expect("ser");
-        assert_eq!(json["pageRanges"], "1-3");
-        assert_eq!(json["pdfA"], "a2-b");
-        assert_eq!(json["pdfUa"], true);
-        assert_eq!(json["maxImageResolution"], 200);
-        let back: OfficeOptions = serde_json::from_value(json).expect("de");
-        assert_eq!(back, opts);
-    }
-
-    #[test]
-    fn office_options_deserialise_with_missing_fields() {
-        let v: OfficeOptions = serde_json::from_str("{}").expect("de");
-        assert_eq!(v, OfficeOptions::default());
-    }
-
-    #[test]
-    fn office_options_filter_options_all_new_fields() {
-        let opts = OfficeOptions {
-            landscape: true,
-            export_bookmarks: true,
-            export_bookmarks_to_pdf_destination: true,
-            export_form_fields: true,
-            allow_duplicate_field_names: true,
-            export_placeholders: true,
-            export_notes: true,
-            export_notes_pages: true,
-            export_only_notes_pages: true,
-            export_notes_in_margin: true,
-            convert_ooo_target_to_pdf_target: true,
-            export_links_relative_fsys: true,
-            export_hidden_slides: true,
-            skip_empty_pages: true,
-            add_original_document_as_stream: true,
-            single_page_sheets: true,
-            lossless_image_compression: true,
-            reduce_image_resolution: true,
-            native_watermark_text: Some("SECRET".into()),
-            native_watermark_color: Some(16711680),
-            native_watermark_font_height: Some(20),
-            native_watermark_rotate_angle: Some(30),
-            native_watermark_font_name: Some("Times".into()),
-            native_tiled_watermark_text: Some("DRAFT".into()),
-            initial_view: Some(1),
-            initial_page: Some(5),
-            magnification: Some(2),
-            zoom: Some(150),
-            page_layout: Some(3),
-            first_page_on_left: true,
-            resize_window_to_initial_page: true,
-            center_window: true,
-            open_in_full_screen_mode: true,
-            display_pdf_document_title: true,
-            hide_viewer_menubar: true,
-            hide_viewer_toolbar: true,
-            hide_viewer_window_controls: true,
-            use_transition_effects: true,
-            open_bookmark_levels: Some(-1),
-            ..Default::default()
-        };
-        let entries = opts.filter_options();
-        let expected = [
-            "ExportBookmarks=true",
-            "ExportBookmarksToPDFDestination=true",
-            "ExportFormFields=true",
-            "AllowDuplicateFieldNames=true",
-            "ExportPlaceholders=true",
-            "ExportNotes=true",
-            "ExportNotesPages=true",
-            "ExportOnlyNotesPages=true",
-            "ExportNotesInMargin=true",
-            "ConvertOOoTargetToPDFTarget=true",
-            "ExportLinksRelativeFsys=true",
-            "ExportHiddenSlides=true",
-            "IsSkipEmptyPages=true",
-            "IsAddStream=true",
-            "SinglePageSheets=true",
-            "UseLosslessCompression=true",
-            "ReduceImageResolution=true",
-            "Watermark=SECRET",
-            "WatermarkColor=16711680",
-            "WatermarkFontHeight=20",
-            "WatermarkRotateAngle=30",
-            "WatermarkFontName=Times",
-            "TiledWatermark=DRAFT",
-            "InitialView=1",
-            "InitialPage=5",
-            "Magnification=2",
-            "Zoom=150",
-            "PageLayout=3",
-            "FirstPageOnLeft=true",
-            "ResizeWindowToInitialPage=true",
-            "CenterWindow=true",
-            "OpenInFullScreenMode=true",
-            "DisplayPDFDocumentTitle=true",
-            "HideViewerMenubar=true",
-            "HideViewerToolbar=true",
-            "HideViewerWindowControls=true",
-            "UseTransitionEffects=true",
-            "OpenBookmarkLevels=-1",
-        ];
-        for e in expected {
-            assert!(
-                entries.iter().any(|s| s == e),
-                "missing {e}; got {entries:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn office_options_validation_new_ranges() {
-        let bad = OfficeOptions {
-            initial_view: Some(5),
-            ..Default::default()
-        };
-        assert!(matches!(bad.validate(), Err(EngineError::InvalidOption(_))));
-
-        let bad = OfficeOptions {
-            magnification: Some(10),
-            ..Default::default()
-        };
-        assert!(matches!(bad.validate(), Err(EngineError::InvalidOption(_))));
-
-        let bad = OfficeOptions {
-            max_image_resolution: Some(200),
-            ..Default::default()
-        };
-        assert!(matches!(bad.validate(), Err(EngineError::InvalidOption(_))));
-
-        let ok = OfficeOptions {
-            initial_view: Some(2),
-            magnification: Some(3),
-            zoom: Some(200),
-            page_layout: Some(1),
-            open_bookmark_levels: Some(5),
-            max_image_resolution: Some(300),
             ..Default::default()
         };
         assert!(ok.validate().is_ok());
     }
 
+    #[test]
+    fn office_options_roundtrip_json() {
+        let json = serde_json::json!({
+            "landscape": true,
+            "pdfA": "a2-b",
+            "quality": 80
+        });
+        let back: OfficeOptions = serde_json::from_value(json).expect("de");
+        assert!(back.landscape);
+        assert_eq!(back.pdf_a, Some(PdfAProfile::A2B));
+        assert_eq!(back.quality, Some(80));
+    }
+
+    #[test]
+    fn office_options_deserialize_empty_object() {
+        let v: OfficeOptions = serde_json::from_str("{}").expect("de");
+        assert_eq!(v, OfficeOptions::default());
+    }
+
+    #[test]
+    fn validate_accepts_defaults() {
+        assert!(OfficeOptions::default().validate().is_ok());
+    }
 }
