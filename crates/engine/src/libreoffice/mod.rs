@@ -8,6 +8,7 @@
 //! `tokio::sync::oneshot` reply channels.
 
 pub mod filter;
+mod error;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
