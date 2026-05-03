@@ -255,6 +255,18 @@ impl ApiError {
                 documentation: Some(documentation_link("LIBREOFFICE_TIMEOUT")),
             },
 
+            // LibreOffice document errors (encrypted, corrupted, unsupported format)
+            // Refined in Task 10.
+            ApiError::Engine(EngineError::LibreOfficeEncrypted)
+            | ApiError::Engine(EngineError::LibreOfficeCorrupted(_))
+            | ApiError::Engine(EngineError::LibreOfficeUnsupportedFormat) => ApiErrorResponse {
+                error: "LibreOffice document error".to_string(),
+                code: code.to_string(),
+                details: None,
+                suggestion: None,
+                documentation: None,
+            },
+
             // Invalid option with field context
             ApiError::Engine(EngineError::InvalidOption(msg)) => ApiErrorResponse {
                 error: msg.clone(),
@@ -649,6 +661,12 @@ fn engine_status_and_code(e: &EngineError) -> (StatusCode, &'static str) {
             (StatusCode::INTERNAL_SERVER_ERROR, "ENGINE_UNAVAILABLE")
         }
         EngineError::Cdp(_) | EngineError::Internal(_) | EngineError::Io(_) | EngineError::Pdf(_) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL")
+        }
+        // Refined in Task 10 (real mapping is 422/415, not 500).
+        EngineError::LibreOfficeEncrypted
+        | EngineError::LibreOfficeCorrupted(_)
+        | EngineError::LibreOfficeUnsupportedFormat => {
             (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL")
         }
     }
