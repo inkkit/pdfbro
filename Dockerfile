@@ -79,6 +79,7 @@ RUN apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
         chromium chromium-sandbox \
         qpdf ghostscript \
+        poppler-utils \
         curl ca-certificates \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
