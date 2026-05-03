@@ -178,7 +178,7 @@ LABEL org.opencontainers.image.title="Folio" \
       org.opencontainers.image.description="A Docker-based API for converting documents to PDF." \
       org.opencontainers.image.version="${FOLIO_VERSION}" \
       org.opencontainers.image.authors="Folio Team" \
-      org.opencontainers.image.source="https://github.com/been-there-done-that/folio"
+      org.opencontainers.image.source="https://github.com/vel/folio"
 
 # Install LibreOffice from Debian bookworm-backports (newer than bookworm's 7.4).
 # python3-uno must match the LO version so it is also pulled from backports.
@@ -229,7 +229,7 @@ LABEL org.opencontainers.image.title="Folio (Chromium)" \
       org.opencontainers.image.description="A Docker-based API for converting documents to PDF — Chromium variant." \
       org.opencontainers.image.version="${FOLIO_VERSION}" \
       org.opencontainers.image.authors="Folio Team" \
-      org.opencontainers.image.source="https://github.com/been-there-done-that/folio"
+      org.opencontainers.image.source="https://github.com/vel/folio"
 
 COPY --link --chown="${FOLIO_USER_UID}:${FOLIO_USER_GID}" \
     --from=builder-chromium /app/target/release/folio-server /usr/bin/
@@ -260,7 +260,7 @@ LABEL org.opencontainers.image.title="Folio (LibreOffice)" \
       org.opencontainers.image.description="A Docker-based API for converting documents to PDF — LibreOffice variant." \
       org.opencontainers.image.version="${FOLIO_VERSION}" \
       org.opencontainers.image.authors="Folio Team" \
-      org.opencontainers.image.source="https://github.com/been-there-done-that/folio"
+      org.opencontainers.image.source="https://github.com/vel/folio"
 
 # Install LibreOffice from Debian bookworm-backports (newer than bookworm's 7.4).
 # python3-uno must match the LO version so it is also pulled from backports.
