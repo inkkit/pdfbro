@@ -170,9 +170,9 @@ export
 # Override registry:   make docker-build-all DOCKER_REGISTRY=myrepo/pdfbro
 # =============================================================================
 
-DOCKER_REGISTRY ?= deesh2025/no-name
+DOCKER_REGISTRY ?= ghcr.io/inkkit/pdfbro
 VERSION ?= 0.1.0
-MAJOR_VERSION ?= 8
+MAJOR_VERSION ?= 0
 
 # Internal helper — build a target and tag it.
 # $(1) = Dockerfile target name, $(2) = tag suffix (e.g. "-chromium", or "" for full)
