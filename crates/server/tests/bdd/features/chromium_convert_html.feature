@@ -3,7 +3,7 @@
 Feature: /forms/chromium/convert/html
 
   Scenario: POST /forms/chromium/convert/html (Default)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/page-1-html/index.html | file   |
       | Gotenberg-Output-Filename | foo                             | header |
@@ -19,7 +19,7 @@ Feature: /forms/chromium/convert/html
       """
 
   Scenario: POST /forms/chromium/convert/html (Single Page)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/pages-12-html/index.html | file   |
       | Gotenberg-Output-Filename | foo                               | header |
@@ -60,7 +60,7 @@ Feature: /forms/chromium/convert/html
       """
 
   Scenario: POST /forms/chromium/convert/html (Landscape)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/page-1-html/index.html | file   |
       | Gotenberg-Output-Filename | foo                             | header |
@@ -83,7 +83,7 @@ Feature: /forms/chromium/convert/html
 
   @skip
   Scenario: POST /forms/chromium/convert/html (Native Page Ranges)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/pages-12-html/index.html | file   |
       | nativePageRanges          | 2-3                               | field  |
@@ -104,7 +104,7 @@ Feature: /forms/chromium/convert/html
       """
 
   Scenario: POST /forms/chromium/convert/html (Header & Footer)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/pages-12-html/index.html       | file   |
       | files                     | testdata/header-footer-html/header.html | file   |
@@ -134,7 +134,7 @@ Feature: /forms/chromium/convert/html
       """
 
   Scenario: POST /forms/chromium/convert/html (Wait Delay)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/feature-rich-html/index.html | file   |
       | Gotenberg-Output-Filename | foo                                   | header |
@@ -164,7 +164,7 @@ Feature: /forms/chromium/convert/html
       """
 
   Scenario: POST /forms/chromium/convert/html (Wait For Expression)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/feature-rich-html/index.html | file   |
       | Gotenberg-Output-Filename | foo                                   | header |
@@ -194,7 +194,7 @@ Feature: /forms/chromium/convert/html
       """
 
   Scenario: POST /forms/chromium/convert/html (rAF / ResizeObserver / IntersectionObserver fire with waitForExpression)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/paint-callbacks-html/index.html       | file   |
       | waitForExpression         | !!document.body.getAttribute('data-pdf-ready') | field  |
@@ -218,7 +218,7 @@ Feature: /forms/chromium/convert/html
       """
 
   Scenario: POST /forms/chromium/convert/html (rAF / ResizeObserver / IntersectionObserver fire with waitDelay and emulatedMediaType=print)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/paint-callbacks-html/index.html | file   |
       | waitDelay                 | 3s                                       | field  |
@@ -243,7 +243,7 @@ Feature: /forms/chromium/convert/html
       """
 
   Scenario: POST /forms/chromium/convert/html (Wait For Selector)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/feature-rich-html/index.html | file   |
       | Gotenberg-Output-Filename | foo                                   | header |
@@ -273,7 +273,7 @@ Feature: /forms/chromium/convert/html
       """
 
   Scenario: POST /forms/chromium/convert/html (Emulated Media Type)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/feature-rich-html/index.html | file   |
       | Gotenberg-Output-Filename | foo                                   | header |
@@ -329,7 +329,7 @@ Feature: /forms/chromium/convert/html
       """
 
   Scenario: POST /forms/chromium/convert/html (Emulated Media Features)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/feature-rich-html/index.html | file   |
       | Gotenberg-Output-Filename | foo                                   | header |
@@ -405,7 +405,7 @@ Feature: /forms/chromium/convert/html
       """
 
   Scenario: POST /forms/chromium/convert/html (Default Allow / Deny Lists)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files | testdata/feature-rich-html/index.html | file |
     Then the response status code should be 200
@@ -414,7 +414,7 @@ Feature: /forms/chromium/convert/html
 
   @skip
   Scenario: POST /forms/chromium/convert/html (Main URL does NOT match allowed list)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST | ^file:(?!//\\/tmp/).* |
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files | testdata/feature-rich-html/index.html | file |
@@ -427,7 +427,7 @@ Feature: /forms/chromium/convert/html
 
   @skip
   Scenario: POST /forms/chromium/convert/html (Main URL does match denied list)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST |                |
       | CHROMIUM_DENY_LIST  | ^file:///tmp.* |
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
@@ -441,7 +441,7 @@ Feature: /forms/chromium/convert/html
 
   @skip
   Scenario: POST /forms/chromium/convert/html (Request does not match the allowed list)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST | ^file:///tmp.* |
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files | testdata/feature-rich-html/index.html | file |
@@ -450,7 +450,7 @@ Feature: /forms/chromium/convert/html
     Then there should be 1 PDF(s) in the response
 
   Scenario: POST /forms/chromium/convert/html (JavaScript Enabled)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/feature-rich-html/index.html | file   |
       | Gotenberg-Output-Filename | foo                                   | header |
@@ -467,7 +467,7 @@ Feature: /forms/chromium/convert/html
 
   @skip
   Scenario: POST /forms/chromium/convert/html (JavaScript Disabled)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | CHROMIUM_DISABLE_JAVASCRIPT | true |
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/feature-rich-html/index.html | file   |
@@ -485,7 +485,7 @@ Feature: /forms/chromium/convert/html
 
   @skip
   Scenario: POST /forms/chromium/convert/html (Fail On Resource HTTP Status Codes)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                         | testdata/feature-rich-html/index.html | file  |
       | failOnResourceHttpStatusCodes | [499,599]                             | field |
@@ -499,7 +499,7 @@ Feature: /forms/chromium/convert/html
 
   @skip
   Scenario: POST /forms/chromium/convert/html (Fail On Resource HTTP Status Codes - Ignore Domains)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                           | testdata/feature-rich-html/index.html | file  |
       | failOnResourceHttpStatusCodes   | [499,599]                             | field |
@@ -510,7 +510,7 @@ Feature: /forms/chromium/convert/html
 
   @skip
   Scenario: POST /forms/chromium/convert/html (Fail On Resource Loading Failed)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                       | testdata/feature-rich-html/index.html | file  |
       | failOnResourceLoadingFailed | true                                  | field |
@@ -531,7 +531,7 @@ Feature: /forms/chromium/convert/html
 
   @skip
   Scenario: POST /forms/chromium/convert/html (Fail On Console Exceptions)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                   | testdata/feature-rich-html/index.html | file  |
       | failOnConsoleExceptions | true                                  | field |
@@ -551,7 +551,7 @@ Feature: /forms/chromium/convert/html
       """
 
   Scenario: POST /forms/chromium/convert/html (Bad Request)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | singlePage                    | foo | field |
       | paperWidth                    | foo | field |
@@ -648,7 +648,7 @@ Feature: /forms/chromium/convert/html
   @split
   @skip
   Scenario: POST /forms/chromium/convert/html (Split Intervals)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files     | testdata/pages-3-html/index.html | file  |
       | splitMode | intervals                        | field |
@@ -679,7 +679,7 @@ Feature: /forms/chromium/convert/html
   @output-filename
   @skip
   Scenario: POST /forms/chromium/convert/html (Split Output Filename)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/pages-3-html/index.html | file   |
       | splitMode                 | intervals                        | field  |
@@ -710,7 +710,7 @@ Feature: /forms/chromium/convert/html
   @split
   @skip
   Scenario: POST /forms/chromium/convert/html (Split Pages)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files     | testdata/pages-3-html/index.html | file  |
       | splitMode | pages                            | field |
@@ -735,7 +735,7 @@ Feature: /forms/chromium/convert/html
   @split
   @skip
   Scenario: POST /forms/chromium/convert/html (Split Pages & Unify)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/pages-3-html/index.html | file   |
       | splitMode                 | pages                            | field  |
@@ -760,7 +760,7 @@ Feature: /forms/chromium/convert/html
   @split
   @skip
   Scenario: POST /forms/chromium/convert/html (Split Many PDFs - Lot of Pages)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files     | testdata/pages-12-html/index.html | file  |
       | splitMode | intervals                         | field |
@@ -794,7 +794,7 @@ Feature: /forms/chromium/convert/html
 
   @convert
   Scenario: POST /forms/chromium/convert/html (PDF/A-1b & PDF/UA-1)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files | testdata/page-1-html/index.html | file  |
       | pdfa  | PDF/A-1b                        | field |
@@ -808,7 +808,7 @@ Feature: /forms/chromium/convert/html
   @split
   @skip
   Scenario: POST /forms/chromium/convert/html (Split & PDF/A-1b & PDF/UA-1)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files     | testdata/pages-3-html/index.html | file  |
       | splitMode | intervals                        | field |
@@ -842,7 +842,7 @@ Feature: /forms/chromium/convert/html
   @output-filename
   @skip
   Scenario: POST /forms/chromium/convert/html (Split & PDF/A-1b & PDF/UA-1 & Output Filename)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/pages-3-html/index.html | file   |
       | splitMode                 | intervals                        | field  |
@@ -862,7 +862,7 @@ Feature: /forms/chromium/convert/html
 
   @metadata
   Scenario: POST /forms/chromium/convert/html (Metadata)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/page-1-html/index.html                                                                                                                                                                                                                                                                           | file   |
       | metadata                  | {"Author":"Julien Neuhart","Copyright":"Julien Neuhart","CreateDate":"2006-09-18T16:27:50-04:00","Creator":"Gotenberg","Keywords":["first","second"],"Marked":true,"ModDate":"2006-09-18T16:27:50-04:00","PDFVersion":1.7,"Producer":"Gotenberg","Subject":"Sample","Title":"Sample","Trapped":"Unknown"} | field  |
@@ -898,7 +898,7 @@ Feature: /forms/chromium/convert/html
 
   @flatten
   Scenario: POST /forms/chromium/convert/html (Flatten)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files   | testdata/page-1-html/index.html | file  |
       | flatten | true                            | field |
@@ -908,7 +908,7 @@ Feature: /forms/chromium/convert/html
 
   @encrypt
   Scenario: POST /forms/chromium/convert/html (Encrypt - user password only)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files        | testdata/page-1-html/index.html | file  |
       | userPassword | foo                             | field |
@@ -918,7 +918,7 @@ Feature: /forms/chromium/convert/html
 
   @encrypt
   Scenario: POST /forms/chromium/convert/html (Encrypt - both user and owner passwords)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files         | testdata/page-1-html/index.html | file  |
       | userPassword  | foo                             | field |
@@ -929,7 +929,7 @@ Feature: /forms/chromium/convert/html
 
   @watermark
   Scenario: POST /forms/chromium/convert/html (Watermark - Text)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files               | testdata/page-1-html/index.html | file  |
       | watermarkSource     | text                            | field |
@@ -940,7 +940,7 @@ Feature: /forms/chromium/convert/html
 
   @stamp
   Scenario: POST /forms/chromium/convert/html (Stamp - Text)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files           | testdata/page-1-html/index.html | file  |
       | stampSource     | text                            | field |
@@ -951,7 +951,7 @@ Feature: /forms/chromium/convert/html
 
   @rotate
   Scenario: POST /forms/chromium/convert/html (Rotate 90)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files       | testdata/page-1-html/index.html | file  |
       | rotateAngle | 90                              | field |
@@ -963,7 +963,7 @@ Feature: /forms/chromium/convert/html
   @embed
   Scenario: POST /forms/chromium/convert/html (Embeds)
     # Reason: Embed file check step not yet implemented
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/page-1-html/index.html | file   |
       | embeds                    | testdata/embed_1.xml            | file   |
@@ -987,7 +987,7 @@ Feature: /forms/chromium/convert/html
   @embed
   Scenario: POST /forms/chromium/convert/html (PDF/A-3b & PDF/UA-1 & Metadata & Watermark & Stamp & Flatten & Embeds)
     # Reason: Embed file check step not yet implemented
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/page-1-html/index.html                                                                                                                                                                                                                                                                           | file   |
       | pdfa                      | PDF/A-3b                                                                                                                                                                                                                                                                                                  | field  |
@@ -1007,7 +1007,7 @@ Feature: /forms/chromium/convert/html
 
   @skip
   Scenario: POST /forms/chromium/convert/html (Routes Disabled)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | CHROMIUM_DISABLE_ROUTES | true |
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files | testdata/page-1-html/index.html | file |
@@ -1015,7 +1015,7 @@ Feature: /forms/chromium/convert/html
 
   @skip
   Scenario: POST /forms/chromium/convert/html (Gotenberg Trace)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files           | testdata/page-1-html/index.html | file   |
       | Gotenberg-Trace | forms_chromium_convert_html     | header |
@@ -1028,7 +1028,7 @@ Feature: /forms/chromium/convert/html
   @skip
   Scenario: POST /forms/chromium/convert/html (Download From)
     # Reason: downloadFrom with live static server requires integration environment
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | downloadFrom | [{"url":"http://host.docker.internal:%d/static/testdata/page-1-html/index.html","extraHttpHeaders":{"X-Foo":"bar"}}] | field |
@@ -1040,7 +1040,7 @@ Feature: /forms/chromium/convert/html
   @skip
   Scenario: POST /forms/chromium/convert/html (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a webhook server
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                       | testdata/page-1-html/index.html              | file   |
@@ -1055,7 +1055,7 @@ Feature: /forms/chromium/convert/html
   @skip
   @skip
   Scenario: POST /forms/chromium/convert/html (Basic Auth)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
       | GOTENBERG_API_BASIC_AUTH_USERNAME | foo  |
       | GOTENBERG_API_BASIC_AUTH_PASSWORD | bar  |
@@ -1066,7 +1066,7 @@ Feature: /forms/chromium/convert/html
   @skip
   Scenario: POST /foo/forms/chromium/convert/html (Root Path)
     # Reason: Folio does not support configurable API root path prefix
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_DEBUG_ROUTE | true  |
       | API_ROOT_PATH          | /foo/ |
     When I make a "POST" request to "/foo/forms/chromium/convert/html" with the following form data and header(s):
@@ -1076,7 +1076,7 @@ Feature: /forms/chromium/convert/html
 
   # See: https://github.com/gotenberg/gotenberg/issues/1505.
   Scenario: POST /forms/chromium/convert/html (Asset)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/html-with-asset/index.html | file   |
       | files                     | testdata/html-with-asset/image.png  | file   |
@@ -1089,7 +1089,7 @@ Feature: /forms/chromium/convert/html
 
   @skip
   Scenario: POST /forms/chromium/convert/html (stampSource=pdf without uploaded stamp file => 400)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files           | testdata/page-1-html/index.html | file  |
       | stampSource     | pdf                             | field |
@@ -1102,7 +1102,7 @@ Feature: /forms/chromium/convert/html
 
   @skip
   Scenario: POST /forms/chromium/convert/html (watermarkSource=pdf without uploaded watermark file => 400)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files               | testdata/page-1-html/index.html | file  |
       | watermarkSource     | pdf                             | field |
@@ -1115,7 +1115,7 @@ Feature: /forms/chromium/convert/html
 
   # See: https://github.com/gotenberg/gotenberg/issues/1500.
   Scenario: POST /forms/chromium/convert/html (Long Filename)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files                     | testdata/page-1-html/index.html | file   |
       | Gotenberg-Output-Filename | foo                             | header |

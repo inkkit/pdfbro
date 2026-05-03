@@ -4,7 +4,7 @@
 Feature: /forms/pdfengines/merge
 
   Scenario: POST /forms/pdfengines/merge (default)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files                     | testdata/page_1.pdf | file   |
       | files                     | testdata/page_2.pdf | file   |
@@ -25,7 +25,7 @@ Feature: /forms/pdfengines/merge
       """
 
   Scenario: POST /forms/pdfengines/merge (QPDF)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_MERGE_ENGINES | qpdf |
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files                     | testdata/page_1.pdf | file   |
@@ -49,7 +49,7 @@ Feature: /forms/pdfengines/merge
   @skip
   Scenario: POST /forms/pdfengines/merge (PDFtk)
     # Reason: Folio uses lopdf/qpdf, not pdftk
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_MERGE_ENGINES | pdftk |
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files                     | testdata/page_1.pdf | file   |
@@ -63,7 +63,7 @@ Feature: /forms/pdfengines/merge
     Then the "foo.pdf" PDF should have 2 page(s)
 
   Scenario: POST /forms/pdfengines/merge (Bad Request)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | Gotenberg-Output-Filename | foo | header |
     Then the response status code should be 400
@@ -101,7 +101,7 @@ Feature: /forms/pdfengines/merge
 
   @convert
   Scenario: POST /forms/pdfengines/merge (PDF/A-1b & PDF/UA-1)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files                     | testdata/page_1.pdf | file   |
       | files                     | testdata/page_2.pdf | file   |
@@ -118,7 +118,7 @@ Feature: /forms/pdfengines/merge
 
   @metadata
   Scenario: POST /forms/pdfengines/merge (Metadata)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files                     | testdata/page_1.pdf                                                                                                                                                                                                                                                                                       | file   |
       | files                     | testdata/page_2.pdf                                                                                                                                                                                                                                                                                       | file   |
@@ -156,7 +156,7 @@ Feature: /forms/pdfengines/merge
 
   @bookmarks
   Scenario: POST /forms/pdfengines/merge (Bookmarks List)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files                     | testdata/page_1.pdf                 | file   |
       | files                     | testdata/page_2.pdf                 | file   |
@@ -182,7 +182,7 @@ Feature: /forms/pdfengines/merge
 
   @bookmarks
   Scenario: POST /forms/pdfengines/merge (Auto-index Bookmarks)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files                     | testdata/page_1_with_bookmarks.pdf | file   |
       | files                     | testdata/page_2_with_bookmarks.pdf | file   |
@@ -212,7 +212,7 @@ Feature: /forms/pdfengines/merge
 
   @flatten
   Scenario: POST /forms/pdfengines/merge (Flatten)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files                     | testdata/page_1.pdf | file   |
       | files                     | testdata/page_2.pdf | file   |
@@ -227,7 +227,7 @@ Feature: /forms/pdfengines/merge
 
   @encrypt
   Scenario: POST /forms/pdfengines/merge (Encrypt - user password only)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files        | testdata/page_1.pdf | file  |
       | files        | testdata/page_2.pdf | file  |
@@ -239,7 +239,7 @@ Feature: /forms/pdfengines/merge
 
   @encrypt
   Scenario: POST /forms/pdfengines/merge (Encrypt - both user and owner passwords)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files         | testdata/page_1.pdf | file  |
       | files         | testdata/page_2.pdf | file  |
@@ -252,7 +252,7 @@ Feature: /forms/pdfengines/merge
 
   @watermark
   Scenario: POST /forms/pdfengines/merge (Watermark - Text)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files               | testdata/page_1.pdf | file  |
       | files               | testdata/page_2.pdf | file  |
@@ -264,7 +264,7 @@ Feature: /forms/pdfengines/merge
 
   @stamp
   Scenario: POST /forms/pdfengines/merge (Stamp - Text)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files           | testdata/page_1.pdf | file  |
       | files           | testdata/page_2.pdf | file  |
@@ -276,7 +276,7 @@ Feature: /forms/pdfengines/merge
 
   @rotate
   Scenario: POST /forms/pdfengines/merge (Rotate 90)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files       | testdata/page_1.pdf | file  |
       | files       | testdata/page_2.pdf | file  |
@@ -289,7 +289,7 @@ Feature: /forms/pdfengines/merge
   @embed
   Scenario: POST /forms/pdfengines/merge (Embeds)
     # Reason: Embed file check step not yet implemented
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files                     | testdata/page_1.pdf  | file   |
       | files                     | testdata/page_2.pdf  | file   |
@@ -300,7 +300,7 @@ Feature: /forms/pdfengines/merge
 
   @skip
   Scenario: POST /forms/pdfengines/merge (Routes Disabled)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_DISABLE_ROUTES | true |
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files | testdata/page_1.pdf | file |
@@ -309,7 +309,7 @@ Feature: /forms/pdfengines/merge
 
   @skip
   Scenario: POST /forms/pdfengines/merge (Gotenberg Trace)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files           | testdata/page_1.pdf    | file   |
       | files           | testdata/page_2.pdf    | file   |
@@ -323,7 +323,7 @@ Feature: /forms/pdfengines/merge
   @skip
   Scenario: POST /forms/pdfengines/merge (Download From)
     # Reason: downloadFrom with live static server requires integration environment
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | downloadFrom | [{"url":"http://host.docker.internal/static/testdata/page_1.pdf"},{"url":"http://host.docker.internal/static/testdata/page_2.pdf"}] | field |
     Then the response status code should be 200
@@ -334,7 +334,7 @@ Feature: /forms/pdfengines/merge
   @skip
   Scenario: POST /forms/pdfengines/merge (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files                       | testdata/page_1.pdf                 | file   |
       | files                       | testdata/page_2.pdf                 | file   |
@@ -345,7 +345,7 @@ Feature: /forms/pdfengines/merge
   @skip
   @skip
   Scenario: POST /forms/pdfengines/merge (Basic Auth)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
       | GOTENBERG_API_BASIC_AUTH_USERNAME | foo  |
       | GOTENBERG_API_BASIC_AUTH_PASSWORD | bar  |
@@ -357,7 +357,7 @@ Feature: /forms/pdfengines/merge
   @skip
   Scenario: POST /foo/forms/pdfengines/merge (Root Path)
     # Reason: Folio does not support configurable API root path prefix
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_DEBUG_ROUTE | true  |
       | API_ROOT_PATH          | /foo/ |
     When I make a "POST" request to "/foo/forms/pdfengines/merge" with the following form data and header(s):
@@ -369,7 +369,7 @@ Feature: /forms/pdfengines/merge
   @convert
   @encrypt
   Scenario: POST /forms/pdfengines/merge (PDF/A + Encrypt => 400)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files        | testdata/page_1.pdf | file  |
       | files        | testdata/page_2.pdf | file  |
@@ -378,7 +378,7 @@ Feature: /forms/pdfengines/merge
     Then the response status code should be 400
 
   Scenario: POST /forms/pdfengines/merge (stampSource=pdf without uploaded stamp file => 400)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files           | testdata/page_1.pdf | file  |
       | files           | testdata/page_2.pdf | file  |
@@ -391,7 +391,7 @@ Feature: /forms/pdfengines/merge
       """
 
   Scenario: POST /forms/pdfengines/merge (watermarkSource=pdf without uploaded watermark file => 400)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files               | testdata/page_1.pdf | file  |
       | files               | testdata/page_2.pdf | file  |
@@ -404,7 +404,7 @@ Feature: /forms/pdfengines/merge
       """
 
   Scenario: POST /forms/pdfengines/merge (Long Filename)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files                     | testdata/Longitudinell_jämförelse_mellan_laserkirurgi_och_strålbehandling_gällande_röstkvalitet_och_självskattad_kommunikation_upp_till_två_år_efter_tidig_stämbandscancer_i_ett_randomiserat_kontrollerat_försök.pdf | file   |
       | files                     | testdata/page_2.pdf                                                                                                                                                                                                   | file   |

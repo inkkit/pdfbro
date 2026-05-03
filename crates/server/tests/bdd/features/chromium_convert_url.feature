@@ -4,7 +4,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Default)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field  |
@@ -22,7 +22,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Single Page)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/pages-12-html/index.html | field  |
@@ -66,7 +66,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Landscape)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field  |
@@ -91,7 +91,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Native Page Ranges)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/pages-12-html/index.html | field  |
@@ -114,7 +114,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Header & Footer)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/pages-12-html/index.html | field  |
@@ -146,7 +146,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Custom HTTP Headers)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/page-1-html/index.html                                                                                                                                          | field  |
@@ -161,7 +161,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Cookies)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/page-1-html/index.html                                                            | field  |
@@ -176,7 +176,7 @@ Feature: /forms/chromium/convert/url
   # See https://github.com/gotenberg/gotenberg/issues/1130.
   @skip
   Scenario: POST /forms/chromium/convert/url (case-insensitive sameSite)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/page-1-html/index.html                                                                             | field  |
@@ -190,7 +190,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Wait Delay)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/feature-rich-html-remote/index.html | field  |
@@ -223,7 +223,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Wait For Expression)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/feature-rich-html-remote/index.html | field  |
@@ -256,7 +256,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Wait For Selector)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/feature-rich-html-remote/index.html | field  |
@@ -289,7 +289,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Emulated Media Type)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/feature-rich-html-remote/index.html | field  |
@@ -349,7 +349,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Emulated Media Features)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/feature-rich-html-remote/index.html | field  |
@@ -430,7 +430,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Default Allow / Deny Lists)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url | http://host.docker.internal:%d/html/testdata/feature-rich-html-remote/index.html | field |
@@ -440,7 +440,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Main URL does NOT match allowed list)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST | ^file:(?!//\\/tmp/).* |
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
@@ -454,7 +454,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Main URL does match denied list)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST |         |
       | CHROMIUM_DENY_LIST  | ^http.* |
     Given I have a static server
@@ -469,7 +469,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Request does not match the allowed list)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST | ^.* |
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
@@ -480,7 +480,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (file:// scheme rejected at route layer)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url | file:///tmp/foo/index.html | field |
     Then the response status code should be 400
@@ -492,7 +492,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Main URL resolves to a non-public IP, permissive default)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST |  |
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
@@ -503,7 +503,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Main URL is a non-public IP literal, deny-private-ips on)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST       |      |
       | CHROMIUM_DENY_PRIVATE_IPS | true |
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
@@ -517,7 +517,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Main URL resolves to a non-public IP, deny-private-ips on with allow-list bypass)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST       | .+   |
       | CHROMIUM_DENY_PRIVATE_IPS | true |
     Given I have a static server
@@ -529,7 +529,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (JavaScript Enabled)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/feature-rich-html-remote/index.html | field  |
@@ -547,7 +547,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (JavaScript Disabled)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | CHROMIUM_DISABLE_JAVASCRIPT | true |
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
@@ -566,7 +566,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Fail On Resource HTTP Status Codes)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                           | http://host.docker.internal:%d/html/testdata/feature-rich-html-remote/index.html | field |
@@ -584,7 +584,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Fail On Resource Loading Failed)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                         | http://host.docker.internal:%d/html/testdata/feature-rich-html-remote/index.html | field |
@@ -602,7 +602,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Fail On Console Exceptions)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                     | http://host.docker.internal:%d/html/testdata/feature-rich-html-remote/index.html | field |
@@ -624,7 +624,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Bad Request)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | singlePage                    | foo | field |
@@ -732,7 +732,7 @@ Feature: /forms/chromium/convert/url
   @split
   @skip
   Scenario: POST /forms/chromium/convert/url (Split Intervals)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url       | http://host.docker.internal:%d/html/testdata/pages-3-html/index.html | field |
@@ -764,7 +764,7 @@ Feature: /forms/chromium/convert/url
   @output-filename
   @skip
   Scenario: POST /forms/chromium/convert/url (Split Output Filename)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/pages-3-html/index.html | field  |
@@ -784,7 +784,7 @@ Feature: /forms/chromium/convert/url
   @split
   @skip
   Scenario: POST /forms/chromium/convert/url (Split Pages)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url       | http://host.docker.internal:%d/html/testdata/pages-3-html/index.html | field |
@@ -810,7 +810,7 @@ Feature: /forms/chromium/convert/url
   @split
   @skip
   Scenario: POST /forms/chromium/convert/url (Split Pages & Unify)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/pages-3-html/index.html | field  |
@@ -836,7 +836,7 @@ Feature: /forms/chromium/convert/url
   @split
   @skip
   Scenario: POST /forms/chromium/convert/url (Split Many PDFs - Lot of Pages)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url       | http://host.docker.internal:%d/html/testdata/pages-12-html/index.html | field |
@@ -872,7 +872,7 @@ Feature: /forms/chromium/convert/url
   @convert
   @skip
   Scenario: POST /forms/chromium/convert/url (PDF/A-1b & PDF/UA-1)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url   | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field |
@@ -885,7 +885,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (Split & PDF/A-1b & PDF/UA-1)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url       | http://host.docker.internal:%d/html/testdata/pages-3-html/index.html | field |
@@ -903,7 +903,7 @@ Feature: /forms/chromium/convert/url
   @output-filename
   @skip
   Scenario: POST /forms/chromium/convert/url (Split & PDF/A-1b & PDF/UA-1 & Output Filename)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/pages-3-html/index.html | field  |
@@ -919,7 +919,7 @@ Feature: /forms/chromium/convert/url
   @metadata
   @skip
   Scenario: POST /forms/chromium/convert/url (Metadata)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/page-1-html/index.html                                                                                                                                                                                                                                       | field  |
@@ -957,7 +957,7 @@ Feature: /forms/chromium/convert/url
   @flatten
   @skip
   Scenario: POST /forms/chromium/convert/url (Flatten)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url     | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field |
@@ -969,7 +969,7 @@ Feature: /forms/chromium/convert/url
   @encrypt
   @skip
   Scenario: POST /forms/chromium/convert/url (Encrypt - user password only)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url          | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field |
@@ -981,7 +981,7 @@ Feature: /forms/chromium/convert/url
   @encrypt
   @skip
   Scenario: POST /forms/chromium/convert/url (Encrypt - both user and owner passwords)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url           | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field |
@@ -996,7 +996,7 @@ Feature: /forms/chromium/convert/url
   @skip
   Scenario: POST /forms/chromium/convert/url (Embeds)
     # Reason: Embed file check step not yet implemented
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field  |
@@ -1018,7 +1018,7 @@ Feature: /forms/chromium/convert/url
   @skip
   Scenario: POST /forms/chromium/convert/url (PDF/A-3b & PDF/UA-1 & Metadata & Flatten & Embeds)
     # Reason: Embed file check step not yet implemented
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/page-1-html/index.html                                                                                                                                                                                                                                       | field  |
@@ -1036,7 +1036,7 @@ Feature: /forms/chromium/convert/url
   @skip
   @skip
   Scenario: POST /forms/chromium/convert/url (Routes Disabled)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | CHROMIUM_DISABLE_ROUTES | true |
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
@@ -1046,7 +1046,7 @@ Feature: /forms/chromium/convert/url
   @skip
   @skip
   Scenario: POST /forms/chromium/convert/url (Gotenberg Trace)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url             | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field  |
@@ -1060,7 +1060,7 @@ Feature: /forms/chromium/convert/url
   @skip
   Scenario: POST /forms/chromium/convert/url (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a webhook server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                         | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field  |
@@ -1075,7 +1075,7 @@ Feature: /forms/chromium/convert/url
   @skip
   @skip
   Scenario: POST /forms/chromium/convert/url (Basic Auth)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
       | GOTENBERG_API_BASIC_AUTH_USERNAME | foo  |
       | GOTENBERG_API_BASIC_AUTH_PASSWORD | bar  |
@@ -1088,7 +1088,7 @@ Feature: /forms/chromium/convert/url
   @skip
   Scenario: POST /foo/forms/chromium/convert/url (Root Path)
     # Reason: Folio does not support configurable API root path prefix
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_DEBUG_ROUTE | true  |
       | API_ROOT_PATH          | /foo/ |
     Given I have a static server
@@ -1099,7 +1099,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (stampSource=pdf without uploaded stamp file => 400)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url             | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field |
@@ -1113,7 +1113,7 @@ Feature: /forms/chromium/convert/url
 
   @skip
   Scenario: POST /forms/chromium/convert/url (watermarkSource=pdf without uploaded watermark file => 400)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                 | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field |
@@ -1128,7 +1128,7 @@ Feature: /forms/chromium/convert/url
   # See: https://github.com/gotenberg/gotenberg/issues/1500.
   @skip
   Scenario: POST /forms/chromium/convert/url (Long Filename)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a static server
     When I make a "POST" request to "/forms/chromium/convert/url" with the following form data and header(s):
       | url                       | http://host.docker.internal:%d/html/testdata/page-1-html/index.html | field  |

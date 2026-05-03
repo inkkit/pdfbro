@@ -2,7 +2,7 @@
 Feature: Output Filename
 
   Scenario: Default (Single Output File)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/flatten" with the following form data and header(s):
       | files                     | testdata/page_1.pdf | file   |
       | Gotenberg-Output-Filename | foo                 | header |
@@ -12,7 +12,7 @@ Feature: Output Filename
       | foo.pdf |
 
   Scenario: Default (Many Output Files)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/flatten" with the following form data and header(s):
       | files                     | testdata/page_1.pdf | file   |
       | files                     | testdata/page_2.pdf | file   |
@@ -24,7 +24,7 @@ Feature: Output Filename
 
   # See https://github.com/gotenberg/gotenberg/issues/1227.
   Scenario: Path As Filename
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/flatten" with the following form data and header(s):
       | files                     | testdata/page_1.pdf | file   |
       | Gotenberg-Output-Filename | /tmp/foo            | header |

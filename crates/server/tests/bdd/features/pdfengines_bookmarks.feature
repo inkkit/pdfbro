@@ -4,7 +4,7 @@
 Feature: /forms/pdfengines/bookmarks/{write|read}
 
   Scenario: POST /forms/pdfengines/bookmarks/{write|read} (Single PDF & Bookmarks list)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/bookmarks/write" with the following form data and header(s):
       | files                     | testdata/page_1.pdf                                                      | file   |
       | bookmarks                 | [{"title":"Index","page":1,"children":[{"title":"Sub-index","page":1}]}] | field  |
@@ -35,7 +35,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
       """
 
   Scenario: POST /forms/pdfengines/bookmarks/{write|read} (Single PDF & Bookmarks Map)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/bookmarks/write" with the following form data and header(s):
       | files                     | testdata/page_1.pdf                         | file   |
       | bookmarks                 | {"page_1.pdf":[{"title":"Index","page":1}]} | field  |
@@ -60,7 +60,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
       """
 
   Scenario: POST /forms/pdfengines/bookmarks/{write|read} (Many PDFs & Bookmarks List)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/bookmarks/write" with the following form data and header(s):
       | files     | testdata/page_1.pdf          | file  |
       | files     | testdata/page_2.pdf          | file  |
@@ -92,7 +92,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
       """
 
   Scenario: POST /forms/pdfengines/bookmarks/{write|read} (Many PDFs & Bookmarks Map)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/bookmarks/write" with the following form data and header(s):
       | files     | testdata/page_1.pdf                                                                   | file  |
       | files     | testdata/page_2.pdf                                                                   | file  |
@@ -124,7 +124,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
       """
 
   Scenario: POST /forms/pdfengines/bookmarks/read (Empty List)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/bookmarks/read" with the following form data and header(s):
       | files | testdata/page_1.pdf | file |
     Then the response status code should be 200
@@ -137,12 +137,12 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
       """
 
   Scenario: POST /forms/pdfengines/bookmarks/write (Bad Request)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/bookmarks/write" with the following form data and header(s):
       | Gotenberg-Output-Filename | foo | header |
     Then the response status code should be 400
     Then the response header "Content-Type" should be "application/json"
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/bookmarks/write" with the following form data and header(s):
       | files     | testdata/page_1.pdf | file  |
       | bookmarks | foo                 | field |
@@ -150,7 +150,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
     Then the response header "Content-Type" should be "application/json"
 
   Scenario: POST /forms/pdfengines/bookmarks/read (Bad Request)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/bookmarks/read" with the following form data and header(s):
       | Gotenberg-Output-Filename | foo | header |
     Then the response status code should be 400
@@ -162,7 +162,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
 
   @skip
   Scenario: POST /forms/pdfengines/bookmarks/write (Routes Disabled)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_DISABLE_ROUTES | true |
     When I make a "POST" request to "/forms/pdfengines/bookmarks/write" with the following form data and header(s):
       | files     | testdata/page_1.pdf          | file  |
@@ -171,7 +171,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
 
   @skip
   Scenario: POST /forms/pdfengines/bookmarks/read (Routes Disabled)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_DISABLE_ROUTES | true |
     When I make a "POST" request to "/forms/pdfengines/bookmarks/write" with the following form data and header(s):
       | files | testdata/page_1.pdf | file |
@@ -179,7 +179,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
 
   @skip
   Scenario: POST /forms/pdfengines/bookmarks/write (Gotenberg Trace)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/bookmarks/write" with the following form data and header(s):
       | files           | testdata/page_1.pdf              | file   |
       | bookmarks       | [{"title":"Index","page":1}]     | field  |
@@ -190,7 +190,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
 
   @skip
   Scenario: POST /forms/pdfengines/bookmarks/read (Gotenberg Trace)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/bookmarks/read" with the following form data and header(s):
       | files           | testdata/page_1.pdf             | file   |
       | Gotenberg-Trace | forms_pdfengines_bookmarks_read | header |
@@ -200,7 +200,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
 
   @output-filename
   Scenario: POST /forms/pdfengines/bookmarks/write (Output Filename - Single PDF)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/bookmarks/write" with the following form data and header(s):
       | files                     | testdata/page_1.pdf          | file   |
       | bookmarks                 | [{"title":"Index","page":1}] | field  |
@@ -212,7 +212,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
 
   @output-filename
   Scenario: POST /forms/pdfengines/bookmarks/write (Output Filename - Many PDFs)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/bookmarks/write" with the following form data and header(s):
       | files                     | testdata/page_1.pdf          | file   |
       | files                     | testdata/page_2.pdf          | file   |
@@ -230,7 +230,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
   @skip
   Scenario: POST /forms/pdfengines/bookmarks/write (Download From)
     # Reason: downloadFrom with live static server requires integration environment
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/bookmarks/write" with the following form data and header(s):
       | bookmarks                 | [{"title":"Index","page":1}]                                                                             | field  |
       | downloadFrom              | [{"url":"http://host.docker.internal/static/testdata/page_1.pdf","extraHttpHeaders":{"X-Foo":"bar"}}]    | field  |
@@ -243,7 +243,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
   @skip
   Scenario: POST /forms/pdfengines/bookmarks/read (Download From)
     # Reason: downloadFrom with live static server requires integration environment
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/bookmarks/read" with the following form data and header(s):
       | downloadFrom | [{"url":"http://host.docker.internal/static/testdata/page_1.pdf","extraHttpHeaders":{"X-Foo":"bar"}}] | field |
     Then the response status code should be 200
@@ -254,7 +254,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
   @skip
   Scenario: POST /forms/pdfengines/bookmarks/write (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/bookmarks/write" with the following form data and header(s):
       | files                       | testdata/page_1.pdf                 | file   |
       | bookmarks                   | [{"title":"Index","page":1}]        | field  |
@@ -266,7 +266,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
   @skip
   Scenario: POST /forms/pdfengines/bookmarks/read (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/bookmarks/read" with the following form data and header(s):
       | files                       | testdata/page_1.pdf                 | file   |
       | Gotenberg-Webhook-Url       | http://host.docker.internal/webhook | header |
@@ -275,7 +275,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
   @skip
   @skip
   Scenario: POST /forms/pdfengines/bookmarks/write (Basic Auth)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
       | GOTENBERG_API_BASIC_AUTH_USERNAME | foo  |
       | GOTENBERG_API_BASIC_AUTH_PASSWORD | bar  |
@@ -287,7 +287,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
   @skip
   @skip
   Scenario: POST /forms/pdfengines/bookmarks/read (Basic Auth)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
       | GOTENBERG_API_BASIC_AUTH_USERNAME | foo  |
       | GOTENBERG_API_BASIC_AUTH_PASSWORD | bar  |
@@ -298,7 +298,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
   @skip
   Scenario: POST /foo/forms/pdfengines/bookmarks/{write|read} (Root Path)
     # Reason: Folio does not support configurable API root path prefix
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_DEBUG_ROUTE | true  |
       | API_ROOT_PATH          | /foo/ |
     When I make a "POST" request to "/foo/forms/pdfengines/bookmarks/write" with the following form data and header(s):

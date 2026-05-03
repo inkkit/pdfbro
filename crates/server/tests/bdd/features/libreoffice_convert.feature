@@ -3,7 +3,7 @@
 Feature: /forms/libreoffice/convert
 
   Scenario: POST /forms/libreoffice/convert (Single Document)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files                     | testdata/page_1.docx | file   |
       | Gotenberg-Output-Filename | foo                  | header |
@@ -19,7 +19,7 @@ Feature: /forms/libreoffice/convert
       """
 
   Scenario: POST /forms/libreoffice/convert (Many Documents)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files                     | testdata/page_1.docx | file   |
       | files                     | testdata/page_2.docx | file   |
@@ -43,7 +43,7 @@ Feature: /forms/libreoffice/convert
       """
 
   Scenario: POST /forms/libreoffice/convert (Non-basic Latin Characters)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files                     | testdata/Special_Chars_ß.docx | file   |
       | Gotenberg-Output-Filename | foo                           | header |
@@ -60,7 +60,7 @@ Feature: /forms/libreoffice/convert
 
   @skip
   Scenario: POST /forms/libreoffice/convert (Protected)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files | testdata/protected_page_1.docx | file |
     Then the response status code should be 400
@@ -74,7 +74,7 @@ Feature: /forms/libreoffice/convert
 
   @skip
   Scenario: POST /forms/libreoffice/convert (Landscape)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files                     | testdata/page_1.docx | file   |
       | Gotenberg-Output-Filename | foo                  | header |
@@ -92,7 +92,7 @@ Feature: /forms/libreoffice/convert
     Then the "foo.pdf" PDF should be set to landscape orientation
 
   Scenario: POST /forms/libreoffice/convert (Native Page Ranges - Single Document)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files                     | testdata/pages_3.docx | file   |
       | nativePageRanges          | 2-3                   | field  |
@@ -113,7 +113,7 @@ Feature: /forms/libreoffice/convert
       """
 
   Scenario: POST /forms/libreoffice/convert (Native Page Ranges - Many Documents)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files                     | testdata/pages_3.docx  | file   |
       | files                     | testdata/pages_12.docx | file   |
@@ -130,7 +130,7 @@ Feature: /forms/libreoffice/convert
     Then the "pages_12.docx.pdf" PDF should have 2 page(s)
 
   Scenario: POST /forms/libreoffice/convert (Bad Request)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | landscape | foo | field |
     Then the response status code should be 400
@@ -153,7 +153,7 @@ Feature: /forms/libreoffice/convert
 
   @merge
   Scenario: POST /forms/libreoffice/convert (Merge)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files                     | testdata/page_1.docx | file   |
       | files                     | testdata/page_2.docx | file   |
@@ -178,7 +178,7 @@ Feature: /forms/libreoffice/convert
   @split
   @skip
   Scenario: POST /forms/libreoffice/convert (Merge & Split)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files     | testdata/page_1.docx | file  |
       | files     | testdata/page_2.docx | file  |
@@ -205,7 +205,7 @@ Feature: /forms/libreoffice/convert
   @split
   @skip
   Scenario: POST /forms/libreoffice/convert (Split Intervals)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files     | testdata/pages_3.docx | file  |
       | splitMode | intervals             | field |
@@ -222,7 +222,7 @@ Feature: /forms/libreoffice/convert
   @split
   @skip
   Scenario: POST /forms/libreoffice/convert (Split Pages)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files     | testdata/pages_3.docx | file  |
       | splitMode | pages                 | field |
@@ -237,7 +237,7 @@ Feature: /forms/libreoffice/convert
   @split
   @skip
   Scenario: POST /forms/libreoffice/convert (Split Pages & Unify)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files      | testdata/pages_3.docx | file  |
       | splitMode  | pages                 | field |
@@ -252,7 +252,7 @@ Feature: /forms/libreoffice/convert
 
   @convert
   Scenario: POST /forms/libreoffice/convert (PDF/A-1b & PDF/UA-1)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files | testdata/page_1.docx | file  |
       | pdfa  | PDF/A-1b             | field |
@@ -264,7 +264,7 @@ Feature: /forms/libreoffice/convert
 
   @metadata
   Scenario: POST /forms/libreoffice/convert (Metadata)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files                     | testdata/page_1.docx                                                                                                                                                                                                                                                                                      | file   |
       | metadata                  | {"Author":"Julien Neuhart","Copyright":"Julien Neuhart","CreateDate":"2006-09-18T16:27:50-04:00","Creator":"Gotenberg","Keywords":["first","second"],"Marked":true,"ModDate":"2006-09-18T16:27:50-04:00","PDFVersion":1.7,"Producer":"Gotenberg","Subject":"Sample","Title":"Sample","Trapped":"Unknown"} | field  |
@@ -300,7 +300,7 @@ Feature: /forms/libreoffice/convert
 
   @flatten
   Scenario: POST /forms/libreoffice/convert (Flatten)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files   | testdata/page_1.docx | file  |
       | flatten | true                 | field |
@@ -310,7 +310,7 @@ Feature: /forms/libreoffice/convert
 
   @encrypt
   Scenario: POST /forms/libreoffice/convert (Encrypt - user password only)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files        | testdata/page_1.docx | file  |
       | userPassword | foo                  | field |
@@ -321,7 +321,7 @@ Feature: /forms/libreoffice/convert
 
   @encrypt
   Scenario: POST /forms/libreoffice/convert (Encrypt - both user and owner passwords)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files         | testdata/page_1.docx | file  |
       | userPassword  | foo                  | field |
@@ -333,7 +333,7 @@ Feature: /forms/libreoffice/convert
 
   @watermark
   Scenario: POST /forms/libreoffice/convert (Watermark - Text)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files               | testdata/page_1.docx | file  |
       | watermarkSource     | text                 | field |
@@ -344,7 +344,7 @@ Feature: /forms/libreoffice/convert
 
   @stamp
   Scenario: POST /forms/libreoffice/convert (Stamp - Text)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files           | testdata/page_1.docx | file  |
       | stampSource     | text                 | field |
@@ -355,7 +355,7 @@ Feature: /forms/libreoffice/convert
 
   @rotate
   Scenario: POST /forms/libreoffice/convert (Rotate 90)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files       | testdata/page_1.docx | file  |
       | rotateAngle | 90                   | field |
@@ -365,7 +365,7 @@ Feature: /forms/libreoffice/convert
 
   @watermark
   Scenario: POST /forms/libreoffice/convert (Native Watermark - Text)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files               | testdata/page_1.docx | file  |
       | nativeWatermarkText | CONFIDENTIAL         | field |
@@ -375,7 +375,7 @@ Feature: /forms/libreoffice/convert
 
   @watermark
   Scenario: POST /forms/libreoffice/convert (Native Watermark - Tiled)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files                    | testdata/page_1.docx | file  |
       | nativeTiledWatermarkText | CONFIDENTIAL         | field |
@@ -387,7 +387,7 @@ Feature: /forms/libreoffice/convert
   @embed
   Scenario: POST /forms/libreoffice/convert (Embeds)
     # Reason: Embed file check step not yet implemented
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files                     | testdata/page_1.docx | file   |
       | embeds                    | testdata/embed_1.xml | file   |
@@ -401,7 +401,7 @@ Feature: /forms/libreoffice/convert
 
   @skip
   Scenario: POST /forms/libreoffice/convert (Routes Disabled)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | LIBREOFFICE_DISABLE_ROUTES | true |
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files | testdata/page_1.docx | file |
@@ -409,7 +409,7 @@ Feature: /forms/libreoffice/convert
 
   @skip
   Scenario: POST /forms/libreoffice/convert (Gotenberg Trace)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files           | testdata/page_1.docx      | file   |
       | Gotenberg-Trace | forms_libreoffice_convert | header |
@@ -422,7 +422,7 @@ Feature: /forms/libreoffice/convert
   @skip
   Scenario: POST /forms/libreoffice/convert (Download From)
     # Reason: downloadFrom with live static server requires integration environment
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | downloadFrom | [{"url":"http://host.docker.internal/static/testdata/page_1.docx","extraHttpHeaders":{"X-Foo":"bar"}}] | field |
     Then the response status code should be 200
@@ -433,7 +433,7 @@ Feature: /forms/libreoffice/convert
   @skip
   Scenario: POST /forms/libreoffice/convert (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files                       | testdata/page_1.docx                | file   |
       | Gotenberg-Output-Filename   | foo                                 | header |
@@ -443,7 +443,7 @@ Feature: /forms/libreoffice/convert
   @skip
   @skip
   Scenario: POST /forms/libreoffice/convert (Basic Auth)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
       | GOTENBERG_API_BASIC_AUTH_USERNAME | foo  |
       | GOTENBERG_API_BASIC_AUTH_PASSWORD | bar  |
@@ -454,7 +454,7 @@ Feature: /forms/libreoffice/convert
   @skip
   Scenario: POST /foo/forms/libreoffice/convert (Root Path)
     # Reason: Folio does not support configurable API root path prefix
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_DEBUG_ROUTE | true  |
       | API_ROOT_PATH          | /foo/ |
     When I make a "POST" request to "/foo/forms/libreoffice/convert" with the following form data and header(s):
@@ -464,7 +464,7 @@ Feature: /forms/libreoffice/convert
 
   @skip
   Scenario: POST /forms/libreoffice/convert (stampSource=pdf without uploaded stamp file => 400)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files           | testdata/page_1.docx | file  |
       | stampSource     | pdf                  | field |
@@ -477,7 +477,7 @@ Feature: /forms/libreoffice/convert
 
   @skip
   Scenario: POST /forms/libreoffice/convert (watermarkSource=pdf without uploaded watermark file => 400)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files               | testdata/page_1.docx | file  |
       | watermarkSource     | pdf                  | field |
@@ -489,7 +489,7 @@ Feature: /forms/libreoffice/convert
       """
 
   Scenario: POST /forms/libreoffice/convert (Long Filename)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files                     | testdata/Longitudinell_jämförelse_mellan_laserkirurgi_och_strålbehandling_gällande_röstkvalitet_och_självskattad_kommunikation_upp_till_två_år_efter_tidig_stämbandscancer_i_ett_randomiserat_kontrollerat_försök.docx | file   |
       | Gotenberg-Output-Filename | foo                                                                                                                                                                                                                    | header |

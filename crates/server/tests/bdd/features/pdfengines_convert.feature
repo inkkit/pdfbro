@@ -3,7 +3,7 @@
 Feature: /forms/pdfengines/convert
 
   Scenario: POST /forms/pdfengines/convert (Single PDF/A-1b)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/convert" with the following form data and header(s):
       | files | testdata/page_1.pdf | file  |
       | pdfa  | PDF/A-1b            | field |
@@ -13,7 +13,7 @@ Feature: /forms/pdfengines/convert
     Then the response PDF(s) should pass PDF/A validation
 
   Scenario: POST /forms/pdfengines/convert (Single PDF/A-2b)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/convert" with the following form data and header(s):
       | files | testdata/page_1.pdf | file  |
       | pdfa  | PDF/A-2b            | field |
@@ -23,7 +23,7 @@ Feature: /forms/pdfengines/convert
     Then the response PDF(s) should pass PDF/A validation
 
   Scenario: POST /forms/pdfengines/convert (Single PDF/A-3b)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/convert" with the following form data and header(s):
       | files | testdata/page_1.pdf | file  |
       | pdfa  | PDF/A-3b            | field |
@@ -33,7 +33,7 @@ Feature: /forms/pdfengines/convert
     Then the response PDF(s) should pass PDF/A validation
 
   Scenario: POST /forms/pdfengines/convert (Single PDF/UA-1)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/convert" with the following form data and header(s):
       | files | testdata/page_1.pdf | file  |
       | pdfua | true                | field |
@@ -42,7 +42,7 @@ Feature: /forms/pdfengines/convert
     Then there should be 1 PDF(s) in the response
 
   Scenario: POST /forms/pdfengines/convert (Single PDF/A-1b & PDF/UA-1)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/convert" with the following form data and header(s):
       | files | testdata/page_1.pdf | file  |
       | pdfa  | PDF/A-1b            | field |
@@ -53,7 +53,7 @@ Feature: /forms/pdfengines/convert
     Then the response PDF(s) should pass PDF/A validation
 
   Scenario: POST /forms/pdfengines/convert (Many PDFs)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/convert" with the following form data and header(s):
       | files | testdata/page_1.pdf | file  |
       | files | testdata/page_2.pdf | file  |
@@ -64,7 +64,7 @@ Feature: /forms/pdfengines/convert
     Then the response PDF(s) should pass PDF/A validation
 
   Scenario: POST /forms/pdfengines/convert (Bad Request)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/convert" with the following form data and header(s):
       | files | testdata/page_1.pdf | file |
     Then the response status code should be 400
@@ -93,7 +93,7 @@ Feature: /forms/pdfengines/convert
 
   @skip
   Scenario: POST /forms/pdfengines/convert (Gotenberg Trace)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/convert" with the following form data and header(s):
       | files           | testdata/page_1.pdf      | file   |
       | pdfa            | PDF/A-1b                 | field  |
@@ -104,7 +104,7 @@ Feature: /forms/pdfengines/convert
 
   @output-filename
   Scenario: POST /forms/pdfengines/convert (Output Filename - Single PDF)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/convert" with the following form data and header(s):
       | files                     | testdata/page_1.pdf | file   |
       | pdfa                      | PDF/A-1b            | field  |
@@ -116,7 +116,7 @@ Feature: /forms/pdfengines/convert
 
   @output-filename
   Scenario: POST /forms/pdfengines/convert (Output Filename - Many PDFs)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/convert" with the following form data and header(s):
       | files                     | testdata/page_1.pdf | file   |
       | files                     | testdata/page_2.pdf | file   |
@@ -134,7 +134,7 @@ Feature: /forms/pdfengines/convert
   @skip
   Scenario: POST /forms/pdfengines/convert (Download From)
     # Reason: downloadFrom with live static server requires integration environment
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/convert" with the following form data and header(s):
       | downloadFrom | [{"url":"http://host.docker.internal/static/testdata/page_1.pdf","extraHttpHeaders":{"X-Foo":"bar"}}] | field |
       | pdfa         | PDF/A-1b                                                                                              | field |
@@ -146,7 +146,7 @@ Feature: /forms/pdfengines/convert
   @skip
   Scenario: POST /forms/pdfengines/convert (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/convert" with the following form data and header(s):
       | files                       | testdata/page_1.pdf                 | file   |
       | pdfa                        | PDF/A-1b                            | field  |
@@ -156,7 +156,7 @@ Feature: /forms/pdfengines/convert
   @skip
   @skip
   Scenario: POST /forms/pdfengines/convert (Basic Auth)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
       | GOTENBERG_API_BASIC_AUTH_USERNAME | foo  |
       | GOTENBERG_API_BASIC_AUTH_PASSWORD | bar  |
@@ -168,7 +168,7 @@ Feature: /forms/pdfengines/convert
   @skip
   Scenario: POST /foo/forms/pdfengines/convert (Root Path)
     # Reason: Folio does not support configurable API root path prefix
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_DEBUG_ROUTE | true  |
       | API_ROOT_PATH          | /foo/ |
     When I make a "POST" request to "/foo/forms/pdfengines/convert" with the following form data and header(s):

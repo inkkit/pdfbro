@@ -4,7 +4,7 @@
 Feature: /forms/pdfengines/watermark
 
   Scenario: POST /forms/pdfengines/watermark (Text - pdfcpu)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_WATERMARK_ENGINES | pdfcpu |
     When I make a "POST" request to "/forms/pdfengines/watermark" with the following form data and header(s):
       | files               | testdata/page_1.pdf | file  |
@@ -16,7 +16,7 @@ Feature: /forms/pdfengines/watermark
     Then the "page_1.pdf" PDF should have 1 page(s)
 
   Scenario: POST /forms/pdfengines/watermark (Text with Pages - pdfcpu)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_WATERMARK_ENGINES | pdfcpu |
     When I make a "POST" request to "/forms/pdfengines/watermark" with the following form data and header(s):
       | files               | testdata/pages_3.pdf | file  |
@@ -29,7 +29,7 @@ Feature: /forms/pdfengines/watermark
     Then the "pages_3.pdf" PDF should have 3 page(s)
 
   Scenario: POST /forms/pdfengines/watermark (Text with Options - pdfcpu)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_WATERMARK_ENGINES | pdfcpu |
     When I make a "POST" request to "/forms/pdfengines/watermark" with the following form data and header(s):
       | files               | testdata/page_1.pdf                                  | file  |
@@ -41,7 +41,7 @@ Feature: /forms/pdfengines/watermark
     Then there should be 1 PDF(s) in the response
 
   Scenario: POST /forms/pdfengines/watermark (Image - pdfcpu)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_WATERMARK_ENGINES | pdfcpu |
     When I make a "POST" request to "/forms/pdfengines/watermark" with the following form data and header(s):
       | files           | testdata/page_1.pdf    | file  |
@@ -54,7 +54,7 @@ Feature: /forms/pdfengines/watermark
   @skip
   Scenario: POST /forms/pdfengines/watermark (PDF - pdfcpu)
     # Reason: pdfcpu watermark with PDF source fails - WatermarkKind::ImagePng expects PNG bytes not PDF
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_WATERMARK_ENGINES | pdfcpu |
     When I make a "POST" request to "/forms/pdfengines/watermark" with the following form data and header(s):
       | files           | testdata/page_1.pdf | file  |
@@ -67,7 +67,7 @@ Feature: /forms/pdfengines/watermark
   @skip
   Scenario: POST /forms/pdfengines/watermark (PDF - pdftk)
     # Reason: Folio uses lopdf/qpdf, not pdftk
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_WATERMARK_ENGINES | pdftk |
     When I make a "POST" request to "/forms/pdfengines/watermark" with the following form data and header(s):
       | files           | testdata/page_1.pdf | file  |
@@ -80,7 +80,7 @@ Feature: /forms/pdfengines/watermark
   @skip
   Scenario: POST /forms/pdfengines/watermark (Text - pdftk unsupported)
     # Reason: Folio uses lopdf/qpdf, not pdftk
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_WATERMARK_ENGINES | pdftk |
     When I make a "POST" request to "/forms/pdfengines/watermark" with the following form data and header(s):
       | files               | testdata/page_1.pdf | file  |
@@ -97,7 +97,7 @@ Feature: /forms/pdfengines/watermark
   @skip
   Scenario: POST /forms/pdfengines/watermark (Image via Download From)
     # Reason: downloadFrom with live static server requires integration environment
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_WATERMARK_ENGINES | pdfcpu |
     When I make a "POST" request to "/forms/pdfengines/watermark" with the following form data and header(s):
       | files           | testdata/page_1.pdf                                                                          | file  |
@@ -112,7 +112,7 @@ Feature: /forms/pdfengines/watermark
   @skip
   Scenario: POST /forms/pdfengines/watermark (PDF via Download From)
     # Reason: downloadFrom with live static server requires integration environment
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_WATERMARK_ENGINES | pdfcpu |
     When I make a "POST" request to "/forms/pdfengines/watermark" with the following form data and header(s):
       | files           | testdata/page_1.pdf                                                                       | file  |
@@ -123,7 +123,7 @@ Feature: /forms/pdfengines/watermark
     Then there should be 1 PDF(s) in the response
 
   Scenario: POST /forms/pdfengines/watermark (Many PDFs)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/watermark" with the following form data and header(s):
       | files               | testdata/page_1.pdf | file  |
       | files               | testdata/page_2.pdf | file  |
@@ -134,7 +134,7 @@ Feature: /forms/pdfengines/watermark
     Then there should be 2 PDF(s) in the response
 
   Scenario: POST /forms/pdfengines/watermark (Bad Request - No Source)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/watermark" with the following form data and header(s):
       | files | testdata/page_1.pdf | file |
     Then the response status code should be 400
@@ -144,7 +144,7 @@ Feature: /forms/pdfengines/watermark
       """
 
   Scenario: POST /forms/pdfengines/watermark (Bad Request - Invalid Source)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/watermark" with the following form data and header(s):
       | files           | testdata/page_1.pdf | file  |
       | watermarkSource | foo                 | field |
@@ -155,7 +155,7 @@ Feature: /forms/pdfengines/watermark
       """
 
   Scenario: POST /forms/pdfengines/watermark (Bad Request - Missing File for Image Source)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/watermark" with the following form data and header(s):
       | files           | testdata/page_1.pdf | file  |
       | watermarkSource | image               | field |
@@ -166,7 +166,7 @@ Feature: /forms/pdfengines/watermark
       """
 
   Scenario: POST /forms/pdfengines/watermark (Bad Request - Missing File for PDF Source)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/watermark" with the following form data and header(s):
       | files           | testdata/page_1.pdf | file  |
       | watermarkSource | pdf                 | field |
@@ -177,7 +177,7 @@ Feature: /forms/pdfengines/watermark
       """
 
   Scenario: POST /forms/pdfengines/watermark (Bad Request - No PDF)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/watermark" with the following form data and header(s):
       | watermarkSource     | text         | field |
       | watermarkExpression | CONFIDENTIAL | field |
@@ -189,7 +189,7 @@ Feature: /forms/pdfengines/watermark
 
   @skip
   Scenario: POST /forms/pdfengines/watermark (Routes Disabled)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_DISABLE_ROUTES | true |
     When I make a "POST" request to "/forms/pdfengines/watermark" with the following form data and header(s):
       | files               | testdata/page_1.pdf | file  |
@@ -199,7 +199,7 @@ Feature: /forms/pdfengines/watermark
 
   @skip
   Scenario: POST /forms/pdfengines/watermark (Gotenberg Trace)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/watermark" with the following form data and header(s):
       | files               | testdata/page_1.pdf        | file   |
       | watermarkSource     | text                       | field  |
@@ -214,7 +214,7 @@ Feature: /forms/pdfengines/watermark
   @skip
   Scenario: POST /forms/pdfengines/watermark (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/watermark" with the following form data and header(s):
       | files                       | testdata/page_1.pdf                 | file   |
       | watermarkSource             | text                                | field  |
@@ -225,7 +225,7 @@ Feature: /forms/pdfengines/watermark
   @skip
   @skip
   Scenario: POST /forms/pdfengines/watermark (Basic Auth)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
       | GOTENBERG_API_BASIC_AUTH_USERNAME | foo  |
       | GOTENBERG_API_BASIC_AUTH_PASSWORD | bar  |
@@ -238,7 +238,7 @@ Feature: /forms/pdfengines/watermark
   @skip
   Scenario: POST /foo/forms/pdfengines/watermark (Root Path)
     # Reason: Folio does not support configurable API root path prefix
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_DEBUG_ROUTE | true  |
       | API_ROOT_PATH          | /foo/ |
     When I make a "POST" request to "/foo/forms/pdfengines/watermark" with the following form data and header(s):

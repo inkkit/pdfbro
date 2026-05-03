@@ -3,7 +3,7 @@
 Feature: /forms/chromium/convert/markdown
 
   Scenario: POST /forms/chromium/convert/markdown (Default)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                     | testdata/page-1-markdown/index.html | file   |
       | files                     | testdata/page-1-markdown/page_1.md  | file   |
@@ -20,7 +20,7 @@ Feature: /forms/chromium/convert/markdown
       """
 
   Scenario: POST /forms/chromium/convert/markdown (Single Page)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                     | testdata/pages-12-markdown/index.html | file   |
       | files                     | testdata/pages-12-markdown/page_1.md  | file   |
@@ -82,7 +82,7 @@ Feature: /forms/chromium/convert/markdown
       """
 
   Scenario: POST /forms/chromium/convert/markdown (Landscape)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                     | testdata/page-1-markdown/index.html | file   |
       | files                     | testdata/page-1-markdown/page_1.md  | file   |
@@ -107,7 +107,7 @@ Feature: /forms/chromium/convert/markdown
 
   @skip
   Scenario: POST /forms/chromium/convert/markdown (Native Page Ranges)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                     | testdata/pages-12-markdown/index.html | file   |
       | files                     | testdata/pages-12-markdown/page_1.md  | file   |
@@ -140,7 +140,7 @@ Feature: /forms/chromium/convert/markdown
       """
 
   Scenario: POST /forms/chromium/convert/markdown (Header & Footer)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                     | testdata/pages-12-markdown/index.html   | file   |
       | files                     | testdata/pages-12-markdown/page_1.md    | file   |
@@ -182,7 +182,7 @@ Feature: /forms/chromium/convert/markdown
       """
 
   Scenario: POST /forms/chromium/convert/markdown (Wait Delay)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                     | testdata/feature-rich-markdown/index.html | file   |
       | files                     | testdata/feature-rich-markdown/table.md   | file   |
@@ -214,7 +214,7 @@ Feature: /forms/chromium/convert/markdown
       """
 
   Scenario: POST /forms/chromium/convert/markdown (Wait For Expression)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                     | testdata/feature-rich-markdown/index.html | file   |
       | files                     | testdata/feature-rich-markdown/table.md   | file   |
@@ -246,7 +246,7 @@ Feature: /forms/chromium/convert/markdown
       """
 
   Scenario: POST /forms/chromium/convert/markdown (Emulated Media Type)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                     | testdata/feature-rich-markdown/index.html | file   |
       | files                     | testdata/feature-rich-markdown/table.md   | file   |
@@ -287,7 +287,7 @@ Feature: /forms/chromium/convert/markdown
 
   @skip
   Scenario: POST /forms/chromium/convert/markdown (Main URL does NOT match allowed list)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST | ^file:(?!//\\/tmp/).* |
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files | testdata/feature-rich-markdown/index.html | file |
@@ -301,7 +301,7 @@ Feature: /forms/chromium/convert/markdown
 
   @skip
   Scenario: POST /forms/chromium/convert/markdown (Main URL does match denied list)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | CHROMIUM_ALLOW_LIST |                |
       | CHROMIUM_DENY_LIST  | ^file:///tmp.* |
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
@@ -315,7 +315,7 @@ Feature: /forms/chromium/convert/markdown
       """
 
   Scenario: POST /forms/chromium/convert/markdown (JavaScript Enabled)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                     | testdata/feature-rich-markdown/index.html | file   |
       | files                     | testdata/feature-rich-markdown/table.md   | file   |
@@ -333,7 +333,7 @@ Feature: /forms/chromium/convert/markdown
 
   @skip
   Scenario: POST /forms/chromium/convert/markdown (JavaScript Disabled)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | CHROMIUM_DISABLE_JAVASCRIPT | true |
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                     | testdata/feature-rich-markdown/index.html | file   |
@@ -352,7 +352,7 @@ Feature: /forms/chromium/convert/markdown
 
   @skip
   Scenario: POST /forms/chromium/convert/markdown (Fail On Resource HTTP Status Codes)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                         | testdata/feature-rich-markdown/index.html | file  |
       | files                         | testdata/feature-rich-markdown/table.md   | file  |
@@ -361,7 +361,7 @@ Feature: /forms/chromium/convert/markdown
 
   @skip
   Scenario: POST /forms/chromium/convert/markdown (Fail On Resource Loading Failed)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                       | testdata/feature-rich-markdown/index.html | file  |
       | files                       | testdata/feature-rich-markdown/table.md   | file  |
@@ -375,7 +375,7 @@ Feature: /forms/chromium/convert/markdown
 
   @skip
   Scenario: POST /forms/chromium/convert/markdown (Fail On Console Exceptions)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                   | testdata/feature-rich-markdown/index.html | file  |
       | files                   | testdata/feature-rich-markdown/table.md   | file  |
@@ -389,7 +389,7 @@ Feature: /forms/chromium/convert/markdown
 
   @skip
   Scenario: POST /forms/chromium/convert/markdown (Bad Request)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files | testdata/pages-3-markdown/index.html | file |
       | files | testdata/pages-3-markdown/page_1.md  | file |
@@ -417,7 +417,7 @@ Feature: /forms/chromium/convert/markdown
   @split
   @skip
   Scenario: POST /forms/chromium/convert/markdown (Split Intervals)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files     | testdata/pages-3-markdown/index.html | file  |
       | files     | testdata/pages-3-markdown/page_1.md  | file  |
@@ -451,7 +451,7 @@ Feature: /forms/chromium/convert/markdown
   @output-filename
   @skip
   Scenario: POST /forms/chromium/convert/markdown (Split Output Filename)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                     | testdata/pages-3-markdown/index.html | file   |
       | files                     | testdata/pages-3-markdown/page_1.md  | file   |
@@ -473,7 +473,7 @@ Feature: /forms/chromium/convert/markdown
   @split
   @skip
   Scenario: POST /forms/chromium/convert/markdown (Split Pages)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files     | testdata/pages-3-markdown/index.html | file  |
       | files     | testdata/pages-3-markdown/page_1.md  | file  |
@@ -501,7 +501,7 @@ Feature: /forms/chromium/convert/markdown
   @split
   @skip
   Scenario: POST /forms/chromium/convert/markdown (Split Pages & Unify)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                     | testdata/pages-3-markdown/index.html | file   |
       | files                     | testdata/pages-3-markdown/page_1.md  | file   |
@@ -528,7 +528,7 @@ Feature: /forms/chromium/convert/markdown
 
   @convert
   Scenario: POST /forms/chromium/convert/markdown (PDF/A-1b & PDF/UA-1)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files | testdata/page-1-markdown/index.html | file  |
       | files | testdata/page-1-markdown/page_1.md  | file  |
@@ -541,7 +541,7 @@ Feature: /forms/chromium/convert/markdown
 
   @metadata
   Scenario: POST /forms/chromium/convert/markdown (Metadata)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                     | testdata/page-1-markdown/index.html                                                                                                                                                                                                                                                                       | file   |
       | files                     | testdata/page-1-markdown/page_1.md                                                                                                                                                                                                                                                                        | file   |
@@ -578,7 +578,7 @@ Feature: /forms/chromium/convert/markdown
 
   @flatten
   Scenario: POST /forms/chromium/convert/markdown (Flatten)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files   | testdata/page-1-markdown/index.html | file  |
       | files   | testdata/page-1-markdown/page_1.md  | file  |
@@ -589,7 +589,7 @@ Feature: /forms/chromium/convert/markdown
 
   @encrypt
   Scenario: POST /forms/chromium/convert/markdown (Encrypt - user password only)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files        | testdata/page-1-markdown/index.html | file  |
       | files        | testdata/page-1-markdown/page_1.md  | file  |
@@ -601,7 +601,7 @@ Feature: /forms/chromium/convert/markdown
 
   @encrypt
   Scenario: POST /forms/chromium/convert/markdown (Encrypt - both user and owner passwords)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files         | testdata/page-1-markdown/index.html | file  |
       | files         | testdata/page-1-markdown/page_1.md  | file  |
@@ -616,7 +616,7 @@ Feature: /forms/chromium/convert/markdown
   @embed
   Scenario: POST /forms/chromium/convert/markdown (Embeds)
     # Reason: Embed file check step not yet implemented
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                     | testdata/page-1-markdown/index.html | file   |
       | files                     | testdata/page-1-markdown/page_1.md  | file   |
@@ -631,7 +631,7 @@ Feature: /forms/chromium/convert/markdown
 
   @skip
   Scenario: POST /forms/chromium/convert/markdown (Routes Disabled)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | CHROMIUM_DISABLE_ROUTES | true |
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files | testdata/page-1-markdown/index.html | file |
@@ -640,7 +640,7 @@ Feature: /forms/chromium/convert/markdown
 
   @skip
   Scenario: POST /forms/chromium/convert/markdown (Gotenberg Trace)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files           | testdata/page-1-markdown/index.html | file   |
       | files           | testdata/page-1-markdown/page_1.md  | file   |
@@ -654,7 +654,7 @@ Feature: /forms/chromium/convert/markdown
   @skip
   Scenario: POST /forms/chromium/convert/markdown (Download From)
     # Reason: downloadFrom with live static server requires integration environment
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | downloadFrom | [{"url":"http://host.docker.internal/static/testdata/page-1-markdown/index.html","extraHttpHeaders":{"X-Foo":"bar"}}] | field |
       | files        | testdata/page-1-markdown/page_1.md                                                                                    | file  |
@@ -666,7 +666,7 @@ Feature: /forms/chromium/convert/markdown
   @skip
   Scenario: POST /forms/chromium/convert/markdown (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                       | testdata/page-1-markdown/index.html | file   |
       | files                       | testdata/page-1-markdown/page_1.md  | file   |
@@ -677,7 +677,7 @@ Feature: /forms/chromium/convert/markdown
   @skip
   @skip
   Scenario: POST /forms/chromium/convert/markdown (Basic Auth)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
       | GOTENBERG_API_BASIC_AUTH_USERNAME | foo  |
       | GOTENBERG_API_BASIC_AUTH_PASSWORD | bar  |
@@ -689,7 +689,7 @@ Feature: /forms/chromium/convert/markdown
   @skip
   Scenario: POST /foo/forms/chromium/convert/markdown (Root Path)
     # Reason: Folio does not support configurable API root path prefix
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_DEBUG_ROUTE | true  |
       | API_ROOT_PATH          | /foo/ |
     When I make a "POST" request to "/foo/forms/chromium/convert/markdown" with the following form data and header(s):
@@ -700,7 +700,7 @@ Feature: /forms/chromium/convert/markdown
 
   @skip
   Scenario: POST /forms/chromium/convert/markdown (stampSource=pdf without uploaded stamp file => 400)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files           | testdata/page-1-markdown/index.html | file  |
       | files           | testdata/page-1-markdown/page_1.md  | file  |
@@ -714,7 +714,7 @@ Feature: /forms/chromium/convert/markdown
 
   @skip
   Scenario: POST /forms/chromium/convert/markdown (watermarkSource=pdf without uploaded watermark file => 400)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files               | testdata/page-1-markdown/index.html | file  |
       | files               | testdata/page-1-markdown/page_1.md  | file  |
@@ -727,7 +727,7 @@ Feature: /forms/chromium/convert/markdown
       """
 
   Scenario: POST /forms/chromium/convert/markdown (Long Filename)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/chromium/convert/markdown" with the following form data and header(s):
       | files                     | testdata/page-1-markdown/index.html | file   |
       | files                     | testdata/page-1-markdown/page_1.md  | file   |

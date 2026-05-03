@@ -4,7 +4,7 @@
 Feature: /forms/pdfengines/split
 
   Scenario: POST /forms/pdfengines/split (Intervals - Default)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files     | testdata/pages_3.pdf | file  |
       | splitMode | intervals            | field |
@@ -31,7 +31,7 @@ Feature: /forms/pdfengines/split
       """
 
   Scenario: POST /forms/pdfengines/split (Pages - Default)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files     | testdata/pages_3.pdf | file  |
       | splitMode | pages                | field |
@@ -54,7 +54,7 @@ Feature: /forms/pdfengines/split
       """
 
   Scenario: POST /forms/pdfengines/split (Pages & Unify - Default)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files      | testdata/pages_3.pdf | file  |
       | splitMode  | pages                | field |
@@ -76,7 +76,7 @@ Feature: /forms/pdfengines/split
       """
 
   Scenario: POST /forms/pdfengines/split (Intervals - pdfcpu)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_SPLIT_ENGINES | pdfcpu |
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files     | testdata/pages_3.pdf | file  |
@@ -94,7 +94,7 @@ Feature: /forms/pdfengines/split
   @skip
   Scenario: POST /forms/pdfengines/split (Pages & Unify - PDFtk)
     # Reason: Folio uses lopdf/qpdf, not pdftk
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_SPLIT_ENGINES | pdftk |
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files      | testdata/pages_3.pdf | file  |
@@ -106,7 +106,7 @@ Feature: /forms/pdfengines/split
     Then there should be 1 PDF(s) in the response
 
   Scenario: POST /forms/pdfengines/split (Many PDFs - Lot of Pages)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files     | testdata/pages_12.pdf | file  |
       | files     | testdata/pages_3.pdf  | file  |
@@ -117,7 +117,7 @@ Feature: /forms/pdfengines/split
     Then there should be 15 PDF(s) in the response
 
   Scenario: POST /forms/pdfengines/split (Bad Request)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | Gotenberg-Output-Filename | foo | header |
     Then the response status code should be 400
@@ -156,7 +156,7 @@ Feature: /forms/pdfengines/split
 
   @convert
   Scenario: POST /forms/pdfengines/split (PDF/A-1b & PDF/UA-1)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files     | testdata/pages_3.pdf | file  |
       | splitMode | intervals            | field |
@@ -173,7 +173,7 @@ Feature: /forms/pdfengines/split
 
   @metadata
   Scenario: POST /forms/pdfengines/split (Metadata)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files     | testdata/pages_3.pdf                                                                                                                                                                                                                                                                                      | file  |
       | splitMode | intervals                                                                                                                                                                                                                                                                                                 | field |
@@ -188,7 +188,7 @@ Feature: /forms/pdfengines/split
 
   @flatten
   Scenario: POST /forms/pdfengines/split (Flatten)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files     | testdata/pages_3.pdf | file  |
       | splitMode | intervals            | field |
@@ -200,7 +200,7 @@ Feature: /forms/pdfengines/split
 
   @encrypt
   Scenario: POST /forms/pdfengines/split (Encrypt - user password only)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files        | testdata/pages_3.pdf | file  |
       | splitMode    | intervals            | field |
@@ -213,7 +213,7 @@ Feature: /forms/pdfengines/split
 
   @watermark
   Scenario: POST /forms/pdfengines/split (Watermark - Text)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files               | testdata/pages_3.pdf | file  |
       | splitMode           | intervals            | field |
@@ -226,7 +226,7 @@ Feature: /forms/pdfengines/split
 
   @stamp
   Scenario: POST /forms/pdfengines/split (Stamp - Text)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files           | testdata/pages_3.pdf | file  |
       | splitMode       | intervals            | field |
@@ -239,7 +239,7 @@ Feature: /forms/pdfengines/split
 
   @rotate
   Scenario: POST /forms/pdfengines/split (Rotate 90)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files       | testdata/pages_3.pdf | file  |
       | splitMode   | intervals            | field |
@@ -253,7 +253,7 @@ Feature: /forms/pdfengines/split
   @embed
   Scenario: POST /forms/pdfengines/split (Embeds)
     # Reason: Embed file check step not yet implemented
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files     | testdata/pages_3.pdf | file  |
       | embeds    | testdata/embed_1.xml | file  |
@@ -266,7 +266,7 @@ Feature: /forms/pdfengines/split
 
   @skip
   Scenario: POST /forms/pdfengines/split (Routes Disabled)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_DISABLE_ROUTES | true |
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files     | testdata/pages_3.pdf | file  |
@@ -276,7 +276,7 @@ Feature: /forms/pdfengines/split
 
   @skip
   Scenario: POST /forms/pdfengines/split (Gotenberg Trace)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files           | testdata/pages_3.pdf   | file   |
       | splitMode       | intervals              | field  |
@@ -288,7 +288,7 @@ Feature: /forms/pdfengines/split
 
   @output-filename
   Scenario: POST /forms/pdfengines/split (Output Filename - Single PDF)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files                     | testdata/pages_3.pdf | file   |
       | splitMode                 | pages                | field  |
@@ -302,7 +302,7 @@ Feature: /forms/pdfengines/split
 
   @output-filename
   Scenario: POST /forms/pdfengines/split (Output Filename - Many PDFs)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files                     | testdata/pages_3.pdf | file   |
       | splitMode                 | intervals            | field  |
@@ -320,7 +320,7 @@ Feature: /forms/pdfengines/split
   @skip
   Scenario: POST /forms/pdfengines/split (Download From)
     # Reason: downloadFrom with live static server requires integration environment
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | downloadFrom | [{"url":"http://host.docker.internal/static/testdata/pages_3.pdf","extraHttpHeaders":{"X-Foo":"bar"}}] | field |
       | splitMode    | intervals                                                                                              | field |
@@ -333,7 +333,7 @@ Feature: /forms/pdfengines/split
   @skip
   Scenario: POST /forms/pdfengines/split (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files                       | testdata/pages_3.pdf                | file   |
       | splitMode                   | intervals                           | field  |
@@ -344,7 +344,7 @@ Feature: /forms/pdfengines/split
   @skip
   @skip
   Scenario: POST /forms/pdfengines/split (Basic Auth)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
       | GOTENBERG_API_BASIC_AUTH_USERNAME | foo  |
       | GOTENBERG_API_BASIC_AUTH_PASSWORD | bar  |
@@ -357,7 +357,7 @@ Feature: /forms/pdfengines/split
   @skip
   Scenario: POST /foo/forms/pdfengines/split (Root Path)
     # Reason: Folio does not support configurable API root path prefix
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_DEBUG_ROUTE | true  |
       | API_ROOT_PATH          | /foo/ |
     When I make a "POST" request to "/foo/forms/pdfengines/split" with the following form data and header(s):
@@ -370,7 +370,7 @@ Feature: /forms/pdfengines/split
   @convert
   @encrypt
   Scenario: POST /forms/pdfengines/split (PDF/A + Encrypt => 400)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files        | testdata/pages_3.pdf | file  |
       | splitMode    | intervals            | field |
@@ -380,7 +380,7 @@ Feature: /forms/pdfengines/split
     Then the response status code should be 400
 
   Scenario: POST /forms/pdfengines/split (stampSource=pdf without uploaded stamp file => 400)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files           | testdata/pages_3.pdf | file  |
       | splitMode       | intervals            | field |
@@ -394,7 +394,7 @@ Feature: /forms/pdfengines/split
       """
 
   Scenario: POST /forms/pdfengines/split (watermarkSource=pdf without uploaded watermark file => 400)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files               | testdata/pages_3.pdf | file  |
       | splitMode           | intervals            | field |
@@ -408,7 +408,7 @@ Feature: /forms/pdfengines/split
       """
 
   Scenario: POST /forms/pdfengines/split (Long Filename)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files                     | testdata/Longitudinell_jämförelse_mellan_laserkirurgi_och_strålbehandling_gällande_röstkvalitet_och_självskattad_kommunikation_upp_till_två_år_efter_tidig_stämbandscancer_i_ett_randomiserat_kontrollerat_försök.pdf | file   |
       | splitMode                 | pages                                                                                                                                                                                                                 | field  |

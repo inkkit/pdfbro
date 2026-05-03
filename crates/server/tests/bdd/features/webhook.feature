@@ -5,7 +5,7 @@ Feature: Webhook
   @skip
   Scenario: Default
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a webhook server
     When I make a "POST" request to "/forms/pdfengines/flatten" with the following form data and header(s):
       | files                       | testdata/page_1.pdf                          | file   |
@@ -20,7 +20,7 @@ Feature: Webhook
   @skip
   Scenario: Extra HTTP Headers
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a webhook server
     When I make a "POST" request to "/forms/pdfengines/flatten" with the following form data and header(s):
       | files                                | testdata/page_1.pdf                            | file   |
@@ -39,7 +39,7 @@ Feature: Webhook
   @skip
   Scenario: Synchronous
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | WEBHOOK_ENABLE_SYNC_MODE | true |
     Given I have a webhook server
     When I make a "POST" request to "/forms/pdfengines/flatten" with the following form data and header(s):
@@ -54,7 +54,7 @@ Feature: Webhook
   @skip
   Scenario: Webhook Events URL (Success)
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a webhook server
     When I make a "POST" request to "/forms/pdfengines/flatten" with the following form data and header(s):
       | files                        | testdata/page_1.pdf                           | file   |
@@ -70,7 +70,7 @@ Feature: Webhook
   @skip
   Scenario: Webhook Events URL (Synchronous)
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | WEBHOOK_ENABLE_SYNC_MODE | true |
     Given I have a webhook server
     When I make a "POST" request to "/forms/pdfengines/flatten" with the following form data and header(s):
@@ -86,7 +86,7 @@ Feature: Webhook
   @skip
   Scenario: Webhook Events URL Only (Success)
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     Given I have a webhook server
     When I make a "POST" request to "/forms/pdfengines/flatten" with the following form data and header(s):
       | files                        | testdata/page_1.pdf                           | file   |
@@ -101,7 +101,7 @@ Feature: Webhook
   @skip
   Scenario: Webhook Events URL Only (Synchronous)
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | WEBHOOK_ENABLE_SYNC_MODE | true |
     Given I have a webhook server
     When I make a "POST" request to "/forms/pdfengines/flatten" with the following form data and header(s):

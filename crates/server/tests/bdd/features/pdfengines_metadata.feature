@@ -5,7 +5,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
 
   @skip
   Scenario: POST /forms/pdfengines/metadata/{write|read} (Single PDF)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
       | files                     | testdata/page_1.pdf                                                                                                                                                                                                                                                                                       | file   |
       | metadata                  | {"Author":"Julien Neuhart","Copyright":"Julien Neuhart","CreateDate":"2006-09-18T16:27:50-04:00","Creator":"Gotenberg","Keywords":["first","second"],"Marked":true,"ModDate":"2006-09-18T16:27:50-04:00","PDFVersion":1.7,"Producer":"Gotenberg","Subject":"Sample","Title":"Sample","Trapped":"Unknown"} | field  |
@@ -39,7 +39,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
 
   @skip
   Scenario: POST /forms/pdfengines/metadata/{write|read} (Many PDFs)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
       | files    | testdata/page_1.pdf                                                                                                                                                                                                                                                                                       | file  |
       | files    | testdata/page_2.pdf                                                                                                                                                                                                                                                                                       | file  |
@@ -87,12 +87,12 @@ Feature: /forms/pdfengines/metadata/{write|read}
       """
 
   Scenario: POST /forms/pdfengines/metadata/write (Bad Request)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
       | Gotenberg-Output-Filename | foo | header |
     Then the response status code should be 400
     Then the response header "Content-Type" should be "application/json"
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
       | files    | testdata/page_1.pdf | file  |
       | metadata | foo                 | field |
@@ -105,7 +105,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
     # -FileName=, -SymLink=, or -HardLink=, allowing arbitrary filesystem
     # writes as the container user. WriteMetadata now rejects values
     # containing control characters with HTTP 400.
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
       | files    | testdata/page_1.pdf                            | file  |
       | metadata | {"Title":"test\n-FileName=/tmp/inject_proof"} | field |
@@ -120,7 +120,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
     # Regression: ExifTool treats "System:FileName" identically to "FileName".
     # The dangerous-tag blocklist must strip group prefixes before comparing,
     # otherwise the attacker renames/moves files with a single HTTP request.
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
       | files                     | testdata/page_1.pdf                                                         | file   |
       | metadata                  | {"System:FileName":"stolen.pdf","System:Directory":"/tmp","Author":"legit"} | field  |
@@ -137,7 +137,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
       """
 
   Scenario: POST /forms/pdfengines/metadata/read (Bad Request)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/metadata/read" with the following form data and header(s):
       | Gotenberg-Output-Filename | foo | header |
     Then the response status code should be 400
@@ -149,7 +149,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
 
   @skip
   Scenario: POST /forms/pdfengines/metadata/write (Routes Disabled)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_DISABLE_ROUTES | true |
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
       | files    | testdata/page_1.pdf                                                                                                                                                                                                                                                                                       | file  |
@@ -158,7 +158,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
 
   @skip
   Scenario: POST /forms/pdfengines/metadata/read (Routes Disabled)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_DISABLE_ROUTES | true |
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
       | files | testdata/page_1.pdf | file |
@@ -166,7 +166,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
 
   @skip
   Scenario: POST /forms/pdfengines/metadata/write (Gotenberg Trace)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
       | files           | testdata/page_1.pdf                                                                                                                                                                                                                                                                                       | file   |
       | metadata        | {"Author":"Julien Neuhart","Copyright":"Julien Neuhart","CreateDate":"2006-09-18T16:27:50-04:00","Creator":"Gotenberg","Keywords":["first","second"],"Marked":true,"ModDate":"2006-09-18T16:27:50-04:00","PDFVersion":1.7,"Producer":"Gotenberg","Subject":"Sample","Title":"Sample","Trapped":"Unknown"} | field  |
@@ -177,7 +177,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
 
   @skip
   Scenario: POST /forms/pdfengines/metadata/read (Gotenberg Trace)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/metadata/read" with the following form data and header(s):
       | files           | testdata/page_1.pdf            | file   |
       | Gotenberg-Trace | forms_pdfengines_metadata_read | header |
@@ -188,7 +188,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
   @output-filename
   @skip
   Scenario: POST /forms/pdfengines/metadata/write (Output Filename - Single PDF)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
       | files                     | testdata/page_1.pdf                                                                                                                                                                                                                                                                                       | file   |
       | metadata                  | {"Author":"Julien Neuhart","Copyright":"Julien Neuhart","CreateDate":"2006-09-18T16:27:50-04:00","Creator":"Gotenberg","Keywords":["first","second"],"Marked":true,"ModDate":"2006-09-18T16:27:50-04:00","PDFVersion":1.7,"Producer":"Gotenberg","Subject":"Sample","Title":"Sample","Trapped":"Unknown"} | field  |
@@ -201,7 +201,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
   @output-filename
   @skip
   Scenario: POST /forms/pdfengines/metadata/write (Output Filename - Many PDFs)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
       | files                     | testdata/page_1.pdf                                                                                                                                                                                                                                                                                       | file   |
       | files                     | testdata/page_2.pdf                                                                                                                                                                                                                                                                                       | file   |
@@ -219,7 +219,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
   @skip
   Scenario: POST /forms/pdfengines/metadata/write (Download From)
     # Reason: downloadFrom with live static server requires integration environment
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
       | metadata                  | {"Author":"Julien Neuhart","Copyright":"Julien Neuhart","CreateDate":"2006-09-18T16:27:50-04:00","Creator":"Gotenberg","Keywords":["first","second"],"Marked":true,"ModDate":"2006-09-18T16:27:50-04:00","PDFVersion":1.7,"Producer":"Gotenberg","Subject":"Sample","Title":"Sample","Trapped":"Unknown"} | field  |
       | downloadFrom              | [{"url":"http://host.docker.internal/static/testdata/page_1.pdf","extraHttpHeaders":{"X-Foo":"bar"}}]                                                                                                                                                                                                    | field  |
@@ -232,7 +232,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
   @skip
   Scenario: POST /forms/pdfengines/metadata/read (Download From)
     # Reason: downloadFrom with live static server requires integration environment
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/metadata/read" with the following form data and header(s):
       | downloadFrom | [{"url":"http://host.docker.internal/static/testdata/page_1.pdf","extraHttpHeaders":{"X-Foo":"bar"}}] | field |
     Then the response status code should be 200
@@ -243,7 +243,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
   @skip
   Scenario: POST /forms/pdfengines/metadata/write (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
       | files                       | testdata/page_1.pdf                                                                                                                                                                                                                                                                                       | file   |
       | metadata                    | {"Author":"Julien Neuhart","Copyright":"Julien Neuhart","CreateDate":"2006-09-18T16:27:50-04:00","Creator":"Gotenberg","Keywords":["first","second"],"Marked":true,"ModDate":"2006-09-18T16:27:50-04:00","PDFVersion":1.7,"Producer":"Gotenberg","Subject":"Sample","Title":"Sample","Trapped":"Unknown"} | field  |
@@ -255,7 +255,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
   @skip
   Scenario: POST /forms/pdfengines/metadata/read (Webhook)
     # Reason: Folio uses synchronous response API; no push webhook support
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/metadata/read" with the following form data and header(s):
       | files                       | testdata/page_1.pdf                 | file   |
       | Gotenberg-Webhook-Url       | http://host.docker.internal/webhook | header |
@@ -264,7 +264,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
   @skip
   @skip
   Scenario: POST /forms/pdfengines/metadata/write (Basic Auth)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
       | GOTENBERG_API_BASIC_AUTH_USERNAME | foo  |
       | GOTENBERG_API_BASIC_AUTH_PASSWORD | bar  |
@@ -276,7 +276,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
   @skip
   @skip
   Scenario: POST /forms/pdfengines/metadata/read (Basic Auth)
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_BASIC_AUTH             | true |
       | GOTENBERG_API_BASIC_AUTH_USERNAME | foo  |
       | GOTENBERG_API_BASIC_AUTH_PASSWORD | bar  |
@@ -287,7 +287,7 @@ Feature: /forms/pdfengines/metadata/{write|read}
   @skip
   Scenario: POST /foo/forms/pdfengines/metadata/{write|read} (Root Path)
     # Reason: Folio does not support configurable API root path prefix
-    Given I have a Folio container with the following environment variable(s):
+    Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_DEBUG_ROUTE | true  |
       | API_ROOT_PATH          | /foo/ |
     When I make a "POST" request to "/foo/forms/pdfengines/metadata/write" with the following form data and header(s):
@@ -298,13 +298,13 @@ Feature: /forms/pdfengines/metadata/{write|read}
     Then the response header "Content-Type" should be "application/pdf"
 
   Scenario: POST /forms/pdfengines/metadata/read (Long Filename)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/metadata/read" with the following form data and header(s):
       | files | testdata/Longitudinell_jämförelse_mellan_laserkirurgi_och_strålbehandling_gällande_röstkvalitet_och_självskattad_kommunikation_upp_till_två_år_efter_tidig_stämbandscancer_i_ett_randomiserat_kontrollerat_försök.pdf | file |
     Then the response status code should be 200
 
   Scenario: POST /forms/pdfengines/metadata/write (Long Filename)
-    Given I have a default Folio container
+    Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/metadata/write" with the following form data and header(s):
       | files                     | testdata/Longitudinell_jämförelse_mellan_laserkirurgi_och_strålbehandling_gällande_röstkvalitet_och_självskattad_kommunikation_upp_till_två_år_efter_tidig_stämbandscancer_i_ett_randomiserat_kontrollerat_försök.pdf | file   |
       | metadata                  | {"Author":"Test"}                                                                                                                                                                                                     | field  |
