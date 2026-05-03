@@ -263,14 +263,13 @@ fn browser_config_from(config: &ServerConfig) -> BrowserConfig {
 
 #[cfg(feature = "libreoffice")]
 fn libreoffice_config_from(config: &ServerConfig) -> LibreOfficeConfig {
-    let defaults = LibreOfficeConfig::default();
     LibreOfficeConfig {
-        executable: config.soffice_path.clone(),
+        // The user-supplied path is now a *directory* (LOK's program path);
+        // pass it through verbatim. None falls through to libreofficekit's
+        // own discovery (LOK_PROGRAM_PATH + known system locations).
+        install_path: config.lo_program_dir.clone(),
         timeout: config.request_timeout,
-        max_concurrency: defaults.max_concurrency,
         lazy_start: config.libreoffice_lazy_start,
         idle_shutdown_timeout: config.libreoffice_idle_shutdown_timeout,
-        unoserver_port: config.libreoffice_unoserver_port,
-        unoserver_ready_timeout: config.libreoffice_unoserver_ready_timeout,
     }
 }

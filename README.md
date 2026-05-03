@@ -206,7 +206,7 @@ make run            # docker compose up (full image)
 make test-integration  # BDD scenarios in Docker
 ```
 
-**Useful env vars:** `CHROME_PATH`, `LIBREOFFICE_PATH`, `RUST_LOG`, `PDFBRO_PORT`, `PDFBRO_CONCURRENCY`
+**Useful env vars:** `CHROME_PATH`, `LO_PROGRAM_PATH`, `RUST_LOG`, `PDFBRO_PORT`, `PDFBRO_CONCURRENCY`
 
 ---
 
