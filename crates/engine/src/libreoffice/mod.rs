@@ -64,6 +64,9 @@ struct Inner {
     /// Single-flight guard: prevents two concurrent first-`convert()` callers
     /// from spawning two worker threads.
     init_lock: tokio::sync::Mutex<()>,
+    /// `Some(t)` after each successful conversion; `None` until the first
+    /// completes. The idle-watcher uses this to decide when to exit.
+    last_activity: Arc<parking_lot::Mutex<Option<std::time::Instant>>>,
 }
 
 struct ConvertRequest {
@@ -136,6 +139,7 @@ impl LibreOfficeEngine {
                 install_path,
                 lazy_start: config.lazy_start,
                 init_lock: tokio::sync::Mutex::new(()),
+                last_activity: Arc::new(parking_lot::Mutex::new(None)),
             }),
         };
 
@@ -165,11 +169,12 @@ impl LibreOfficeEngine {
 
         let install_path = self.inner.install_path.clone();
         let healthy_worker = Arc::clone(&self.inner.healthy);
+        let last_activity_worker = Arc::clone(&self.inner.last_activity);
 
         let handle = std::thread::Builder::new()
             .name("lok-worker".into())
             .spawn(move || {
-                lok_worker_thread(install_path, rx, startup_tx, healthy_worker);
+                lok_worker_thread(install_path, rx, startup_tx, healthy_worker, last_activity_worker);
             })
             .map_err(|e| EngineError::Internal(format!("failed to spawn LOK thread: {e}")))?;
 
@@ -188,9 +193,53 @@ impl LibreOfficeEngine {
         Ok(())
     }
 
-    /// Stub — body filled in by Task 8.
-    fn spawn_idle_watcher(&self, _timeout: Duration) {
-        // Intentionally empty until Task 8.
+    /// Spawn a sibling thread that polls `last_activity`. When the worker
+    /// has been idle for at least `idle_timeout`, the watcher logs and
+    /// calls `libc::_exit(0)` to terminate the process. The orchestrator
+    /// (Cloud Run / Fly / k8s with restartPolicy) is expected to restart
+    /// on the next request. This is process-level exit, not engine-level
+    /// — there is no in-process recovery path because LOK enforces one
+    /// `Office` instance per process for the lifetime of that process.
+    fn spawn_idle_watcher(&self, idle_timeout: Duration) {
+        let last_activity = Arc::clone(&self.inner.last_activity);
+        let healthy = Arc::clone(&self.inner.healthy);
+        let lazy = self.inner.lazy_start;
+
+        std::thread::Builder::new()
+            .name("lok-idle-watch".into())
+            .spawn(move || {
+                if !lazy {
+                    info!(
+                        ?idle_timeout,
+                        "idle-shutdown configured without lazy-start; first request after idle-exit will pay full cold-start"
+                    );
+                }
+                loop {
+                    // Sleep in increments (cap at 15 s) so the watcher
+                    // notices an unhealthy engine quickly even with long
+                    // idle timeouts.
+                    std::thread::sleep(idle_timeout.min(Duration::from_secs(15)));
+                    if !healthy.load(Ordering::SeqCst) {
+                        // Worker died or shutdown was called; don't fire
+                        // _exit unnecessarily — the process will be
+                        // replaced anyway.
+                        continue;
+                    }
+                    let snapshot = *last_activity.lock();
+                    let now = std::time::Instant::now();
+                    if should_exit_for_idle(snapshot, now, idle_timeout) {
+                        warn!(
+                            ?idle_timeout,
+                            "LibreOffice idle shutdown triggered; process exiting — \
+                             orchestrator will restart on next request"
+                        );
+                        unsafe {
+                            libc::_exit(0);
+                        }
+                    }
+                }
+            })
+            .expect("spawn lok-idle-watch");
     }
 
     // ------------------------------------------------------------------
@@ -371,6 +420,7 @@ fn lok_worker_thread(
     rx: mpsc::Receiver<ConvertRequest>,
     startup_tx: tokio::sync::oneshot::Sender<EngineResult<()>>,
     healthy: Arc<AtomicBool>,
+    last_activity: Arc<parking_lot::Mutex<Option<std::time::Instant>>>,
 ) {
     use libreofficekit::Office;
 
@@ -392,6 +442,10 @@ fn lok_worker_thread(
 
     for req in rx {
         let result = lok_convert(&office, &req.input, &req.opts);
+        // Stamp activity after the conversion completes (success OR failure)
+        // so the watcher only fires when the worker truly idles, not during
+        // a slow conversion.
+        *last_activity.lock() = Some(std::time::Instant::now());
         let _ = req.reply.send(result);
     }
 
@@ -1056,6 +1110,46 @@ impl std::fmt::Display for PdfAProfile {
             PdfAProfile::A2B => write!(f, "PDF/A-2b"),
             PdfAProfile::A3B => write!(f, "PDF/A-3b"),
         }
+    }
+}
+
+/// Decide whether the idle-watcher should fire `_exit(0)`. Pure function
+/// for testability — accepts synthetic `Instant`s.
+fn should_exit_for_idle(
+    last_activity: Option<std::time::Instant>,
+    now: std::time::Instant,
+    idle_timeout: Duration,
+) -> bool {
+    match last_activity {
+        // Watcher only arms after the first successful conversion.
+        None => false,
+        Some(t) => now.saturating_duration_since(t) > idle_timeout,
+    }
+}
+
+#[cfg(test)]
+mod idle_tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn idle_does_not_fire_before_first_activity() {
+        let now = Instant::now();
+        assert!(!should_exit_for_idle(None, now, Duration::from_secs(30)));
+    }
+
+    #[test]
+    fn idle_does_not_fire_within_window() {
+        let t = Instant::now();
+        let now = t + Duration::from_secs(10);
+        assert!(!should_exit_for_idle(Some(t), now, Duration::from_secs(30)));
+    }
+
+    #[test]
+    fn idle_fires_past_window() {
+        let t = Instant::now();
+        let now = t + Duration::from_secs(31);
+        assert!(should_exit_for_idle(Some(t), now, Duration::from_secs(30)));
     }
 }
 
