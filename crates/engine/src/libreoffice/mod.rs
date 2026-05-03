@@ -297,6 +297,69 @@ impl LibreOfficeEngine {
     pub async fn healthy(&self) -> bool {
         self.inner.healthy.load(Ordering::SeqCst)
     }
+
+    /// Drain in-flight conversions, join the worker thread, and skip LOK's
+    /// destroy() to bypass the LO ≥ 6.5 atexit teardown bug. Idempotent.
+    ///
+    /// Bounded to 5 s — if a conversion is wedged inside an uncancellable
+    /// FFI call, we give up and return Ok anyway; the process is exiting.
+    pub async fn shutdown(&self) -> EngineResult<()> {
+        // Mark unhealthy first so concurrent convert() calls fail fast
+        // instead of racing the channel close.
+        self.inner.healthy.store(false, Ordering::SeqCst);
+
+        // Take and drop the tx so the worker's `for req in rx` exits.
+        let _dropped_tx = self.inner.tx.lock().take();
+
+        // Take the join handle and wait for the worker to exit, capped.
+        let handle = self.inner.worker_handle.lock().take();
+        if let Some(handle) = handle {
+            let join_result = tokio::time::timeout(
+                Duration::from_secs(5),
+                tokio::task::spawn_blocking(move || handle.join()),
+            )
+            .await;
+            match join_result {
+                Ok(Ok(Ok(()))) => {}
+                Ok(Ok(Err(_))) => {
+                    warn!("LOK worker thread panicked during shutdown");
+                }
+                Ok(Err(e)) => {
+                    warn!("LOK worker join task failed: {e}");
+                }
+                Err(_) => {
+                    warn!(
+                        "LOK worker did not exit within 5s — likely wedged in FFI call; \
+                         giving up and proceeding (process is shutting down anyway)"
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Drop for LibreOfficeEngine {
+    fn drop(&mut self) {
+        // Only the LAST clone needs to do anything; an Arc::strong_count of 2
+        // means another Arc still holds the engine (this Drop is for a clone).
+        if Arc::strong_count(&self.inner) > 1 {
+            return;
+        }
+
+        // If we still have a worker handle, the user never called shutdown().
+        // Take a best-effort path: drop the tx, but don't block on join —
+        // there might not be a runtime, and we can't await here anyway.
+        let had_tx = self.inner.tx.lock().take().is_some();
+        let had_handle = self.inner.worker_handle.lock().take().is_some();
+        if had_tx || had_handle {
+            warn!(
+                "LibreOfficeEngine dropped without explicit shutdown(); \
+                 worker tx dropped, handle leaked. Call shutdown() in your \
+                 graceful-shutdown path to clean up."
+            );
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

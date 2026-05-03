@@ -299,3 +299,39 @@ async fn convert_corrupted_returns_corrupted_error() {
         "got {err:?}"
     );
 }
+
+#[tokio::test]
+async fn z_shutdown_drains_then_rejects_new_requests() {
+    let Some(lo) = engine().await else { return; };
+
+    // Kick off a real conversion in the background — it should still
+    // complete successfully because shutdown drains in-flight work.
+    let lo_for_convert = lo.clone();
+    let convert_task = tokio::spawn(async move {
+        lo_for_convert
+            .convert(&writer_fixture(), &OfficeOptions::default())
+            .await
+    });
+
+    // Give the worker ~50 ms to actually pick up the request.
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    // Shut down. Must drain the in-flight conversion successfully.
+    let started = Instant::now();
+    lo.shutdown().await.expect("shutdown");
+    let shutdown_took = started.elapsed();
+
+    let convert_result = convert_task.await.expect("join");
+    assert!(convert_result.is_ok(), "in-flight convert was lost: {convert_result:?}");
+    assert!(
+        shutdown_took < Duration::from_secs(10),
+        "shutdown was slow: {shutdown_took:?}"
+    );
+
+    // After shutdown, new requests fail-fast.
+    let err = lo
+        .convert(&writer_fixture(), &OfficeOptions::default())
+        .await
+        .expect_err("expected failure post-shutdown");
+    assert!(matches!(err, EngineError::Internal(_)), "got {err:?}");
+}
