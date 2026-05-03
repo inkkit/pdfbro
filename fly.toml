@@ -1,9 +1,7 @@
-# fly.toml app configuration file for pdfbro on Fly.io
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
+# fly.toml — pdfbro on Fly.io
+# https://fly.io/docs/reference/configuration/
 
-app = 'foliov001'
+app = 'pdfbro'
 primary_region = 'bom'
 
 [http_service]
@@ -15,12 +13,10 @@ primary_region = 'bom'
   processes = ['app']
 
 [env]
-  # Lazy-start engines so the machine doesn't OOM before the first request.
-  # LibreOffice peaks at ~1.3 GB under load; Chromium adds another ~300 MB.
-  LIBREOFFICE_LAZY_START = "false"
-  CHROMIUM_LAZY_START = "false"
-  # Required in containers — no dbus/display available.
   PDFBRO_NO_SANDBOX = "true"
+  CHROMIUM_LAZY_START = "true"
+  LIBREOFFICE_LAZY_START = "true"
+  RUST_LOG = "info,chromiumoxide::handler=error"
 
 [[vm]]
   memory = '2gb'

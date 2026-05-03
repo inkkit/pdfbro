@@ -43,13 +43,22 @@ run-libreoffice: ## Run LibreOffice-only image via Docker Compose
 FLY_APP ?= $(shell grep '^app' fly.toml 2>/dev/null | sed "s/app = '//;s/'//")
 
 .PHONY: deploy
-deploy: ## Build linux/amd64 image and deploy to Fly.io
+deploy: ## Build linux/amd64 image locally and deploy to Fly.io (no remote builder)
 	fly auth docker
 	docker buildx build --platform linux/amd64 --target pdfbro \
 		-t registry.fly.io/$(FLY_APP):latest \
 		--load -f Dockerfile .
 	docker push registry.fly.io/$(FLY_APP):latest
-	fly deploy --app $(FLY_APP) --image registry.fly.io/$(FLY_APP):latest
+	fly deploy --app $(FLY_APP) --image registry.fly.io/$(FLY_APP):latest --local-only
+
+.PHONY: deploy-chromium
+deploy-chromium: ## Deploy Chromium-only image to Fly.io
+	fly auth docker
+	docker buildx build --platform linux/amd64 --target pdfbro-chromium \
+		-t registry.fly.io/$(FLY_APP):latest \
+		--load -f Dockerfile .
+	docker push registry.fly.io/$(FLY_APP):latest
+	fly deploy --app $(FLY_APP) --image registry.fly.io/$(FLY_APP):latest --local-only
 
 .PHONY: stop
 stop: ## Stop all containers
