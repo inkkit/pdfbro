@@ -24,8 +24,8 @@ It also ships as a **Rust library, a CLI, and a single binary** — and has a li
 ## Quickstart
 
 ```bash
-# Build and run (Docker)
-docker compose up
+# Pull and run
+docker run --rm -p 3000:3000 ghcr.io/inkkit/pdfbro:latest
 
 # Convert a URL to PDF
 curl -X POST http://localhost:3000/forms/chromium/convert/url \
@@ -36,9 +36,11 @@ curl -X POST http://localhost:3000/forms/chromium/convert/url \
 open http://localhost:3000/_/
 ```
 
-Or run directly with Cargo:
+Or build from source:
 
 ```bash
+docker compose up
+# or
 cargo run -p server -- serve --port 3000
 ```
 
@@ -150,6 +152,12 @@ Run `pdfbro-server serve --help` for the full flag reference.
 | `pdfbro-lambda` | Full + Lambda Web Adapter | AWS Lambda |
 
 ```bash
+# Pull a specific variant
+docker pull ghcr.io/inkkit/pdfbro:latest
+docker pull ghcr.io/inkkit/pdfbro:latest-chromium
+docker pull ghcr.io/inkkit/pdfbro:latest-libreoffice
+
+# Build locally
 docker build --target pdfbro-chromium -t pdfbro:chromium .
 ```
 
