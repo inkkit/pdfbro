@@ -1,0 +1,29 @@
+# Compose override for "steady-state" bench mode.
+#
+# Apply on top of docker-compose.bench.yml:
+#   docker compose -f docker-compose.bench.yml -f docker-compose.bench.steady-state.yml up
+#
+# What this does:
+#   pdfbro  — forces eager engine start (already the default, made explicit)
+#   Gotenberg — disables its default periodic restart behaviour (Chrome every 100
+#               requests, LibreOffice every 10 requests) and enables auto-start so
+#               both engines start at container boot, matching pdfbro's model.
+#
+# This gives a fair apples-to-apples comparison: both servers keep Chrome and
+# LibreOffice alive for the entire benchmark run with no recycling.
+
+services:
+  pdfbro:
+    environment:
+      RUST_LOG: error
+      CHROMIUM_LAZY_START: "false"
+      LIBREOFFICE_LAZY_START: "false"
+
+  gotenberg:
+    command:
+      - gotenberg
+      - --chromium-allow-list=.*
+      - --chromium-auto-start=true
+      - --chromium-restart-after=0
+      - --libreoffice-auto-start=true
+      - --libreoffice-restart-after=0

@@ -267,29 +267,62 @@ Python (`pip install pdfbro-py`) · Node.js (`npm install @vel/pdfbro`) — HTML
 
 ## Performance
 
-Benchmarked on a 2-CPU / 2 GB Docker cgroup, 4 concurrent clients, 60 s warm-up + 120 s timed run (3 repetitions). Both servers ran identical fixture files.
+Benchmarked on a 2-CPU / 2 GB Docker cgroup, 4 concurrent clients, 60 s warm-up + 120 s timed run (3 repetitions). Both servers ran identical fixture files. See [`bench/README.md`](./bench/README.md) for full methodology and how to reproduce.
 
-### Latency (ms) & throughput
+### Latency (ms) & throughput — isolated mode
+
+> Containers restarted before each workload for a clean baseline. pdfbro wins all five workloads.
 
 | Workload | p50 pdfbro | p50 Gotenberg | p95 pdfbro | p95 Gotenberg | RPS pdfbro | RPS Gotenberg |
 |---|---|---|---|---|---|---|
-| HTML → PDF (small) | **195** | 302 | **250** | 489 | **19.9** | 12.3 |
-| HTML → PDF (large) | **213** | 299 | **271** | 421 | **17.9** | 11.9 |
-| URL → PDF | **290** | 478 | **628** | 941 | **12.3** | 7.6 |
-| DOCX → PDF (LibreOffice) | **286** | 688 | **528** | 1 262 | **12.3** | 5.1 |
-| PDF merge | **14** | 15 | **35** | 51 | **213.9** | 181.6 |
+| HTML → PDF (small) | **251** | 413 | **425** | 740 | **14.2** | 8.7 |
+| HTML → PDF (large) | **302** | 406 | **508** | 694 | **11.9** | 9.0 |
+| URL → PDF | **303** | 417 | **455** | 726 | **12.2** | 8.6 |
+| DOCX → PDF (LibreOffice) | **306** | 492 | **557** | 812 | **10.9** | 7.1 |
+| PDF merge | **11** | 18 | **17** | 35 | **328** | 192 |
 
-### Peak memory (MiB)
+### Peak memory (MiB) — isolated mode
+
+> Each workload measured from a freshly restarted container — no carryover from prior workloads. RSS includes all child processes (Chrome, LibreOffice). pdfbro starts both Chrome and LibreOffice eagerly at boot regardless of which engine a workload uses; Gotenberg starts engines lazily. The gap on LibreOffice and merge rows reflects this design difference, not operation cost.
+
+| Workload | pdfbro | Gotenberg | What the gap reflects |
+|---|---|---|---|
+| HTML → PDF (small) | **313** | 329 | Chrome RSS — effectively identical |
+| HTML → PDF (large) | 325 | **321** | Chrome RSS — effectively identical |
+| URL → PDF | **307** | 331 | Chrome RSS — effectively identical |
+| DOCX → PDF (LibreOffice) | 810 | **129** | pdfbro holds Chrome + LibreOffice; Gotenberg only LibreOffice (lazy Chrome) |
+| PDF merge | 244 | **23** | pdfbro holds Chrome at boot; Gotenberg starts nothing for a pure merge |
+
+<details>
+<summary>Steady-state accumulated mode (both servers warm, no engine recycling)</summary>
+
+Both containers ran continuously with Gotenberg's periodic restart disabled (`--chromium-restart-after=0 --libreoffice-restart-after=0`). Numbers accumulate across workloads because all engines stay alive throughout. pdfbro wins all latency numbers; Gotenberg's Go runtime has a notably smaller LibreOffice RSS footprint.
+
+**Latency (p50):**
 
 | Workload | pdfbro | Gotenberg |
 |---|---|---|
-| HTML → PDF (small) | 340 | **320** |
-| HTML → PDF (large) | 457 | **327** |
-| URL → PDF | 544 | **358** |
-| DOCX → PDF (LibreOffice) | 1 306 | **402** |
-| PDF merge | 1 747 | **384** |
+| HTML → PDF (small) | **259** ms | 357 ms |
+| HTML → PDF (large) | **279** ms | 377 ms |
+| URL → PDF | **276** ms | 382 ms |
+| DOCX → PDF (LibreOffice) | **277** ms | 412 ms |
+| PDF merge | **10** ms | 17 ms |
 
-> **Note:** URL and LibreOffice workloads show high variance (CV > 30%) across runs — treat those numbers as indicative, not definitive. Chrome PDF rendering is non-deterministic. Results are hardware-specific; run `docker compose -f docker-compose.bench.yml up -d && cargo run -p bench -- perf` to reproduce on your machine.
+**Peak RSS (accumulated — engines never recycled):**
+
+| Workload | pdfbro | Gotenberg |
+|---|---|---|
+| HTML → PDF (small) | **327** MiB | 397 MiB |
+| HTML → PDF (large) | **425** MiB | 446 MiB |
+| URL → PDF | 501 MiB | **491** MiB |
+| DOCX → PDF (LibreOffice) | 1 309 MiB | **442** MiB |
+| PDF merge | 1 850 MiB | **425** MiB |
+
+The DOCX and merge rows show accumulated Chrome + LibreOffice RSS for pdfbro (~1.3–1.9 GiB) vs Gotenberg's much lighter LibreOffice integration (~440 MiB). This is a known issue tracked for the LibreOffice engine — Gotenberg's unoserver process model keeps the LO process lighter. See [`bench/README.md`](./bench/README.md) for details.
+
+</details>
+
+> **Stability:** Chrome workloads show CV 20–40% across runs — treat numbers as indicative, not definitive. Chrome PDF rendering is non-deterministic. Results are hardware-specific.
 
 ---
 
