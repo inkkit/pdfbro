@@ -255,16 +255,39 @@ impl ApiError {
                 documentation: Some(documentation_link("LIBREOFFICE_TIMEOUT")),
             },
 
-            // LibreOffice document errors (encrypted, corrupted, unsupported format)
-            // Refined in Task 10.
-            ApiError::Engine(EngineError::LibreOfficeEncrypted)
-            | ApiError::Engine(EngineError::LibreOfficeCorrupted(_))
-            | ApiError::Engine(EngineError::LibreOfficeUnsupportedFormat) => ApiErrorResponse {
-                error: "LibreOffice document error".to_string(),
+            ApiError::Engine(EngineError::LibreOfficeEncrypted) => ApiErrorResponse {
+                error: "Document is encrypted or password-protected".to_string(),
                 code: code.to_string(),
                 details: None,
-                suggestion: None,
-                documentation: None,
+                suggestion: Some(
+                    "Decrypt the document and resubmit. pdfbro does not currently accept passwords."
+                        .to_string(),
+                ),
+                documentation: Some(documentation_link("DOCUMENT_ENCRYPTED")),
+            },
+
+            ApiError::Engine(EngineError::LibreOfficeCorrupted(msg)) => ApiErrorResponse {
+                error: format!("Document is corrupted or unreadable: {msg}"),
+                code: code.to_string(),
+                details: None,
+                suggestion: Some(
+                    "Open the file in Office/LibreOffice and resave it; common causes are \
+                     truncated uploads or zero-byte files."
+                        .to_string(),
+                ),
+                documentation: Some(documentation_link("DOCUMENT_CORRUPTED")),
+            },
+
+            ApiError::Engine(EngineError::LibreOfficeUnsupportedFormat) => ApiErrorResponse {
+                error: "Unsupported document format".to_string(),
+                code: code.to_string(),
+                details: None,
+                suggestion: Some(
+                    "Verify the file extension matches its content. Supported: \
+                     docx/doc/odt/rtf/txt/html, xlsx/xls/ods/csv, pptx/ppt/odp."
+                        .to_string(),
+                ),
+                documentation: Some(documentation_link("UNSUPPORTED_FORMAT")),
             },
 
             // Invalid option with field context
@@ -663,11 +686,14 @@ fn engine_status_and_code(e: &EngineError) -> (StatusCode, &'static str) {
         EngineError::Cdp(_) | EngineError::Internal(_) | EngineError::Io(_) | EngineError::Pdf(_) => {
             (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL")
         }
-        // Refined in Task 10 (real mapping is 422/415, not 500).
-        EngineError::LibreOfficeEncrypted
-        | EngineError::LibreOfficeCorrupted(_)
-        | EngineError::LibreOfficeUnsupportedFormat => {
-            (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL")
+        EngineError::LibreOfficeEncrypted => {
+            (StatusCode::UNPROCESSABLE_ENTITY, "DOCUMENT_ENCRYPTED")
+        }
+        EngineError::LibreOfficeCorrupted(_) => {
+            (StatusCode::UNPROCESSABLE_ENTITY, "DOCUMENT_CORRUPTED")
+        }
+        EngineError::LibreOfficeUnsupportedFormat => {
+            (StatusCode::UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_FORMAT")
         }
     }
 }
@@ -697,6 +723,9 @@ fn documentation_link(error_code: &str) -> String {
         "WEBHOOK_ERROR" => "/webhooks#troubleshooting",
         "UNSAFE_FILENAME" => "/security#filename-validation",
         "UNSUPPORTED_MEDIA_TYPE" => "/api#content-type",
+        "DOCUMENT_ENCRYPTED" => "/troubleshooting#document-encrypted",
+        "DOCUMENT_CORRUPTED" => "/troubleshooting#document-corrupted",
+        "UNSUPPORTED_FORMAT" => "/troubleshooting#unsupported-format",
         _ => "/troubleshooting",
     };
     format!("{base_url}{path}")
