@@ -151,6 +151,8 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
     .with_webhook_validator(webhook_validator)
     .with_batch_manager(batch_manager);
     #[cfg(feature = "libreoffice")]
+    let libreoffice_for_shutdown = libreoffice.clone();
+    #[cfg(feature = "libreoffice")]
     let state = state.with_libreoffice(Some(Arc::new(libreoffice)));
 
     {
@@ -218,6 +220,16 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
         let shutdown = tokio::time::timeout(shutdown::DEFAULT_DRAIN, chromium.shutdown());
         if let Err(_e) = shutdown.await {
             tracing::warn!("Chromium shutdown exceeded drain budget");
+        }
+    }
+
+    #[cfg(feature = "libreoffice")]
+    {
+        let shutdown = tokio::time::timeout(shutdown::DEFAULT_DRAIN, libreoffice_for_shutdown.shutdown());
+        if let Err(_e) = shutdown.await {
+            tracing::warn!("LibreOffice shutdown exceeded drain budget");
+        } else {
+            tracing::info!("LibreOffice shut down cleanly");
         }
     }
 
