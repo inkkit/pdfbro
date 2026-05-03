@@ -432,7 +432,7 @@ Feature: /forms/libreoffice/convert
   @webhook
   @skip
   Scenario: POST /forms/libreoffice/convert (Webhook)
-    # Reason: Folio uses synchronous response API; no push webhook support
+    # Reason: pdfbro uses synchronous response API; no push webhook support
     Given I have a default pdfbro container
     When I make a "POST" request to "/forms/libreoffice/convert" with the following form data and header(s):
       | files                       | testdata/page_1.docx                | file   |
@@ -453,7 +453,7 @@ Feature: /forms/libreoffice/convert
 
   @skip
   Scenario: POST /foo/forms/libreoffice/convert (Root Path)
-    # Reason: Folio does not support configurable API root path prefix
+    # Reason: pdfbro does not support configurable API root path prefix
     Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_DEBUG_ROUTE | true  |
       | API_ROOT_PATH          | /foo/ |

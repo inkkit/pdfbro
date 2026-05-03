@@ -26,7 +26,7 @@ use tracing_subscriber::{
 /// Environment variables respected:
 ///
 /// * `RUST_LOG` – `EnvFilter` directive (same syntax as `env_logger`).
-/// * `FOLIO_LOG_SPAN_EVENTS` – if truthy (`1/true/yes`), span enter/exit
+/// * `PDFBRO_LOG_SPAN_EVENTS` – if truthy (`1/true/yes`), span enter/exit
 ///   events are emitted.
 ///
 /// # Errors
@@ -50,7 +50,7 @@ pub fn init_logging(
             .add_directive("chromiumoxide::handler=error".parse().unwrap())
     };
 
-    let span_events = std::env::var("FOLIO_LOG_SPAN_EVENTS")
+    let span_events = std::env::var("PDFBRO_LOG_SPAN_EVENTS")
         .map(|v| is_truthy(&v))
         .unwrap_or(false);
 

@@ -159,7 +159,7 @@ fn rw_check(c: bool) -> String {
     format!("{}  {}", color("[OK]", "32", c), color("(read / write)", "2", c))
 }
 
-/// Pixel-art FOLIO logo with left margin baked in.
+/// Pixel-art pdfbro logo with left margin baked in.
 fn ascii_logo() -> String {
     const LOGO: &str = r#"███████╗  ██████╗  ██╗      ██╗  ██████╗
 ██╔════╝ ██╔═══██╗ ██║      ██║ ██╔═══██╗

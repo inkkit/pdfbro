@@ -1,5 +1,5 @@
 # Dockerfile for running the full test suite (unit + BDD) with all dependencies.
-# Mirrors the folio production image: Chromium + LibreOffice + unoserver.
+# Mirrors the pdfbro production image: Chromium + LibreOffice + unoserver.
 
 ARG RUST_VERSION=1.88
 
@@ -18,7 +18,7 @@ COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 # =============================================================================
-# Stage: builder — compile everything including folio-server binary
+# Stage: builder — compile everything including pdfbro-server binary
 # =============================================================================
 FROM chef AS builder
 
@@ -64,7 +64,7 @@ COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --recipe-path recipe.json
 RUN cargo chef cook --recipe-path recipe.json --tests
 
-# Build everything: folio-server binary + all test binaries
+# Build everything: pdfbro-server binary + all test binaries
 COPY . .
 RUN cargo test --no-run
 

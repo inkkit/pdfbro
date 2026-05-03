@@ -28,7 +28,7 @@ Feature: /
 
   @skip
   Scenario: GET /foo/ (Root Path)
-    # Reason: Folio does not support configurable API root path prefix
+    # Reason: pdfbro does not support configurable API root path prefix
     Given I have a pdfbro container with the following environment variable(s):
       | API_ROOT_PATH | /foo/ |
     When I make a "GET" request to "/foo/"
@@ -59,7 +59,7 @@ Feature: /
 
   @skip
   Scenario: GET /foo/favicon.ico (Root Path)
-    # Reason: Folio does not support configurable API root path prefix
+    # Reason: pdfbro does not support configurable API root path prefix
     Given I have a pdfbro container with the following environment variable(s):
       | API_ROOT_PATH | /foo/ |
     When I make a "GET" request to "/foo/favicon.ico"

@@ -51,7 +51,7 @@ Feature: /forms/pdfengines/rotate
   @skip
   @skip
   Scenario: POST /forms/pdfengines/rotate (90 - All Pages - pdftk)
-    # Reason: Folio uses lopdf/qpdf, not pdftk
+    # Reason: pdfbro uses lopdf/qpdf, not pdftk
     Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_ROTATE_ENGINES | pdftk |
     When I make a "POST" request to "/forms/pdfengines/rotate" with the following form data and header(s):
@@ -65,7 +65,7 @@ Feature: /forms/pdfengines/rotate
   @skip
   @skip
   Scenario: POST /forms/pdfengines/rotate (Specific Pages - pdftk unsupported)
-    # Reason: Folio uses lopdf/qpdf, not pdftk
+    # Reason: pdfbro uses lopdf/qpdf, not pdftk
     Given I have a pdfbro container with the following environment variable(s):
       | PDFENGINES_ROTATE_ENGINES | pdftk |
     When I make a "POST" request to "/forms/pdfengines/rotate" with the following form data and header(s):
@@ -139,7 +139,7 @@ Feature: /forms/pdfengines/rotate
   @webhook
   @skip
   Scenario: POST /forms/pdfengines/rotate (Webhook)
-    # Reason: Folio uses synchronous response API; no push webhook support
+    # Reason: pdfbro uses synchronous response API; no push webhook support
     Given I have a default pdfbro container
     When I make a "POST" request to "/forms/pdfengines/rotate" with the following form data and header(s):
       | files                       | testdata/page_1.pdf                 | file   |
@@ -161,7 +161,7 @@ Feature: /forms/pdfengines/rotate
 
   @skip
   Scenario: POST /foo/forms/pdfengines/rotate (Root Path)
-    # Reason: Folio does not support configurable API root path prefix
+    # Reason: pdfbro does not support configurable API root path prefix
     Given I have a pdfbro container with the following environment variable(s):
       | API_ENABLE_DEBUG_ROUTE | true  |
       | API_ROOT_PATH          | /foo/ |

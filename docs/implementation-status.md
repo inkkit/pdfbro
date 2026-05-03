@@ -65,7 +65,7 @@
 |---------|--------------|------------|----------|-------|
 | Structured Logging | ✅ Done | ✅ Done | `tracing` + `tracing-subscriber` with JSON/text | Request-id aware. |
 | Prometheus Metrics | ✅ Done | ✅ Done | `crates/server/src/metrics.rs`, `/prometheus/metrics` | Counters, histograms, gauges present. |
-| OpenTelemetry | ❌ Not Started | ✅ Done | `tracing-opentelemetry` + OTLP HTTP exporter wired | `FOLIO_OTEL_ENABLED` / `OTEL_EXPORTER_OTLP_ENDPOINT` env vars. Batch span processor with Tokio runtime. |
+| OpenTelemetry | ❌ Not Started | ✅ Done | `tracing-opentelemetry` + OTLP HTTP exporter wired | `PDFBRO_OTEL_ENABLED` / `OTEL_EXPORTER_OTLP_ENDPOINT` env vars. Batch span processor with Tokio runtime. |
 | Process Supervision | 🚧 In Progress | 🚧 Partial | No restart/idle-timeout logic found | Chrome launched once per server lifetime. No auto-restart or queue backpressure yet. |
 
 ---

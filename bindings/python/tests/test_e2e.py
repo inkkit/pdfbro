@@ -1,8 +1,8 @@
 import os, pathlib, pytest
 import pdfbro
 
-E2E = os.environ.get("FOLIO_E2E") == "1"
-pytestmark = pytest.mark.skipif(not E2E, reason="FOLIO_E2E not set")
+E2E = os.environ.get("PDFBRO_E2E") == "1"
+pytestmark = pytest.mark.skipif(not E2E, reason="PDFBRO_E2E not set")
 
 FIXTURE = pathlib.Path(__file__).resolve().parents[2] / "fixtures" / "hello.html"
 

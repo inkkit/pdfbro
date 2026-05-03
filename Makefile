@@ -289,9 +289,9 @@ docker-login: ## Login to Docker Hub
 	docker login
 
 .PHONY: docker-list-tags
-docker-list-tags: ## List all local Folio images and sizes
+docker-list-tags: ## List all local pdfbro images and sizes
 	docker images $(DOCKER_REGISTRY) --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}"
 
 .PHONY: docker-clean
-docker-clean: ## Remove all local Folio images
+docker-clean: ## Remove all local pdfbro images
 	docker images $(DOCKER_REGISTRY) -q | xargs -r docker rmi -f
