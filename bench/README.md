@@ -95,7 +95,7 @@ Combines Modes 2 and 3: both servers configured identically (no recycling), and 
 
 ## Why the RSS numbers look the way they do
 
-`docker stats` measures the entire container's RSS — the Rust server process plus every child process (Chrome, LibreOffice, unoserver). It cannot isolate individual operation costs.
+`docker stats` measures the entire container's RSS — the Rust server process plus every child process (Chrome, LibreOffice). It cannot isolate individual operation costs.
 
 | Scenario | What inflates RSS |
 |----------|------------------|

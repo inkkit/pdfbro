@@ -142,7 +142,7 @@ print(d.get('$1',{}).get('status','—'))
   if [[ "$probe" == "404" ]]; then
     skip "libreoffice not compiled → /forms/libreoffice/convert (correct 404)"
   else
-    echo -e "${DIM}    waiting for LibreOffice engine (unoserver)...${NC}"
+    echo -e "${DIM}    waiting for LibreOffice engine (LOK)...${NC}"
     for i in $(seq 1 60); do
       [[ "$(engine_status libreoffice)" == "up" ]] && break
       sleep 1

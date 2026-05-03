@@ -941,154 +941,6 @@ impl OfficeOptions {
         }
     }
 
-    /// Legacy comma-separated `Key=Value` builder. **Not** what LOK saveAs
-    /// actually parses — kept only because the unit tests in this module
-    /// exercise it as a property-mapping check. Real conversions go through
-    /// [`Self::lok_save_as_options`].
-    #[cfg(test)]
-    pub(crate) fn filter_options(&self) -> Vec<String> {
-        let mut out: Vec<String> = Vec::new();
-
-        if let Some(pr) = &self.page_ranges {
-            out.push(format!("PageRange={}", pr));
-        }
-        if let Some(prof) = self.pdf_a {
-            let v: i64 = match prof {
-                PdfAProfile::A1B => 1,
-                PdfAProfile::A2B => 2,
-                PdfAProfile::A3B => 3,
-            };
-            out.push(format!("SelectPdfVersion={v}"));
-        }
-        if self.pdf_ua {
-            out.push("PDFUACompliance=true".into());
-        }
-        if let Some(q) = self.quality {
-            out.push(format!("Quality={q}"));
-        }
-        if let Some(r) = self.max_image_resolution {
-            out.push(format!("MaxImageResolution={r}"));
-        }
-        if self.landscape {
-            out.push("IsLandscape=true".into());
-        }
-        if self.export_bookmarks {
-            out.push("ExportBookmarks=true".into());
-        }
-        if self.export_bookmarks_to_pdf_destination {
-            out.push("ExportBookmarksToPDFDestination=true".into());
-        }
-        if self.export_form_fields {
-            out.push("ExportFormFields=true".into());
-        }
-        if self.allow_duplicate_field_names {
-            out.push("AllowDuplicateFieldNames=true".into());
-        }
-        if self.export_placeholders {
-            out.push("ExportPlaceholders=true".into());
-        }
-        if self.export_notes {
-            out.push("ExportNotes=true".into());
-        }
-        if self.export_notes_pages {
-            out.push("ExportNotesPages=true".into());
-        }
-        if self.export_only_notes_pages {
-            out.push("ExportOnlyNotesPages=true".into());
-        }
-        if self.export_notes_in_margin {
-            out.push("ExportNotesInMargin=true".into());
-        }
-        if self.convert_ooo_target_to_pdf_target {
-            out.push("ConvertOOoTargetToPDFTarget=true".into());
-        }
-        if self.export_links_relative_fsys {
-            out.push("ExportLinksRelativeFsys=true".into());
-        }
-        if self.export_hidden_slides {
-            out.push("ExportHiddenSlides=true".into());
-        }
-        if self.skip_empty_pages {
-            out.push("IsSkipEmptyPages=true".into());
-        }
-        if self.add_original_document_as_stream {
-            out.push("IsAddStream=true".into());
-        }
-        if self.single_page_sheets {
-            out.push("SinglePageSheets=true".into());
-        }
-        if self.lossless_image_compression {
-            out.push("UseLosslessCompression=true".into());
-        }
-        if self.reduce_image_resolution {
-            out.push("ReduceImageResolution=true".into());
-        }
-        if let Some(ref text) = self.native_watermark_text {
-            out.push(format!("Watermark={text}"));
-        }
-        if let Some(color) = self.native_watermark_color {
-            out.push(format!("WatermarkColor={color}"));
-        }
-        if let Some(h) = self.native_watermark_font_height {
-            out.push(format!("WatermarkFontHeight={h}"));
-        }
-        if let Some(angle) = self.native_watermark_rotate_angle {
-            out.push(format!("WatermarkRotateAngle={angle}"));
-        }
-        if let Some(ref name) = self.native_watermark_font_name {
-            out.push(format!("WatermarkFontName={name}"));
-        }
-        if let Some(ref text) = self.native_tiled_watermark_text {
-            out.push(format!("TiledWatermark={text}"));
-        }
-        if let Some(v) = self.initial_view {
-            out.push(format!("InitialView={v}"));
-        }
-        if let Some(v) = self.initial_page {
-            out.push(format!("InitialPage={v}"));
-        }
-        if let Some(v) = self.magnification {
-            out.push(format!("Magnification={v}"));
-        }
-        if let Some(v) = self.zoom {
-            out.push(format!("Zoom={v}"));
-        }
-        if let Some(v) = self.page_layout {
-            out.push(format!("PageLayout={v}"));
-        }
-        if self.first_page_on_left {
-            out.push("FirstPageOnLeft=true".into());
-        }
-        if self.resize_window_to_initial_page {
-            out.push("ResizeWindowToInitialPage=true".into());
-        }
-        if self.center_window {
-            out.push("CenterWindow=true".into());
-        }
-        if self.open_in_full_screen_mode {
-            out.push("OpenInFullScreenMode=true".into());
-        }
-        if self.display_pdf_document_title {
-            out.push("DisplayPDFDocumentTitle=true".into());
-        }
-        if self.hide_viewer_menubar {
-            out.push("HideViewerMenubar=true".into());
-        }
-        if self.hide_viewer_toolbar {
-            out.push("HideViewerToolbar=true".into());
-        }
-        if self.hide_viewer_window_controls {
-            out.push("HideViewerWindowControls=true".into());
-        }
-        if self.use_transition_effects {
-            out.push("UseTransitionEffects=true".into());
-        }
-        if let Some(v) = self.open_bookmark_levels {
-            out.push(format!("OpenBookmarkLevels={v}"));
-        }
-
-        out
-    }
 }
 
 /// PDF/A export profile.
@@ -1178,42 +1030,37 @@ mod tests {
     }
 
     #[test]
-    fn default_options_produce_empty_filter_string() {
-        assert!(OfficeOptions::default().filter_options().is_empty());
+    fn lok_save_as_options_default_returns_none() {
+        assert_eq!(OfficeOptions::default().lok_save_as_options(), None);
     }
 
     #[test]
-    fn pdf_a_maps_to_correct_select_pdf_version() {
-        for (prof, expected) in [
-            (PdfAProfile::A1B, "SelectPdfVersion=1"),
-            (PdfAProfile::A2B, "SelectPdfVersion=2"),
-            (PdfAProfile::A3B, "SelectPdfVersion=3"),
-        ] {
-            let opts = OfficeOptions { pdf_a: Some(prof), ..Default::default() };
-            assert_eq!(opts.filter_options(), vec![expected]);
-        }
+    fn lok_save_as_options_pdf_a_emits_select_pdf_version() {
+        let opts = OfficeOptions { pdf_a: Some(PdfAProfile::A2B), ..Default::default() };
+        let json = opts.lok_save_as_options().expect("Some");
+        assert!(json.contains("\"SelectPdfVersion\""));
+        assert!(json.contains("\"value\":\"2\""));
     }
 
     #[test]
-    fn landscape_option_emits_correct_key() {
-        let opts = OfficeOptions { landscape: true, ..Default::default() };
-        assert!(opts.filter_options().contains(&"IsLandscape=true".to_string()));
-    }
-
-    #[test]
-    fn page_ranges_option_emits_correct_key() {
+    fn lok_save_as_options_page_ranges_emits_string_value() {
         let opts = OfficeOptions {
             page_ranges: Some(PageRanges::parse("1-3").unwrap()),
             ..Default::default()
         };
-        let fo = opts.filter_options();
-        assert!(fo.iter().any(|s| s.starts_with("PageRange=")));
+        let json = opts.lok_save_as_options().expect("Some");
+        assert!(json.contains("\"PageRange\""));
+        assert!(json.contains("\"type\":\"string\""));
+        assert!(json.contains("\"value\":\"1-3\""));
     }
 
     #[test]
-    fn pdf_ua_option_emits_correct_key() {
-        let opts = OfficeOptions { pdf_ua: true, ..Default::default() };
-        assert!(opts.filter_options().contains(&"PDFUACompliance=true".to_string()));
+    fn lok_save_as_options_landscape_emits_boolean_value() {
+        let opts = OfficeOptions { landscape: true, ..Default::default() };
+        let json = opts.lok_save_as_options().expect("Some");
+        assert!(json.contains("\"IsLandscape\""));
+        assert!(json.contains("\"type\":\"boolean\""));
+        assert!(json.contains("\"value\":\"true\""));
     }
 
     #[test]

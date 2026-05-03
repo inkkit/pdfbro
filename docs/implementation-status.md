@@ -23,7 +23,7 @@
 |------|---------|--------------|------------|----------|-------|
 | 10 | Engine Types | ✅ Done | ✅ Done | `crates/engine/src/types.rs` (30KB) | Core error types, options, configs all present. |
 | 11 | Chromium Engine | ✅ Done | ✅ Done | `crates/engine/src/chromium/` — `launch.rs`, `render.rs`, `screenshot.rs`, `wait.rs` | Full CDP integration via `chromiumoxide`. |
-| 12 | LibreOffice Engine | ✅ Done | ✅ Done | `crates/engine/src/libreoffice/` | Office doc conversion. |
+| 12 | LibreOffice Engine | ✅ Done | ✅ Done | `crates/engine/src/libreoffice/` | LibreOffice ✅ in-process via LOK (`libreofficekit` crate, single dedicated worker thread, JSON `FilterData` for export options). |
 | 13 | PDF Operations | ✅ Done | ✅ Done | `crates/engine/src/pdfops/` — merge, split, flatten, rotate, watermark, metadata | Watermark & stamp both implemented. |
 | 14 | PDF/A Conversion | ❌ Not Started | **✅ Done** ⚠️ | `crates/engine/src/pdfa/mod.rs` | Ghostscript + qpdf fallback. Route `/forms/pdfengines/convert` wired. **README is wrong.** |
 | 15 | Webhook System | 🚧 Partially Done | ✅ Done | `crates/server/src/webhook/` | Full async job dispatch with all engine operations (Chromium, LibreOffice, PDF ops, encrypt, bookmarks, screenshots). Retry, queue, config extraction all real. **Shipped.** |
