@@ -1107,6 +1107,7 @@ mod tests {
             max_page_memory_mb: 512,
             max_browser_memory_mb: 2048,
             max_concurrent_renders: 10,
+            chrome_launch_timeout: Duration::from_secs(60),
         };
         let json = serde_json::to_string(&c).unwrap();
         let back: BrowserConfig = serde_json::from_str(&json).unwrap();
