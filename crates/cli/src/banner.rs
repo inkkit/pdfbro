@@ -10,14 +10,13 @@ use crate::args::LogFormat;
 use crate::args::GlobalOpts;
 
 /// Print the CLI banner if conditions are right.
+///
+/// Suppressed when `--log-format json` is explicitly set. Always prints in
+/// text mode so `cargo run` and non-TTY shells still see it. Color is
+/// automatically disabled when stdout is not a TTY.
 pub fn print(global: &GlobalOpts) {
-    let want_json = match global.log_format {
-        Some(LogFormat::Json) => true,
-        Some(LogFormat::Text) => false,
-        None => !std::io::stdout().is_terminal(),
-    };
-
-    if want_json || !std::io::stdout().is_terminal() {
+    let want_json = matches!(global.log_format, Some(LogFormat::Json));
+    if want_json {
         return;
     }
 
