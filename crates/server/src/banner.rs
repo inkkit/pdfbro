@@ -22,11 +22,12 @@ struct Row<'a> {
 
 /// Print the startup banner if conditions are right.
 ///
-/// TTY: full ASCII art banner with color.
-/// Non-TTY (Docker, AWS, CI): structured `tracing::info!` lines so operators
-/// can see service status in any log aggregator without the ASCII noise.
+/// Suppressed when `--log-format json` is set (machine-readable / production).
+/// In text mode the banner always prints regardless of TTY, so `cargo run` and
+/// Docker (tty: true) both show it. Color is automatically disabled when
+/// stdout is not a TTY.
 pub fn print(config: &ServerConfig, chromium_ready: bool, libreoffice_ready: bool) {
-    if !std::io::stdout().is_terminal() {
+    if matches!(config.log_format, LogFormat::Json) {
         let version = env!("CARGO_PKG_VERSION");
         tracing::info!(
             version,
@@ -35,9 +36,6 @@ pub fn print(config: &ServerConfig, chromium_ready: bool, libreoffice_ready: boo
             engines = "merge,split,flatten,metadata,convert,bookmarks,watermark,stamp,encrypt,decrypt,rotate",
             "pdfbro server ready",
         );
-        return;
-    }
-    if matches!(config.log_format, LogFormat::Json) {
         return;
     }
 
