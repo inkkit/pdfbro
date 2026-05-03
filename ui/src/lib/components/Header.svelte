@@ -14,7 +14,7 @@
 </script>
 
 <div style="background:{t.surface};border:1px solid {t.rule};border-radius:12px;padding:8px 14px;display:flex;align-items:center;gap:12px;font-size:11.5px">
-    <span style="font-weight:700;font-size:14px;letter-spacing:-0.01em">pdfbro</span>
+    <span style="font-weight:700;letter-spacing:-0.01em;line-height:1"><span style="font-size:16px">PDF</span><span style="font-size:11px;vertical-align:baseline;position:relative;top:1px">bro</span></span>
     <span style="color:{t.muted};font-family:ui-monospace,monospace;font-size:10.5px">v{data.version}</span>
     <Pill tone="accent" {t}>prod</Pill>
     <Pill tone={metricsStore.connected ? 'ok' : 'err'} {t}>● {metricsStore.connected ? 'live' : 'disconnected'}</Pill>

@@ -69,9 +69,7 @@ pub(crate) fn resolve_executable_with(
     Err(EngineError::ChromeNotFound { searched })
 }
 
-/// Check Chrome version and warn if it's newer than what chromiumoxide supports.
-/// chromiumoxide 0.9.1 supports Chrome up to 142 (PDL r1519099).
-/// Newer versions may cause timeouts or 'WS Invalid message' errors.
+/// Log the Chrome version at startup for diagnostics.
 fn check_chrome_version(executable: &Path) {
     let output = std::process::Command::new(executable)
         .arg("--version")
@@ -80,28 +78,7 @@ fn check_chrome_version(executable: &Path) {
     if let Ok(output) = output {
         if output.status.success() {
             let version_str = String::from_utf8_lossy(&output.stdout);
-            // Parse "Google Chrome 147.0.7727.102" -> 147
-            if let Some(major) = version_str
-                .split_whitespace()
-                .last()
-                .and_then(|v| v.split('.').next())
-                .and_then(|m| m.parse::<u32>().ok())
-            {
-                const MAX_SUPPORTED: u32 = 142;
-                if major > MAX_SUPPORTED {
-                    tracing::warn!(
-                        chrome_version = %version_str.trim(),
-                        max_supported = MAX_SUPPORTED,
-                        "Chrome version not supported by chromiumoxide. \
-                         PDF conversions may timeout or fail. \
-                         Install Chrome/Chromium <= {} or use --chrome-path to specify a compatible binary. \
-                         Alternatively, pin to a supported Chrome version for reliable operation.",
-                        MAX_SUPPORTED
-                    );
-                } else {
-                    tracing::info!(chrome_version = %version_str.trim(), "Chrome version OK");
-                }
-            }
+            tracing::info!(chrome_version = %version_str.trim(), "Chrome detected");
         }
     }
 }

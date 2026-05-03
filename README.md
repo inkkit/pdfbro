@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="./docs/assets/folio-logo.svg" alt="pdfbro" width="160"/>
-</p>
-
 <h1 align="center">pdfbro</h1>
 
 <p align="center">
@@ -9,148 +5,96 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/rust-1.75%2B-orange?style=flat-square" alt="Rust 1.75+"/>
+  <img src="https://img.shields.io/badge/rust-1.85%2B-orange?style=flat-square" alt="Rust 1.85+"/>
   <img src="https://img.shields.io/badge/gotenberg_parity-~85%25-blue?style=flat-square" alt="Gotenberg parity ~85%"/>
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT"/>
 </p>
 
 ---
 
-pdfbro converts **HTML, URLs, Markdown, and Office documents** into PDFs using
-real Chrome under the hood. It speaks the same HTTP API as
-[Gotenberg](https://github.com/gotenberg/gotenberg), so most existing
-clients can point at pdfbro with only a base-URL change.
+pdfbro converts **HTML, URLs, Markdown, and Office documents** to PDF using real Chrome under the hood.
+It speaks the same HTTP API as [Gotenberg](https://github.com/gotenberg/gotenberg), so most existing clients work with only a base-URL change.
 
-Unlike Gotenberg, pdfbro also runs as a **Rust library, a CLI, and a single
-binary** — and ships with a live operator console at `/_/` so you can see
-what your PDF service is actually doing without wiring up Grafana first.
+It also ships as a **Rust library, a CLI, and a single binary** — and has a live operator console at `/_/` so you can see what your PDF service is doing without wiring up Grafana first.
 
-> **Status:** active. Core conversions and PDF ops are production-ready.
-> Webhook callback delivery, batch ZIP output, and a few advanced Chromium
-> options are still in progress — see the [feature comparison](./comparison.md).
+> **Status:** active. Core conversions and PDF operations are production-ready. Webhook delivery, batch ZIP output, and a few advanced Chromium wait conditions are in progress.
 
 ---
 
-## Why pdfbro
-
-- **Gotenberg-compatible.** Same routes (`/forms/chromium/*`,
-  `/forms/libreoffice/convert`, `/forms/pdfengines/*`), same multipart
-  contract. Drop-in for ~85% of workloads.
-- **Memory-safe.** Rust core; no GC pauses, no parser-level CVEs from
-  malformed inputs.
-- **Four ways to run it.** HTTP server, CLI, Rust library, Docker — pick
-  whichever fits your shape. The library is the source of truth; the
-  server and CLI are thin wrappers.
-- **Observability-first.** Prometheus metrics, OpenTelemetry traces, and
-  a built-in Svelte SPA at `/_/` showing live RPS, p95 latency,
-  per-engine health, concurrency, and active batches over SSE.
-- **Slim deployment targets.** Multi-stage Dockerfile produces full,
-  Chromium-only, LibreOffice-only, Cloud Run, and Lambda images.
-
-For the honest comparison against Gotenberg (what's parity, what's behind,
-what's ahead) read [`comparison.md`](./comparison.md).
-
----
-
-## 60-second quickstart
+## Quickstart
 
 ```bash
-# Run the server (Docker, full image)
-docker run --rm -p 3000:3000 ghcr.io/vel/pdfbro:latest
+# Build and run (Docker)
+docker compose up
 
 # Convert a URL to PDF
 curl -X POST http://localhost:3000/forms/chromium/convert/url \
   -F "url=https://example.com" \
-  -F "landscape=true" \
   -o out.pdf
 
 # Open the operator console
 open http://localhost:3000/_/
 ```
 
-That's it. Same multipart contract for HTML, Markdown, Office, merge,
-split, watermark, etc.
+Or run directly with Cargo:
+
+```bash
+cargo run -p server -- serve --port 3000
+```
 
 ---
 
-## Install
+## Why pdfbro
 
-| Surface          | Command                                                       |
-|------------------|---------------------------------------------------------------|
-| Docker (full)    | `docker pull ghcr.io/vel/pdfbro:latest`            |
-| Docker (slim)    | `docker pull ghcr.io/vel/pdfbro:latest-chromium`   |
-| CLI (cargo)      | `cargo install --path crates/cli` → `pdfbro --help`            |
-| Server (cargo)   | `cargo run -p server -- serve --port 3000`                    |
-| Library          | `pdfbro-engine = { path = "crates/engine" }` in `Cargo.toml`   |
+- **Gotenberg-compatible.** Same routes (`/forms/chromium/*`, `/forms/libreoffice/convert`, `/forms/pdfengines/*`), same multipart contract. Drop-in for ~85% of workloads.
+- **Memory-safe.** Rust core — no GC pauses, no parser-level CVEs from malformed inputs.
+- **Four ways to run.** HTTP server, CLI, Rust library, or Docker. The library is the source of truth; the server and CLI are thin wrappers.
+- **Observability-first.** Prometheus metrics, OpenTelemetry traces, and a built-in operator console at `/_/` showing live RPS, p95 latency, per-engine health, concurrency, and active batches over SSE.
+- **Slim Docker targets.** Multi-stage Dockerfile produces full, Chromium-only, LibreOffice-only, Cloud Run, and Lambda images.
 
-**Prerequisites for non-Docker installs:** Rust 1.75+, Chrome/Chromium
-(auto-detected, or set `CHROME_PATH`), and optionally LibreOffice for
-Office conversion.
-
-### Embeddable bindings (v1: conversion)
-
-| Surface | Install |
-|---|---|
-| Python  | `pip install pdfbro-py` — see `bindings/python/README.md` |
-| Node.js | `npm install @vel/pdfbro` — see `bindings/node/README.md` |
-
-Both bindings embed the Rust engine directly — no HTTP server needed.
-v1 supports HTML / URL / Markdown / Office → PDF. PDF ops and screenshots ship in v2.
+For an honest comparison (parity, gaps, extras) see [`comparison.md`](./comparison.md).
 
 ---
 
-## HTTP API at a glance
+## HTTP API
 
-All routes are `POST` and accept multipart/form-data unless noted.
+All routes accept `multipart/form-data` via `POST` unless noted.
 
-### Chromium (HTML / URL / Markdown → PDF or screenshot)
 ```
 /forms/chromium/convert/{html,url,markdown}
 /forms/chromium/screenshot/{html,url,markdown}
-```
-
-### LibreOffice (100+ Office formats → PDF)
-```
 /forms/libreoffice/convert
-```
-
-### PDF operations
-```
 /forms/pdfengines/{merge,split,flatten,rotate,watermark,convert,encrypt}
 /forms/pdfengines/metadata/{read,write}
 /forms/pdfengines/bookmarks/{read,write}
-```
 
-### Operational
+GET  /health              → JSON health + per-engine status
+GET  /version             → plain text
+GET  /prometheus/metrics  → Prometheus text format
+GET  /_/                  → operator console
+GET  /_/sse               → Server-Sent Events stream
 ```
-GET  /health                 → JSON health + per-engine status
-GET  /version                → plain text
-GET  /prometheus/metrics     → Prometheus text format
-GET  /_/                     → operator console (SPA)
-GET  /_/sse                  → Server-Sent Events stream
-```
-
-For the gap analysis vs Gotenberg, see [`comparison.md`](./comparison.md).
 
 ---
 
 ## CLI
 
 ```bash
-pdfbro convert --html  index.html         --output out.pdf
+pdfbro convert --html  index.html          --output out.pdf
 pdfbro convert --url   https://example.com --output out.pdf
-pdfbro convert --markdown README.md       --output out.pdf
-pdfbro convert --office report.docx       --output out.pdf
+pdfbro convert --markdown README.md        --output out.pdf
+pdfbro convert --office report.docx        --output out.pdf
 
-pdfbro merge   a.pdf b.pdf c.pdf --output combined.pdf
+pdfbro merge   a.pdf b.pdf c.pdf  --output combined.pdf
 pdfbro split   input.pdf --mode uniform --span 1 --output-dir ./pages/
-pdfbro flatten input.pdf                  --output flat.pdf
-pdfbro rotate  input.pdf --angle 90       --output rotated.pdf
+pdfbro rotate  input.pdf --angle 90    --output rotated.pdf
 pdfbro metadata read  input.pdf
 pdfbro metadata write input.pdf '{"Title":"Q2 Review"}'
 ```
 
-Shell completions: `pdfbro completion zsh > ~/.zfunc/_pdfbro`.
+Install: `cargo install --path crates/cli`
+
+Shell completions: `pdfbro completion zsh > ~/.zfunc/_pdfbro`
 
 ---
 
@@ -170,27 +114,7 @@ async fn main() -> anyhow::Result<()> {
 }
 ```
 
-The engine crate has zero dependency on `axum` or `tower` — it's the same
-code path the server uses, just without an HTTP layer in front.
-
----
-
-## Operator console
-
-`GET /_/` serves a Svelte SPA driven by Server-Sent Events. In one screen:
-
-- **Ticker:** RPS, p95 latency, error %, in-flight count
-- **Routes table:** per-endpoint p50 / p95 / p99, error %, load %
-- **Engines:** Chromium / LibreOffice up-down + restart count
-- **Concurrency grid:** active vs cap, with warn/crit thresholds
-- **Throughput strip:** 30-min RPS + p95 trend with SLA overlay
-- **Resources:** CPU % and memory MB
-- **Batches:** progress + per-item state for active batches
-- **Logs:** last 20 requests, last 10 errors
-
-This is the cleanest lead pdfbro has over Gotenberg today; it's where the
-last 30 commits have lived. If you've ever bolted Grafana onto Gotenberg
-just to see whether it's healthy — this replaces that step.
+The engine crate has zero dependency on `axum` — same code path the server uses, without the HTTP layer.
 
 ---
 
@@ -202,178 +126,91 @@ Common flags (every flag is also `PDFBRO_*` env-overridable):
 pdfbro-server serve \
   --host 0.0.0.0 --port 3000 \
   --concurrency 8 \
-  --max-body-bytes 52428800 \      # 50 MiB
   --request-timeout 120s \
-  --chrome /usr/bin/google-chrome --no-sandbox \
-  --soffice /usr/bin/soffice \
+  --chrome /usr/bin/google-chrome \
+  --no-sandbox \
   --log-level info --log-format json \
-  --api-basic-auth-username admin --api-basic-auth-password secret \
   --otel-enabled --otel-endpoint http://localhost:4318/v1/traces
 ```
 
 Run `pdfbro-server serve --help` for the full flag reference.
 
-**TLS is intentionally not handled in-process.** Put nginx, Caddy, or
-envoy in front. Cert rotation, OCSP stapling, and ALPN are not things
-pdfbro is positioned to do better than they do.
+**TLS** is intentionally not handled in-process — put nginx, Caddy, or Envoy in front.
 
 ---
 
 ## Docker variants
 
-Single `Dockerfile`, multiple `--target` stages — pick the smallest one
-that does what you need.
-
-| Target                       | Contains             | Use case             |
-|------------------------------|----------------------|----------------------|
-| `pdfbro`                      | Chromium + LO        | Default              |
-| `pdfbro-chromium`             | Chromium             | HTML/URL/Markdown only (~30% smaller) |
-| `pdfbro-libreoffice`          | LO                   | Office docs only (~40% smaller) |
-| `pdfbro-cloudrun`             | Full + Cloud Run env | Google Cloud Run     |
-| `pdfbro-lambda`               | Full + Lambda Web Adapter | AWS Lambda      |
-| `pdfbro-{cloudrun,lambda}-{chromium,libreoffice}` | Slim + platform | Mix-and-match |
+| Target | Contains | Use case |
+|--------|----------|----------|
+| `pdfbro` | Chromium + LibreOffice | Default |
+| `pdfbro-chromium` | Chromium only | HTML/URL/Markdown (~30% smaller) |
+| `pdfbro-libreoffice` | LibreOffice only | Office docs (~40% smaller) |
+| `pdfbro-cloudrun` | Full + Cloud Run env | Google Cloud Run |
+| `pdfbro-lambda` | Full + Lambda Web Adapter | AWS Lambda |
 
 ```bash
 docker build --target pdfbro-chromium -t pdfbro:chromium .
-make docker-push-all DOCKER_REGISTRY=ghcr.io/me VERSION=1.0.0
 ```
-
----
-
-## Where things stand
-
-A short, honest scorecard. The full version is [`comparison.md`](./comparison.md).
-
-**Ready to use:**
-HTML/URL/Markdown→PDF · Office→PDF · screenshots · merge · split · flatten ·
-rotate · watermark · metadata · bookmarks · encrypt · PDF/A & PDF/UA ·
-Basic Auth · Prometheus · OpenTelemetry · operator console · CLI · Rust
-library · multi-target Docker.
-
-**In progress:**
-Webhook callback delivery (scaffold ready, delivery TODO) ·
-batch API ZIP/merge output (endpoints + worker exist) ·
-advanced Chromium wait/fail conditions (`waitForSelector`, `failOn*`) ·
-long tail of LibreOffice export filters · `embed` and full `stamp` routes.
-
-**Deliberate gaps:**
-TLS in-process (use a reverse proxy) · OAuth/JWT/RBAC (use a reverse
-proxy) · workflow/DAG engine on top of batch (out of scope).
-
-**Embeddable bindings (v1 shipped):**
-Python (`pip install pdfbro-py`) · Node.js (`npm install @vel/pdfbro`) — HTML / URL / Markdown / Office → PDF in-process.
 
 ---
 
 ## Performance
 
-Benchmarked on a 2-CPU / 2 GB Docker cgroup, 4 concurrent clients, 60 s warm-up + 120 s timed run (3 repetitions). Both servers ran identical fixture files. See [`bench/README.md`](./bench/README.md) for full methodology and how to reproduce.
-
-### Latency (ms) & throughput — isolated mode
-
-> Containers restarted before each workload for a clean baseline. pdfbro wins all five workloads.
+Benchmarked on a 2-CPU / 2 GB Docker cgroup, 4 concurrent clients, containers restarted before each workload for a clean baseline.
 
 | Workload | p50 pdfbro | p50 Gotenberg | p95 pdfbro | p95 Gotenberg | RPS pdfbro | RPS Gotenberg |
 |---|---|---|---|---|---|---|
-| HTML → PDF (small) | **251** | 413 | **425** | 740 | **14.2** | 8.7 |
-| HTML → PDF (large) | **302** | 406 | **508** | 694 | **11.9** | 9.0 |
-| URL → PDF | **303** | 417 | **455** | 726 | **12.2** | 8.6 |
-| DOCX → PDF (LibreOffice) | **306** | 492 | **557** | 812 | **10.9** | 7.1 |
-| PDF merge | **11** | 18 | **17** | 35 | **328** | 192 |
+| HTML → PDF (small) | **251 ms** | 413 ms | **425 ms** | 740 ms | **14.2** | 8.7 |
+| HTML → PDF (large) | **302 ms** | 406 ms | **508 ms** | 694 ms | **11.9** | 9.0 |
+| URL → PDF | **303 ms** | 417 ms | **455 ms** | 726 ms | **12.2** | 8.6 |
+| DOCX → PDF | **306 ms** | 492 ms | **557 ms** | 812 ms | **10.9** | 7.1 |
+| PDF merge | **11 ms** | 18 ms | **17 ms** | 35 ms | **328** | 192 |
 
-### Peak memory (MiB) — isolated mode
+pdfbro starts Chrome **and** LibreOffice eagerly at boot; Gotenberg starts them lazily. Chrome workloads show identical RSS (~310–330 MiB). On LibreOffice workloads, pdfbro's RSS is higher because Chrome is already resident. See [`bench/README.md`](./bench/README.md) for the full methodology and steady-state results.
 
-> Each workload measured from a freshly restarted container — no carryover from prior workloads. RSS includes all child processes (Chrome, LibreOffice). pdfbro starts both Chrome and LibreOffice eagerly at boot regardless of which engine a workload uses; Gotenberg starts engines lazily. The gap on LibreOffice and merge rows reflects this design difference, not operation cost.
-
-| Workload | pdfbro | Gotenberg | What the gap reflects |
-|---|---|---|---|
-| HTML → PDF (small) | **313** | 329 | Chrome RSS — effectively identical |
-| HTML → PDF (large) | 325 | **321** | Chrome RSS — effectively identical |
-| URL → PDF | **307** | 331 | Chrome RSS — effectively identical |
-| DOCX → PDF (LibreOffice) | 810 | **129** | pdfbro holds Chrome + LibreOffice; Gotenberg only LibreOffice (lazy Chrome) |
-| PDF merge | 244 | **23** | pdfbro holds Chrome at boot; Gotenberg starts nothing for a pure merge |
-
-<details>
-<summary>Steady-state accumulated mode (both servers warm, no engine recycling)</summary>
-
-Both containers ran continuously with Gotenberg's periodic restart disabled (`--chromium-restart-after=0 --libreoffice-restart-after=0`). Numbers accumulate across workloads because all engines stay alive throughout. pdfbro wins all latency numbers; Gotenberg's Go runtime has a notably smaller LibreOffice RSS footprint.
-
-**Latency (p50):**
-
-| Workload | pdfbro | Gotenberg |
-|---|---|---|
-| HTML → PDF (small) | **259** ms | 357 ms |
-| HTML → PDF (large) | **279** ms | 377 ms |
-| URL → PDF | **276** ms | 382 ms |
-| DOCX → PDF (LibreOffice) | **277** ms | 412 ms |
-| PDF merge | **10** ms | 17 ms |
-
-**Peak RSS (accumulated — engines never recycled):**
-
-| Workload | pdfbro | Gotenberg |
-|---|---|---|
-| HTML → PDF (small) | **327** MiB | 397 MiB |
-| HTML → PDF (large) | **425** MiB | 446 MiB |
-| URL → PDF | 501 MiB | **491** MiB |
-| DOCX → PDF (LibreOffice) | 1 309 MiB | **442** MiB |
-| PDF merge | 1 850 MiB | **425** MiB |
-
-The DOCX and merge rows show accumulated Chrome + LibreOffice RSS for pdfbro (~1.3–1.9 GiB) vs Gotenberg's much lighter LibreOffice integration (~440 MiB). This is a known issue tracked for the LibreOffice engine — Gotenberg's unoserver process model keeps the LO process lighter. See [`bench/README.md`](./bench/README.md) for details.
-
-</details>
-
-> **Stability:** Chrome workloads show CV 20–40% across runs — treat numbers as indicative, not definitive. Chrome PDF rendering is non-deterministic. Results are hardware-specific.
+> CV 20–40% on Chrome workloads — treat numbers as indicative. Chrome PDF rendering is non-deterministic and hardware-specific.
 
 ---
 
-## Documentation
+## Roadmap
 
-- [`comparison.md`](./comparison.md) — in-depth audit vs Gotenberg
-- [`docs/markdown-plus.md`](./docs/markdown-plus.md) — proposed
-  enhanced Markdown route (front-matter, math, mermaid, themes)
+**Active:**
+- Webhook callback delivery (scaffold done, delivery in progress)
+- Batch API ZIP/merge output (worker exists, output formats in progress)
+- Advanced Chromium wait/fail conditions (`waitForSelector`, `failOn*`)
 
-> **Note on specs.** The previous 32-file `docs/specs/` tree has been
-> archived to [`docs/specs-archive-2026-05-01.zip`](./docs/specs-archive-2026-05-01.zip).
-> Fresh, better-organised contributor-facing specs are being written and
-> will reappear under `docs/` shortly.
+**Planned:**
+- **Native LibreOffice integration via LibreOfficeKit** — replace unoserver (Python + socket) with direct LOK Rust bindings ([`jacobtread/libreofficekit`](https://github.com/jacobtread/libreofficekit)). Gotenberg is doing the same for v9 ([issue #1004](https://github.com/gotenberg/gotenberg/issues/1004)). This will cut LibreOffice RSS significantly and remove the Python dependency.
+- Published Docker images (`ghcr.io`)
+- Python and Node.js bindings on their respective package registries
 
 ---
 
 ## Development
 
 ```bash
-git clone https://github.com/vel/pdfbro.git && cd pdfbro
-
-cargo build --release        # build everything
-cargo test                   # unit + integration (skips gracefully if Chrome missing)
-make check                   # fmt + clippy + unit tests (run before PRs)
-make run                     # docker-compose up, full image
-make test-integration        # BDD scenarios in Docker
+git clone https://github.com/vel/pdfbro && cd pdfbro
+cargo build --release
+cargo test
+make check          # fmt + clippy + unit tests — run before PRs
+make run            # docker compose up (full image)
+make test-integration  # BDD scenarios in Docker
 ```
 
-| Command                 | What it does                          |
-|-------------------------|---------------------------------------|
-| `make docker-build`     | Build full image                      |
-| `make docker-build-all` | Build all 9 image variants            |
-| `make test-unit`        | `cargo test --lib`                    |
-| `make test-integration` | BDD + e2e in container                |
-| `make fmt` / `make lint`| `cargo fmt` / `cargo clippy`          |
-
-**Useful env vars:** `CHROME_PATH`, `LIBREOFFICE_PATH`, `RUST_LOG`,
-`PDFBRO_PORT`, `PDFBRO_CONCURRENCY`, `OTEL_EXPORTER_OTLP_ENDPOINT`.
+**Useful env vars:** `CHROME_PATH`, `LIBREOFFICE_PATH`, `RUST_LOG`, `PDFBRO_PORT`, `PDFBRO_CONCURRENCY`
 
 ---
 
 ## Contributing
 
-PRs welcome. Three things that make a PR easy to land:
+PRs welcome.
 
 1. `make check` passes locally.
 2. Conventional Commits style (`feat:`, `fix:`, `docs:`, `chore:`).
 3. One feature or fix per PR — split mixed work.
 
-For larger changes, open an issue first so we can agree on the shape
-before code.
+For larger changes, open an issue first so we can agree on the shape before code.
 
 ---
 
