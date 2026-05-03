@@ -156,6 +156,16 @@ docker-test: ## Run tests inside Docker container (with Chrome + LibreOffice)
 	docker build -t pdfbro-test -f Dockerfile.test .
 	docker run --rm pdfbro-test
 
+# IMAGE defaults to full image; override with: make test-image IMAGE=ghcr.io/inkkit/pdfbro:latest-chromium
+IMAGE ?= $(DOCKER_REGISTRY):latest
+.PHONY: test-image
+test-image: ## Test a single Docker image with real API calls (make test-image IMAGE=<tag>)
+	bash scripts/test-images.sh "$(IMAGE)"
+
+.PHONY: test-images
+test-images: ## Test all 9 Docker image variants with real API calls
+	bash scripts/test-images.sh
+
 # Export all variables
 export
 
