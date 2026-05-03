@@ -338,11 +338,33 @@ fn lok_convert(office: &libreofficekit::Office, input: &Path, opts: &OfficeOptio
         _ => None,
     };
 
-    let mut doc = match csv_opts {
+    let load_result = match csv_opts {
         Some(o) => office.document_load_with_options(&in_url, o),
         None => office.document_load(&in_url),
-    }
-    .map_err(|e| EngineError::Internal(format!("LOK document_load: {e}")))?;
+    };
+
+    let mut doc = match load_result {
+        Ok(doc) => doc,
+        Err(e) => {
+            // Read up to 8 KB of the input so the classifier can sniff
+            // ZIP / PDF magic and disambiguate "Unsupported URL" between
+            // encrypted and corrupted files. Best-effort — if reading the
+            // prefix fails (file deleted between LOK's failed load and
+            // our re-open, permission flap, etc.) we fall back to an
+            // empty buffer and the classifier degrades to
+            // `LibreOfficeUnsupportedFormat`. Log so the downgrade is
+            // visible in operator dashboards.
+            let prefix = read_prefix(input, 8 * 1024).unwrap_or_else(|err| {
+                warn!(
+                    path = %input.display(),
+                    %err,
+                    "failed to re-read input for error classification; classifying with empty prefix"
+                );
+                Vec::new()
+            });
+            return Err(error::classify_load_error(&e.to_string(), &prefix));
+        }
+    };
 
     let ok = doc
         .save_as(&out_url, filter_name, filter_arg)
@@ -363,6 +385,15 @@ fn lok_convert(office: &libreofficekit::Office, input: &Path, opts: &OfficeOptio
     }
 
     Ok(pdf)
+}
+
+/// Read up to `max_bytes` from the beginning of a file.
+fn read_prefix(path: &Path, max_bytes: usize) -> std::io::Result<Vec<u8>> {
+    use std::io::Read;
+    let f = std::fs::File::open(path)?;
+    let mut buf = Vec::with_capacity(max_bytes);
+    f.take(max_bytes as u64).read_to_end(&mut buf)?;
+    Ok(buf)
 }
 
 // ---------------------------------------------------------------------------
