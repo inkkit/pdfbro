@@ -106,11 +106,44 @@ pub(crate) async fn launch_with(config: BrowserConfig) -> EngineResult<ChromiumE
             EngineError::ChromeLaunch(format!("failed to create user-data-dir: {e}"))
         })?;
 
-    let cx_config = build_chromiumoxide_config(&config, &executable, user_data_dir.path())?;
+    // Cold-launch retry. Chrome occasionally SIGSEGVs or fails its
+    // websocket handshake on the very first launch in a constrained
+    // container — DBus init race, crashpad probing /sys files that
+    // don't exist, etc. The errors are transient: a second attempt
+    // ~250ms later almost always succeeds. Three attempts (one + two
+    // retries) buys us reliability without making real failures slow.
+    //
+    // We rebuild the config each attempt because chromiumoxide's
+    // `BrowserConfig` is consumed by `launch`. Same `user_data_dir` is
+    // reused across attempts since it's a tempfile owned by us.
+    const LAUNCH_ATTEMPTS: u32 = 3;
+    const LAUNCH_BACKOFF: std::time::Duration = std::time::Duration::from_millis(250);
 
-    let (mut browser, mut handler) = Browser::launch(cx_config)
-        .await
-        .map_err(|e| EngineError::ChromeLaunch(e.to_string()))?;
+    let (mut browser, mut handler) = 'launched: {
+        for attempt in 1..=LAUNCH_ATTEMPTS {
+            let cfg_this_attempt =
+                build_chromiumoxide_config(&config, &executable, user_data_dir.path())?;
+            match Browser::launch(cfg_this_attempt).await {
+                Ok(pair) => break 'launched pair,
+                Err(e) => {
+                    if attempt < LAUNCH_ATTEMPTS {
+                        tracing::warn!(
+                            attempt,
+                            max = LAUNCH_ATTEMPTS,
+                            error = %e,
+                            "Chrome cold-launch failed; retrying after backoff"
+                        );
+                        tokio::time::sleep(LAUNCH_BACKOFF * attempt).await;
+                    } else {
+                        return Err(EngineError::ChromeLaunch(e.to_string()));
+                    }
+                }
+            }
+        }
+        // Unreachable: the for loop either breaks with Ok or returns
+        // on the last attempt's Err.
+        unreachable!("Chrome launch retry loop exited without resolution");
+    };
 
     let handler_task = tokio::spawn(async move {
         // chromiumoxide's handler stream yields Result<(), CdpError>.
