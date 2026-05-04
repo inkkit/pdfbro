@@ -246,14 +246,22 @@ const BASELINE_ARGS: &[&str] = &[
     //    on Linux it can stall waiting for D-Bus secrets services.
     "--password-store=basic",
     "--use-mock-keychain",
-];
 
-// `--no-zygote` was DELIBERATELY removed from the baseline. Zygote is
-// Chrome's pre-forked renderer optimisation — disabling it makes every
-// new tab launch from a cold process. We carried `--no-zygote` from a
-// "headless Chrome in Docker" cargo-cult list; chromedp doesn't pass
-// it, Puppeteer doesn't pass it, and the actual Docker advice is
-// `--no-sandbox` (which we still apply via `config.no_sandbox`).
+    // ── Sandbox-disabled containerised environments: keep zygote off.
+    //    chromedp + Puppeteer both omit `--no-zygote` because they
+    //    assume the host has a usable user-namespace setup for the
+    //    zygote subprocess to fork from. Our `Dockerfile.test` and
+    //    production `Dockerfile` both pair `--no-sandbox` with no
+    //    user-namespace remapping; in that combination the zygote can
+    //    fail at first cold-launch (observed as `batch_skip_*` cli
+    //    test exiting 3 in the test container while every subsequent
+    //    Chrome-using test in the same run passed). Keeping the flag.
+    //    The "perf cost" — every new tab launches from a cold
+    //    renderer rather than forking from a pre-warmed zygote — is
+    //    fully amortised in our usage because we keep one warm
+    //    browser and reuse it across requests.
+    "--no-zygote",
+];
 
 /// Names looked up on `$PATH`, in order.
 const PATH_BINARIES: &[&str] = &[
@@ -449,15 +457,19 @@ mod tests {
         assert!(BASELINE_ARGS.contains(&"--use-mock-keychain"));
     }
 
-    /// `--no-zygote` was deliberately removed from the baseline; see
-    /// the comment block right after `BASELINE_ARGS`. If someone
-    /// re-adds it, this test reminds them why not.
+    /// `--no-zygote` is required in our sandbox-disabled containerised
+    /// environments. See the comment block at the bottom of
+    /// `BASELINE_ARGS` for the full reasoning — the short version is
+    /// that without user-namespace support paired with `--no-sandbox`,
+    /// the zygote subprocess can fail at first cold-launch, which
+    /// surfaces as the cli `batch_skip_*` test exiting 3 in the test
+    /// container.
     #[test]
-    fn baseline_args_does_not_include_no_zygote() {
+    fn baseline_args_includes_no_zygote() {
         assert!(
-            !BASELINE_ARGS.contains(&"--no-zygote"),
-            "--no-zygote disables Chrome's pre-forked-renderer optimisation; \
-             chromedp + Puppeteer both omit it; see launch.rs comments"
+            BASELINE_ARGS.contains(&"--no-zygote"),
+            "--no-zygote must stay in the baseline for sandbox-disabled \
+             containerised environments; see launch.rs comments"
         );
     }
 }
