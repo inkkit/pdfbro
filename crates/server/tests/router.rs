@@ -148,6 +148,9 @@ fn clone_engine_error(e: &EngineError) -> EngineError {
             duration: *duration,
         },
         EngineError::LibreOfficeTimeout(d) => EngineError::LibreOfficeTimeout(*d),
+        EngineError::LibreOfficeEncrypted => EngineError::LibreOfficeEncrypted,
+        EngineError::LibreOfficeCorrupted(s) => EngineError::LibreOfficeCorrupted(s.clone()),
+        EngineError::LibreOfficeUnsupportedFormat => EngineError::LibreOfficeUnsupportedFormat,
     }
 }
 
@@ -160,7 +163,7 @@ fn test_config() -> ServerConfig {
         request_timeout: Duration::from_secs(60),
         chrome_path: None,
         no_sandbox: None,
-        soffice_path: None,
+        lo_program_dir: None,
         log_level: "off".to_string(),
         log_format: LogFormat::Text,
         batch_max_items: 50,
@@ -189,8 +192,6 @@ fn test_config() -> ServerConfig {
         api_disable_download_from: false,
         api_correlation_id_header: "x-request-id".to_string(),
         api_root_path: String::new(),
-        libreoffice_unoserver_port: 2003,
-        libreoffice_unoserver_ready_timeout: std::time::Duration::from_secs(60),
         webhook_max_retry: 4,
         webhook_retry_min_wait: std::time::Duration::from_secs(1),
         webhook_retry_max_wait: std::time::Duration::from_secs(30),

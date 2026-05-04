@@ -4,7 +4,7 @@
 //!
 //! These tests skip gracefully when dependencies are missing:
 //! - Chrome on PATH (or via $CHROME_PATH) for Chromium tests
-//! - soffice on PATH (or via $LIBREOFFICE_PATH) for LibreOffice tests
+//! - soffice on PATH (or via $LO_PROGRAM_PATH) for LibreOffice tests
 //!
 //! Each test spawns an instance of the full `pdfbro-server` router on a
 //! dynamically-allocated localhost port, performs HTTP requests against it
@@ -43,7 +43,7 @@ fn have_chrome() -> bool {
 
 /// Return true if a LibreOffice (`soffice`) binary is available.
 fn have_soffice() -> bool {
-    if std::env::var("LIBREOFFICE_PATH").is_ok() {
+    if std::env::var("LO_PROGRAM_PATH").is_ok() {
         return true;
     }
     std::process::Command::new("soffice")
@@ -85,7 +85,7 @@ fn test_config() -> ServerConfig {
         request_timeout: Duration::from_secs(60),
         chrome_path: std::env::var("CHROME_PATH").ok().map(Into::into),
         no_sandbox: Some(cfg!(target_os = "linux")),
-        soffice_path: std::env::var("LIBREOFFICE_PATH").ok().map(Into::into),
+        lo_program_dir: std::env::var("LO_PROGRAM_PATH").ok().map(Into::into),
         log_level: "off".to_string(),
         log_format: LogFormat::Text,
         batch_max_items: 50,
@@ -114,9 +114,7 @@ fn test_config() -> ServerConfig {
         api_disable_download_from: false,
         api_correlation_id_header: "x-request-id".to_string(),
         api_root_path: String::new(),
-        libreoffice_unoserver_port: 0, // OS-assigned, avoids cross-test collisions
 
-        libreoffice_unoserver_ready_timeout: std::time::Duration::from_secs(120),
         webhook_max_retry: 4,
         webhook_retry_min_wait: std::time::Duration::from_secs(1),
         webhook_retry_max_wait: std::time::Duration::from_secs(30),
@@ -139,9 +137,12 @@ async fn launch_chromium(config: &ServerConfig) -> SupervisedChromiumEngine {
 
 async fn launch_libreoffice(config: &ServerConfig) -> SupervisedLibreOfficeEngine {
     let cfg = LibreOfficeConfig {
-        executable: config.soffice_path.clone(),
+        install_path: config
+            .lo_program_dir
+            .as_deref()
+            .and_then(|p| p.parent())
+            .map(|p| p.to_path_buf()),
         timeout: config.request_timeout,
-        unoserver_ready_timeout: config.libreoffice_unoserver_ready_timeout,
         ..LibreOfficeConfig::default()
     };
     SupervisedLibreOfficeEngine::new(cfg)
@@ -284,7 +285,7 @@ async fn e2e_libreoffice_docx() {
     }
     let srv = spawn_server(true).await;
     if !srv.libreoffice_started {
-        eprintln!("skipping: libreoffice engine unavailable (unoserver failed to start)");
+        eprintln!("skipping: libreoffice engine unavailable (LOK failed to start)");
         return;
     }
 

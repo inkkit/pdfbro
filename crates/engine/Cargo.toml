@@ -8,12 +8,12 @@ description = "pdfbro core engine: ChromiumEngine, LibreOfficeEngine, PdfOperati
 [features]
 default = ["chromium", "libreoffice"]
 chromium = ["dep:chromiumoxide", "dep:futures-util", "dep:pulldown-cmark", "dep:urlencoding"]
-libreoffice = ["dep:reqwest", "dep:base64"]
+libreoffice = ["dep:libreofficekit"]
 chrome-fetch = ["chromium", "dep:reqwest", "dep:sha2", "dep:zip", "dep:flate2", "dep:tar", "dep:dirs", "dep:walkdir"]
 
 [dependencies]
-base64 = { workspace = true, optional = true }
 chromiumoxide = { workspace = true, optional = true }
+libreofficekit = { version = "0.5", optional = true }
 futures-util = { workspace = true, optional = true }
 humantime-serde = { workspace = true }
 lopdf = { workspace = true }
@@ -26,6 +26,8 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 which = "7"
+parking_lot = "0.12"
+libc = "0.2"
 
 # Image processing for watermark
 image = { workspace = true }

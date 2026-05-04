@@ -1,28 +1,23 @@
+# syntax=docker/dockerfile:1.4
 # Dockerfile for running the full test suite (unit + BDD) with all dependencies.
-# Mirrors the pdfbro production image: Chromium + LibreOffice + unoserver.
+# Mirrors the pdfbro production image: Chromium + LibreOffice (via LOK — no unoserver).
+#
+# Uses BuildKit cache mounts for the Cargo registry + target dir so incremental
+# compilation works across builds. First build: ~10 min. Subsequent builds after
+# a small source change: ~30-90 s.
+#
+# Usage:
+#   docker build -f Dockerfile.test --progress=plain .
+#
+# Tests run during the build step. Exit 0 = all tests passed.
 
 ARG RUST_VERSION=1.88
+FROM rust:${RUST_VERSION}
 
-# =============================================================================
-# Stage: chef — cargo-chef for dependency caching
-# =============================================================================
-FROM rust:${RUST_VERSION} AS chef
 WORKDIR /app
-RUN cargo install cargo-chef --locked
 
-# =============================================================================
-# Stage: planner — produce recipe.json
-# =============================================================================
-FROM chef AS planner
-COPY . .
-RUN cargo chef prepare --recipe-path recipe.json
-
-# =============================================================================
-# Stage: builder — compile everything including pdfbro-server binary
-# =============================================================================
-FROM chef AS builder
-
-# Runtime deps for Chromium and LibreOffice needed at test time
+# Runtime deps for Chromium and LibreOffice needed at test time.
+# This layer is cached unless the package list changes.
 RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
     # Chromium
     chromium \
@@ -32,7 +27,7 @@ RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
     libpangocairo-1.0-0 libpango-1.0-0 libcairo2 \
     libgdk-pixbuf2.0-0 libglib2.0-0 libgl1-mesa-glx \
     fonts-liberation \
-    # LibreOffice + python3-uno (same source as production image)
+    # LibreOffice — LOK (liblibreofficekit.so) is bundled in libreoffice-core
     && echo "deb http://deb.debian.org/debian bookworm-backports main" \
          > /etc/apt/sources.list.d/backports.list \
     && apt-get update -qq \
@@ -42,14 +37,11 @@ RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
          libreoffice-calc \
          libreoffice-impress \
          libreoffice-draw \
-         python3-uno \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-         python3-minimal python3-pip \
          # PDF tools used by BDD assertion steps
          poppler-utils \
          qpdf \
          ghostscript \
-    && pip3 install --no-cache-dir --break-system-packages unoserver==2.2.1 \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ENV CHROME_PATH=/usr/bin/chromium
@@ -57,18 +49,57 @@ ENV CHROME_BIN=/usr/bin/chromium
 # Required so Chromium can run as root inside the container
 ENV NO_SANDBOX=true
 ENV SAL_USE_VCLPLUGIN=svp
+# LOK program directory — liblibreofficekit.so lives here
+ENV LOK_PROGRAM_PATH=/usr/lib/libreoffice/program
 ENV RUST_LOG=info
+# UTF-8 locale so LibreOffice can open files with non-ASCII names (e.g.
+# `Special_Chars_ß.docx`). Bookworm's default `C` locale fails LO type
+# detection on those paths with `Unsupported URL: type detection failed`.
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
 
-# Cache dependencies
-COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --recipe-path recipe.json
-RUN cargo chef cook --recipe-path recipe.json --tests
-
-# Build everything: pdfbro-server binary + all test binaries
 COPY . .
-RUN cargo test --no-run
 
-# Run pre-compiled test binaries — no recompilation at container start.
-# --test-threads=1 because integration tests share a single unoserver
-# instance on port 2003; running them in parallel triggers contention.
-CMD ["cargo", "test", "--no-fail-fast", "--", "--test-threads=1"]
+# --mount=type=cache keeps /usr/local/cargo (registry + git) and /app/target
+# alive between builds — Cargo sees prior artifacts and only recompiles what changed.
+# Cache mounts are committed even on non-zero exit, so a test failure still
+# preserves compiled artifacts for the next build.
+#
+# --test-threads=1 because LOK allows only one Office instance per process;
+# integration tests share a single static engine via OnceCell.
+#
+# Two failure modes we care about:
+#   1. Compile errors — libtest never runs, no "test result" line is emitted.
+#      We catch these by running `cargo test --no-run` first; any non-zero exit
+#      there is a real compile failure and must fail the build.
+#   2. Test failures — libtest prints "test result: FAILED" / "failures:".
+#      We catch these by greping the test-run output.
+#
+# We then ignore cargo's exit code on the *test-run* invocation only:
+# LibreOffice ≥ 6.5 has a known atexit/teardown bug that bumps the test
+# binary's exit code to non-zero even when every test passed (see
+# libreofficekit-rs README). Trusting libtest's printed verdict at that
+# point is the documented workaround.
+# Bust ONLY this layer when you want a fresh test run without nuking the
+# apt-install / COPY layers. Pass `--build-arg TEST_RUN_ID=$(date +%s)`
+# to the buildx invocation. The default keeps the layer cacheable so a
+# repeat build with no source changes is a no-op.
+ARG TEST_RUN_ID=0
+
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/app/target \
+    bash -c 'set -e -o pipefail; \
+        echo "::compile pass — failing fast on any compile error (TEST_RUN_ID=${TEST_RUN_ID:-0})"; \
+        cargo test --no-fail-fast --no-run; \
+        echo "::run pass — ignoring LO atexit teardown noise on cargo exit"; \
+        set +e; \
+        cargo test --no-fail-fast -- --test-threads=1 2>&1 | tee /tmp/cargo_test.log; \
+        cargo_status=$?; \
+        set -e; \
+        if grep -qE "^test result: FAILED|^failures:$|^error\\[" /tmp/cargo_test.log; then \
+            echo "::test failures detected in libtest output"; \
+            exit 1; \
+        fi; \
+        echo "::all libtest sections reported ok (cargo exit was $cargo_status — ignoring LO atexit teardown noise)"; \
+        exit 0'

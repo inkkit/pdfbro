@@ -182,7 +182,7 @@ mod tests {
             request_timeout: std::time::Duration::from_secs(30),
             chrome_path: None,
             no_sandbox: None,
-            soffice_path: None,
+            lo_program_dir: None,
             log_level: "info".to_string(),
             log_format: LogFormat::Text,
             // Batch processing

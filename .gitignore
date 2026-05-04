@@ -12,3 +12,6 @@ Cargo.lock.bak
 gotenberg-8.29-test-example/
 .worktrees/
 tmp/
+
+# Claude Code local scratch (lockfiles, sub-agent transcripts)
+.claude/

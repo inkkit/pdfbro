@@ -53,6 +53,7 @@ cargo run -p server -- serve --port 3000
 - **Four ways to run.** HTTP server, CLI, Rust library, or Docker. The library is the source of truth; the server and CLI are thin wrappers.
 - **Observability-first.** Prometheus metrics, OpenTelemetry traces, and a built-in operator console at `/_/` showing live RPS, p95 latency, per-engine health, concurrency, and active batches over SSE.
 - **Slim Docker targets.** Multi-stage Dockerfile produces full, Chromium-only, LibreOffice-only, Cloud Run, and Lambda images.
+- **LibreOffice integration via LibreOfficeKit (LOK)** — in-process Rust bindings, no Python daemon, lower memory footprint.
 
 For an honest comparison (parity, gaps, extras) see [`comparison.md`](./comparison.md).
 
@@ -189,7 +190,6 @@ pdfbro starts Chrome **and** LibreOffice eagerly at boot; Gotenberg starts them 
 - Advanced Chromium wait/fail conditions (`waitForSelector`, `failOn*`)
 
 **Planned:**
-- **Native LibreOffice integration via LibreOfficeKit** — replace unoserver (Python + socket) with direct LOK Rust bindings ([`jacobtread/libreofficekit`](https://github.com/jacobtread/libreofficekit)). Gotenberg is doing the same for v9 ([issue #1004](https://github.com/gotenberg/gotenberg/issues/1004)). This will cut LibreOffice RSS significantly and remove the Python dependency.
 - Published Docker images (`ghcr.io`)
 - Python and Node.js bindings on their respective package registries
 
@@ -206,7 +206,7 @@ make run            # docker compose up (full image)
 make test-integration  # BDD scenarios in Docker
 ```
 
-**Useful env vars:** `CHROME_PATH`, `LIBREOFFICE_PATH`, `RUST_LOG`, `PDFBRO_PORT`, `PDFBRO_CONCURRENCY`
+**Useful env vars:** `CHROME_PATH`, `LO_PROGRAM_PATH`, `RUST_LOG`, `PDFBRO_PORT`, `PDFBRO_CONCURRENCY`
 
 ---
 

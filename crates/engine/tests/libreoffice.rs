@@ -50,24 +50,19 @@ fn csv_fixture() -> PathBuf {
     fixtures_dir().join("sample.csv")
 }
 
-/// Shared engine across all tests in this binary. We launch unoserver once
-/// and reuse it — both because per-test launches collided on the fixed
-/// default port 2003 and because the engine is explicitly designed for
-/// concurrent reuse (semaphore + per-call user dirs).
+/// Shared engine across all tests in this binary. We launch one LOK instance
+/// and reuse it — LOK allows only one `Office` per process and initialisation
+/// takes a few seconds.
 static SHARED: tokio::sync::OnceCell<Option<LibreOfficeEngine>> =
     tokio::sync::OnceCell::const_new();
 
 async fn engine() -> Option<LibreOfficeEngine> {
     SHARED
         .get_or_init(|| async {
-            let cfg = LibreOfficeConfig {
-                unoserver_port: 0, // OS-assigned free port
-                ..Default::default()
-            };
-            match LibreOfficeEngine::launch(cfg).await {
+            match LibreOfficeEngine::launch(LibreOfficeConfig::default()).await {
                 Ok(e) => Some(e),
                 Err(e) => {
-                    eprintln!("skipping: failed to launch unoserver: {e}");
+                    eprintln!("skipping: failed to launch LibreOffice LOK engine: {e}");
                     None
                 }
             }
@@ -204,15 +199,11 @@ async fn convert_many_preserves_order() {
 }
 
 #[tokio::test]
-async fn convert_timeout_kills_child() {
-    // Build an engine with a pathologically small unoserver-ready timeout so
-    // launch() fails quickly, and a small per-call timeout so that if launch()
-    // succeeds (unoserver happened to already be running), the convert itself
-    // is exercised under the timeout.
+async fn launch_fails_fast_with_bad_install_path() {
+    // Provide a path that definitely contains no LibreOffice install.
+    // LOK should fail quickly rather than hang.
     let cfg = LibreOfficeConfig {
-        timeout: Duration::from_millis(100),
-        unoserver_ready_timeout: Duration::from_millis(500),
-        unoserver_port: 0,
+        install_path: Some(std::path::PathBuf::from("/nonexistent/__no_lok__")),
         ..Default::default()
     };
     let started = Instant::now();
@@ -220,26 +211,15 @@ async fn convert_timeout_kills_child() {
     let elapsed = started.elapsed();
 
     match res {
-        Err(EngineError::Timeout(_)) => {
-            // unoserver did not become ready in time. Timeout plumbing works.
-            assert!(elapsed < Duration::from_secs(2));
-        }
-        Err(EngineError::Internal(_)) => {
-            // Launch failed for another reason (e.g. unoserver not installed).
-            // Also acceptable — engine is not available.
-        }
-        Ok(lo) => {
-            // unoserver was already running; exercise the convert timeout.
-            let err = lo
-                .convert(&writer_fixture(), &OfficeOptions::default())
-                .await
-                .expect_err("convert should not finish under 100ms");
+        Err(EngineError::Internal(_)) | Err(EngineError::Timeout(_)) => {
+            // Expected: LOK failed to open a library at the bogus path.
             assert!(
-                matches!(err, EngineError::Timeout(_)),
-                "expected EngineError::Timeout, got {err:?}"
+                elapsed < Duration::from_secs(10),
+                "launch should fail fast, took {elapsed:?}"
             );
         }
-        Err(other) => panic!("unexpected error variant from launch: {other:?}"),
+        Ok(_) => panic!("launch should not succeed with a bad install path"),
+        Err(other) => panic!("unexpected error variant: {other:?}"),
     }
 }
 
@@ -272,17 +252,16 @@ async fn convert_unsupported_format_falls_back_to_generic_filter() {
 }
 
 #[tokio::test]
-async fn concurrent_calls_use_distinct_user_dirs() {
-    // If concurrent invocations did NOT each get their own
-    // UserInstallation, soffice would deadlock or report a profile-lock
-    // collision. Spawning N=4 conversions in parallel and verifying all
-    // succeed is a behavioural proof of distinct dirs.
+async fn concurrent_calls_serialize_safely() {
+    // N callers submit conversions simultaneously. With LOK the worker
+    // processes them serially, but every caller still receives the correct
+    // result. Verifies the mpsc + oneshot plumbing under contention.
     let Some(lo) = engine().await else { return; };
     let inputs: Vec<PathBuf> = (0..4).map(|_| writer_fixture()).collect();
     let out = lo
         .convert_many(&inputs, &OfficeOptions::default())
         .await
-        .expect("parallel converts");
+        .expect("serialised converts");
     assert_eq!(out.len(), 4);
     for b in &out {
         assert!(b.starts_with(b"%PDF-"));
@@ -293,4 +272,84 @@ async fn concurrent_calls_use_distinct_user_dirs() {
 async fn healthy_returns_true_for_real_soffice() {
     let Some(lo) = engine().await else { return; };
     assert!(lo.healthy().await);
+}
+
+#[tokio::test]
+async fn convert_corrupted_returns_corrupted_error() {
+    let Some(lo) = engine().await else { return; };
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let bad = tmp.path().join("truncated.docx");
+    // First 200 bytes look like a valid OOXML local-file-header but no
+    // central directory, so LO's type detection will reject it.
+    let head = b"PK\x03\x04\x14\x00\x06\x00\x08\x00\x00\x00!\x00";
+    let mut bytes = head.to_vec();
+    bytes.resize(200, 0u8);
+    std::fs::write(&bad, &bytes).expect("write");
+
+    let err = lo
+        .convert(&bad, &OfficeOptions::default())
+        .await
+        .expect_err("expected error on truncated docx");
+
+    assert!(
+        matches!(
+            err,
+            EngineError::LibreOfficeCorrupted(_) | EngineError::LibreOfficeUnsupportedFormat
+        ),
+        "got {err:?}"
+    );
+}
+
+// NOTE: There is no integration test for lazy-start in this binary, by design.
+// The libreofficekit crate enforces a process-global lock — only ONE
+// `Office` instance can be alive in a process for the lifetime of that
+// process (see `libreofficekit::sys::GLOBAL_OFFICE_LOCK`). Our worker
+// thread additionally `std::mem::forget`s the Office on shutdown to
+// bypass LO ≥ 6.5's atexit teardown bug, so the lock is never released
+// even after `LibreOfficeEngine::shutdown()`.
+//
+// Together that means a second `LibreOfficeEngine::launch` in the same
+// test binary always fails with "already another active instance"
+// once any earlier test has touched the SHARED engine. We instead
+// verify lazy-start via:
+//   * the unit test on the underlying `should_exit_for_idle` helper
+//     and the inspection-level simplicity of `init_worker`'s single-
+//     flight guard, and
+//   * the manual smoke test in `Dockerfile`-built containers (Task 14
+//     step 2: `LIBREOFFICE_LAZY_START=true` confirmed at runtime).
+
+#[tokio::test]
+async fn z_shutdown_drains_then_rejects_new_requests() {
+    let Some(lo) = engine().await else { return; };
+
+    // Kick off a real conversion in the background — it should still
+    // complete successfully because shutdown drains in-flight work.
+    let lo_for_convert = lo.clone();
+    let convert_task = tokio::spawn(async move {
+        lo_for_convert
+            .convert(&writer_fixture(), &OfficeOptions::default())
+            .await
+    });
+
+    // Give the worker ~50 ms to actually pick up the request.
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    // Shut down. Must drain the in-flight conversion successfully.
+    let started = Instant::now();
+    lo.shutdown().await.expect("shutdown");
+    let shutdown_took = started.elapsed();
+
+    let convert_result = convert_task.await.expect("join");
+    assert!(convert_result.is_ok(), "in-flight convert was lost: {convert_result:?}");
+    assert!(
+        shutdown_took < Duration::from_secs(10),
+        "shutdown was slow: {shutdown_took:?}"
+    );
+
+    // After shutdown, new requests fail-fast.
+    let err = lo
+        .convert(&writer_fixture(), &OfficeOptions::default())
+        .await
+        .expect_err("expected failure post-shutdown");
+    assert!(matches!(err, EngineError::Internal(_)), "got {err:?}");
 }

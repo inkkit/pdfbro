@@ -151,6 +151,8 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
     .with_webhook_validator(webhook_validator)
     .with_batch_manager(batch_manager);
     #[cfg(feature = "libreoffice")]
+    let libreoffice_for_shutdown = libreoffice.clone();
+    #[cfg(feature = "libreoffice")]
     let state = state.with_libreoffice(Some(Arc::new(libreoffice)));
 
     {
@@ -221,6 +223,16 @@ async fn serve(args: ServerArgs) -> anyhow::Result<()> {
         }
     }
 
+    #[cfg(feature = "libreoffice")]
+    {
+        let shutdown = tokio::time::timeout(shutdown::DEFAULT_DRAIN, libreoffice_for_shutdown.shutdown());
+        if let Err(_e) = shutdown.await {
+            tracing::warn!("LibreOffice shutdown exceeded drain budget");
+        } else {
+            tracing::info!("LibreOffice shut down cleanly");
+        }
+    }
+
     if config.otel_enabled {
         opentelemetry::global::shutdown_tracer_provider();
         tracing::info!("OpenTelemetry tracer provider shut down");
@@ -251,14 +263,13 @@ fn browser_config_from(config: &ServerConfig) -> BrowserConfig {
 
 #[cfg(feature = "libreoffice")]
 fn libreoffice_config_from(config: &ServerConfig) -> LibreOfficeConfig {
-    let defaults = LibreOfficeConfig::default();
     LibreOfficeConfig {
-        executable: config.soffice_path.clone(),
+        // The user-supplied path is now a *directory* (LOK's program path);
+        // pass it through verbatim. None falls through to libreofficekit's
+        // own discovery (LOK_PROGRAM_PATH + known system locations).
+        install_path: config.lo_program_dir.clone(),
         timeout: config.request_timeout,
-        max_concurrency: defaults.max_concurrency,
         lazy_start: config.libreoffice_lazy_start,
         idle_shutdown_timeout: config.libreoffice_idle_shutdown_timeout,
-        unoserver_port: config.libreoffice_unoserver_port,
-        unoserver_ready_timeout: config.libreoffice_unoserver_ready_timeout,
     }
 }

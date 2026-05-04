@@ -86,6 +86,24 @@ pub enum EngineError {
     #[error("LibreOffice conversion timed out after {0:?}")]
     LibreOfficeTimeout(Duration),
 
+    /// LibreOffice could not load the document because it is encrypted or
+    /// password-protected. Surfaced for OOXML files containing an
+    /// `EncryptedPackage` stream, encrypted ODF, and PDFs with `/Encrypt`.
+    #[error("LibreOffice document is encrypted or password-protected")]
+    LibreOfficeEncrypted,
+
+    /// LibreOffice could not load the document because the file is
+    /// corrupted or unreadable. Includes truncated uploads, zero-byte
+    /// files, and ZIPs/CDFs that fail structural parsing.
+    #[error("LibreOffice document is corrupted or unreadable: {0}")]
+    LibreOfficeCorrupted(String),
+
+    /// LibreOffice does not recognise the file format. Returned when
+    /// content-type detection fails on a file whose bytes match no
+    /// supported import filter.
+    #[error("LibreOffice does not recognise this file format")]
+    LibreOfficeUnsupportedFormat,
+
     /// An I/O error occurred (filesystem, sockets, etc.).
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),

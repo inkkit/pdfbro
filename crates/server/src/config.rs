@@ -86,9 +86,11 @@ pub struct ServerArgs {
     #[arg(long, conflicts_with = "no_sandbox")]
     pub sandbox: bool,
 
-    /// Override the LibreOffice / `soffice` executable path.
-    #[arg(long, value_name = "PATH")]
-    pub soffice: Option<PathBuf>,
+    /// Override the LibreOffice program directory (the folder containing
+    /// `libsofficeapp.so` / `liblibreofficekit.so`, e.g.
+    /// `/usr/lib/libreoffice/program`).
+    #[arg(long = "lo-program-dir", value_name = "DIR", env = "LO_PROGRAM_PATH")]
+    pub lo_program_dir: Option<PathBuf>,
 
     /// Log level filter (default `info`).
     #[arg(long, value_name = "LEVEL")]
@@ -127,14 +129,6 @@ pub struct ServerArgs {
     /// Idle shutdown timeout for LibreOffice (e.g., "10m", "0" to disable).
     #[arg(long, value_name = "DUR", env = "LIBREOFFICE_IDLE_SHUTDOWN_TIMEOUT")]
     pub libreoffice_idle_shutdown_timeout: Option<String>,
-
-    /// Port unoserver listens on (default: 2003).
-    #[arg(long, value_name = "PORT", env = "LIBREOFFICE_UNOSERVER_PORT")]
-    pub libreoffice_unoserver_port: Option<u16>,
-
-    /// Maximum time to wait for unoserver to be ready (e.g., "60s", "2m"). Default: 60s.
-    #[arg(long, value_name = "DUR", env = "LIBREOFFICE_UNOSERVER_READY_TIMEOUT")]
-    pub libreoffice_unoserver_ready_timeout: Option<String>,
 
     // === API Server Flags ===
     /// Disable telemetry for health check route.
@@ -272,8 +266,8 @@ pub struct ServerConfig {
     pub chrome_path: Option<PathBuf>,
     /// Whether to disable Chrome's sandbox. `None` means defer to engine default.
     pub no_sandbox: Option<bool>,
-    /// Override path to `soffice`, if any.
-    pub soffice_path: Option<PathBuf>,
+    /// Override path to the LibreOffice program directory, if any.
+    pub lo_program_dir: Option<PathBuf>,
     /// Tracing filter directive (e.g. `info`, `server=debug,tower=warn`).
     pub log_level: String,
     /// Log output format.
@@ -306,10 +300,6 @@ pub struct ServerConfig {
     pub libreoffice_lazy_start: bool,
     /// Idle shutdown timeout for LibreOffice (None = disabled).
     pub libreoffice_idle_shutdown_timeout: Option<Duration>,
-    /// Port unoserver listens on. Default: 2003.
-    pub libreoffice_unoserver_port: u16,
-    /// Maximum time to wait for unoserver to be ready at startup. Default: 60s.
-    pub libreoffice_unoserver_ready_timeout: Duration,
 
     // === API Server Config ===
     /// Disable telemetry for health check route.
@@ -450,10 +440,17 @@ impl ServerConfig {
             env.get("PDFBRO_NO_SANDBOX").map(|v| is_truthy(v))
         };
 
-        let soffice_path = args
-            .soffice
+        // Discovery order: --lo-program-dir CLI flag / LO_PROGRAM_PATH env var
+        // (clap wires the env attr at parse time, but for unit tests that
+        // pass a synthetic env map we also check it here), then LOK_PROGRAM_PATH
+        // (the libreofficekit crate honours it directly so we accept it as an
+        // alias), else None and let the engine auto-discover via
+        // Office::find_install_path().
+        let lo_program_dir = args
+            .lo_program_dir
             .clone()
-            .or_else(|| env.get("LIBREOFFICE_PATH").map(PathBuf::from));
+            .or_else(|| env.get("LO_PROGRAM_PATH").map(PathBuf::from))
+            .or_else(|| env.get("LOK_PROGRAM_PATH").map(PathBuf::from));
 
         let log_level = pick_string(args.log_level.as_deref(), env, "RUST_LOG", "info");
 
@@ -524,24 +521,6 @@ impl ServerConfig {
                     .ok()
                     .filter(|d| !d.is_zero())
             });
-
-        let libreoffice_unoserver_port = match args.libreoffice_unoserver_port {
-            Some(p) => p,
-            None => match env.get("LIBREOFFICE_UNOSERVER_PORT") {
-                Some(v) => v.parse::<u16>().map_err(|e| ConfigError::Parse {
-                    field: "libreoffice_unoserver_port",
-                    message: e.to_string(),
-                })?,
-                None => 2003,
-            },
-        };
-
-        let libreoffice_unoserver_ready_timeout = args
-            .libreoffice_unoserver_ready_timeout
-            .as_deref()
-            .or_else(|| env.get("LIBREOFFICE_UNOSERVER_READY_TIMEOUT").map(|v| v.as_str()))
-            .and_then(|v| humantime::parse_duration(v).ok())
-            .unwrap_or(Duration::from_secs(60));
 
         // === API Server Config Resolution ===
         let api_disable_health_route_telemetry = args.api_disable_health_route_telemetry
@@ -662,7 +641,7 @@ impl ServerConfig {
             request_timeout,
             chrome_path,
             no_sandbox,
-            soffice_path,
+            lo_program_dir,
             log_level,
             log_format,
             batch_max_items,
@@ -676,8 +655,6 @@ impl ServerConfig {
             chromium_idle_shutdown_timeout,
             libreoffice_lazy_start,
             libreoffice_idle_shutdown_timeout,
-            libreoffice_unoserver_port,
-            libreoffice_unoserver_ready_timeout,
             api_disable_health_route_telemetry,
             api_disable_root_route_telemetry,
             api_disable_debug_route_telemetry,
@@ -866,7 +843,7 @@ mod tests {
         assert_eq!(cfg.log_level, "info");
         assert_eq!(cfg.no_sandbox, None);
         assert!(cfg.chrome_path.is_none());
-        assert!(cfg.soffice_path.is_none());
+        assert!(cfg.lo_program_dir.is_none());
         assert!(!cfg.otel_enabled);
         assert_eq!(cfg.otel_endpoint, "http://localhost:4318/v1/traces");
     }
@@ -883,7 +860,7 @@ mod tests {
                 ("PDFBRO_MAX_BODY", "1048576"),
                 ("PDFBRO_REQUEST_TIMEOUT", "30s"),
                 ("CHROME_PATH", "/opt/chrome"),
-                ("LIBREOFFICE_PATH", "/opt/soffice"),
+                ("LO_PROGRAM_PATH", "/opt/libreoffice/program"),
                 ("RUST_LOG", "debug"),
                 ("PDFBRO_LOG_FORMAT", "json"),
                 ("PDFBRO_NO_SANDBOX", "true"),
@@ -900,8 +877,8 @@ mod tests {
             Some("/opt/chrome")
         );
         assert_eq!(
-            cfg.soffice_path.as_deref().map(|p| p.to_str().unwrap()),
-            Some("/opt/soffice")
+            cfg.lo_program_dir.as_deref().map(|p| p.to_str().unwrap()),
+            Some("/opt/libreoffice/program")
         );
         assert_eq!(cfg.log_level, "debug");
         assert_eq!(cfg.log_format, LogFormat::Json);
@@ -1105,29 +1082,6 @@ mod tests {
         )
         .unwrap();
         assert_eq!(cfg.api_correlation_id_header, "x-trace-id");
-    }
-
-    #[test]
-    fn libreoffice_unoserver_defaults() {
-        let args = ServerArgs::default();
-        let cfg = ServerConfig::resolve(&args, &env(&[])).unwrap();
-        assert_eq!(cfg.libreoffice_unoserver_port, 2003);
-        assert_eq!(cfg.libreoffice_unoserver_ready_timeout, Duration::from_secs(60));
-    }
-
-    #[test]
-    fn libreoffice_unoserver_env_override() {
-        let args = ServerArgs::default();
-        let cfg = ServerConfig::resolve(
-            &args,
-            &env(&[
-                ("LIBREOFFICE_UNOSERVER_PORT", "2004"),
-                ("LIBREOFFICE_UNOSERVER_READY_TIMEOUT", "90s"),
-            ]),
-        )
-        .unwrap();
-        assert_eq!(cfg.libreoffice_unoserver_port, 2004);
-        assert_eq!(cfg.libreoffice_unoserver_ready_timeout, Duration::from_secs(90));
     }
 
     #[test]

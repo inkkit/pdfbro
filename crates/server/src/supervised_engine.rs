@@ -372,4 +372,20 @@ impl SupervisedLibreOfficeEngine {
             None => Err(EngineError::Internal("LibreOffice engine not available".into())),
         }
     }
+
+    /// Drain in-flight conversions, call `LibreOfficeEngine::shutdown()` on
+    /// the inner engine if present, and clear the running flag. This
+    /// supersedes the supervised wrapper's idle-shutdown drop path during
+    /// graceful server shutdown — calling `LibreOfficeEngine::shutdown()`
+    /// guarantees the worker thread runs `mem::forget(office)` to bypass
+    /// LO >= 6.5's atexit teardown segfault.
+    pub async fn shutdown(&self) {
+        let mut guard = self.inner.engine.lock().await;
+        if let Some(engine) = guard.take() {
+            if let Err(e) = engine.shutdown().await {
+                tracing::warn!(error = %e, "LibreOfficeEngine shutdown returned error");
+            }
+        }
+        self.inner.is_running.store(false, Ordering::SeqCst);
+    }
 }
