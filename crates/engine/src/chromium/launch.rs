@@ -211,14 +211,22 @@ const BASELINE_ARGS: &[&str] = &[
     "--disable-backgrounding-occluded-windows",
     "--disable-renderer-backgrounding",
 
-    // ── Subprocess + memory ──────────────────────────────────────────
-    // `site-per-process` (default in modern Chrome) creates a separate
-    // renderer process per origin. Necessary for browser security; pure
-    // overhead for headless PDF rendering. The other features here are
-    // either translation prompts, casting/Hangouts preloading, or
-    // ML-driven optimisation hints we don't want firing during a
-    // benchmarked render.
-    "--disable-features=Translate,AcceptCHFrame,MediaRouter,OptimizationHints,site-per-process",
+    // ── Subprocess + ambient features ────────────────────────────────
+    // Translate prompts, casting/Hangouts preloading, ML-driven
+    // optimisation hints — none of these are useful for headless PDF
+    // rendering and they each occasionally fire during long-running
+    // benchmarks.
+    //
+    // `site-per-process` was originally listed here to drop the
+    // origin-per-process security split, but PR #32's bench showed the
+    // hypothesised RSS reduction did not materialise (`url-local` RSS
+    // stayed flat at ~422 MiB). And combining `site-per-process`
+    // disable with `--no-zygote` in a Docker container running with
+    // `--no-sandbox` reproducibly SIGSEGVs Chrome on the third
+    // cold-launch in the same test binary (observed in
+    // `e2e_libreoffice_docx`, the only e2e test that spins up both
+    // engines). Removed.
+    "--disable-features=Translate,AcceptCHFrame,MediaRouter,OptimizationHints",
 
     // ── Startup / load-time noise ────────────────────────────────────
     "--no-first-run",

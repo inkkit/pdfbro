@@ -21,6 +21,18 @@ use crate::types::EngineError;
 /// branches drop it because their meaning is exhausted by the variant
 /// name; the message would only add LO internals to the API response.
 pub(super) fn classify_load_error(msg: &str, file_prefix: &[u8]) -> EngineError {
+    // Sniff the bytes FIRST — if the file itself unambiguously says
+    // "encrypted" (OOXML EncryptedPackage stream, encrypted ODF
+    // manifest, PDF /Encrypt token), that classification overrides
+    // whichever LO error wrapper we got. Otherwise an OOXML file
+    // whose `EncryptedPackage` makes LO bail with
+    // "loadComponentFromURL returned an empty reference" gets
+    // misclassified as `LibreOfficeCorrupted`, which sends the user
+    // looking for a corruption fix instead of a password.
+    if matches!(sniff_file_condition(file_prefix), FileCondition::Encrypted) {
+        return EngineError::LibreOfficeEncrypted;
+    }
+
     if msg.contains("Unsupported URL") {
         return match sniff_file_condition(file_prefix) {
             FileCondition::Encrypted => EngineError::LibreOfficeEncrypted,
@@ -157,6 +169,26 @@ mod tests {
             &[],
         );
         assert!(matches!(err, EngineError::LibreOfficeCorrupted(_)), "got {err:?}");
+    }
+
+    /// Regression: the classifier sniffs the bytes BEFORE it
+    /// pattern-matches the LOK error string. A real-world OOXML file
+    /// containing an `EncryptedPackage` stream causes LO to bail with
+    /// `loadComponentFromURL returned an empty reference` (not
+    /// `Unsupported URL`). Without sniff-first, that path was returning
+    /// `LibreOfficeCorrupted` — sending users looking for a corruption
+    /// fix when the actual answer is "this file needs a password".
+    #[test]
+    fn loadcomponent_failure_with_encrypted_zip_yields_encrypted() {
+        let bytes = build_zip_with_entry(b"EncryptedPackage", &[0u8; 16]);
+        let err = classify_load_error(
+            "loadComponentFromURL returned an empty reference",
+            &bytes,
+        );
+        assert!(
+            matches!(err, EngineError::LibreOfficeEncrypted),
+            "expected LibreOfficeEncrypted (sniffer should win over message), got {err:?}"
+        );
     }
 
     #[test]
