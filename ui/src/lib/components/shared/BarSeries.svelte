@@ -10,6 +10,7 @@
         refColor,
         label = '',       // unit label shown in tooltip (e.g. "rps", "ms", "%")
         formatValue = (v: number) => v.toFixed(2),
+        maxPoints = 50,   // max number of bars to display (drops older data)
         t,
     }: {
         series: number[];
@@ -19,20 +20,26 @@
         refColor?: string;
         label?: string;
         formatValue?: (v: number) => string;
+        maxPoints?: number;
         t: Theme;
     } = $props();
+
+    // Slice to last maxPoints for display
+    let displaySeries = $derived(
+        series.length > maxPoints ? series.slice(-maxPoints) : series
+    );
 
     let hoveredIdx = $state<number | null>(null);
     let svgEl = $state<SVGSVGElement | null>(null);
 
-    let max = $derived(Math.max(...series, 0.001));
-    let hoveredValue = $derived(hoveredIdx !== null ? series[hoveredIdx] : null);
+    let max = $derived(Math.max(...displaySeries, 0.001));
+    let hoveredValue = $derived(hoveredIdx !== null ? displaySeries[hoveredIdx] : null);
 
     function onMouseMove(e: MouseEvent) {
-        if (!svgEl || series.length === 0) return;
+        if (!svgEl || displaySeries.length === 0) return;
         const rect = svgEl.getBoundingClientRect();
         const x = e.clientX - rect.left;
-        const idx = Math.min(series.length - 1, Math.max(0, Math.floor((x / rect.width) * series.length)));
+        const idx = Math.min(displaySeries.length - 1, Math.max(0, Math.floor((x / rect.width) * displaySeries.length)));
         hoveredIdx = idx;
     }
 
@@ -65,8 +72,8 @@
         {/if}
 
         <!-- Bars -->
-        {#each series as v, i}
-            {@const w = 100 / series.length}
+        {#each displaySeries as v, i}
+            {@const w = 100 / displaySeries.length}
             {@const pct = Math.max(2 / height, v / max)}
             {@const barH = pct * height}
             {@const x = i * w}
@@ -84,7 +91,7 @@
 
         <!-- Hover cursor line -->
         {#if hoveredIdx !== null}
-            {@const w = 100 / series.length}
+            {@const w = 100 / displaySeries.length}
             {@const cx = (hoveredIdx + 0.5) * w}
             <line
                 x1="{cx}%" y1="0"
@@ -99,7 +106,7 @@
 
     <!-- Tooltip -->
     {#if hoveredIdx !== null && hoveredValue !== null}
-        {@const w = 100 / series.length}
+        {@const w = 100 / displaySeries.length}
         {@const pctLeft = (hoveredIdx + 0.5) * w}
         {@const flipLeft = pctLeft > 70}
         <div style="

@@ -5,6 +5,7 @@ pub mod batch_state;
 pub mod batch_types;
 #[cfg(feature = "chromium")]
 pub mod chromium;
+/// Operator console UI routes (SSE stream, static assets, metrics JSON).
 pub mod console;
 pub mod debug;
 pub mod estimate;

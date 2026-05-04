@@ -1,31 +1,48 @@
 // crates/server/src/console_store.rs
+//! In-memory store for console metrics, request logs, and SSE broadcasting.
+
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU32};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex, broadcast, watch};
 
-pub const HISTORY_CAP: usize = 360;  // 30 min at 5s cadence
+/// Max number of metrics samples to keep (~5 min at 5s cadence, matches UI bar chart).
+pub const HISTORY_CAP: usize = 60;
+/// Max number of request/error log entries to keep.
 pub const LOG_CAP: usize = 100;
+/// Broadcast channel capacity for SSE connections.
 pub const BROADCAST_CAP: usize = 4;
 
+/// Single metrics sample collected at a point in time.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MetricsSample {
+    /// Unix timestamp (seconds).
     pub ts: u64,
+    /// Requests per second.
     pub rps: f64,
+    /// p95 latency in milliseconds.
     pub p95_ms: f64,
+    /// Error percentage (0-100).
     pub error_pct: f64,
+    /// Current queue size.
     pub queue_size: u32,
+    /// Active concurrent requests.
     pub concurrency_active: u32,
+    /// CPU percentage (cgroup-aware in containers).
     pub cpu_pct: f64,
+    /// Memory usage in MB (cgroup-aware in containers).
     pub memory_mb: f64,
 }
 
+/// Ring buffer of metrics samples for time-series display.
 #[derive(Debug, Default)]
 pub struct MetricsHistory {
+    /// Time-series samples, oldest at front.
     pub samples: VecDeque<MetricsSample>,
 }
 
 impl MetricsHistory {
+    /// Add a sample, evicting oldest if at capacity.
     pub fn push(&mut self, sample: MetricsSample) {
         if self.samples.len() >= HISTORY_CAP {
             self.samples.pop_front();
@@ -34,46 +51,64 @@ impl MetricsHistory {
     }
 }
 
+/// Log entry for a single HTTP request.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RequestLogEntry {
+    /// Timestamp formatted as HH:MM:SS.
     pub time: String,
+    /// HTTP method (GET, POST, etc.).
     pub method: String,
+    /// Request path/route.
     pub route: String,
+    /// HTTP status code.
     pub status: u16,
+    /// Request duration in milliseconds.
     pub duration_ms: u64,
 }
 
+/// Log entry for a single error.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ErrorLogEntry {
+    /// Timestamp formatted as HH:MM:SS.
     pub time: String,
+    /// Request path where error occurred.
     pub route: String,
+    /// Error message.
     pub message: String,
+    /// Request ID for correlation.
     pub request_id: String,
 }
 
+/// Central store for console metrics, logs, and SSE broadcasting.
 pub struct ConsoleStore {
+    /// Time-series metrics history.
     pub history: Mutex<MetricsHistory>,
+    /// Recent HTTP request log.
     pub request_log: Mutex<VecDeque<RequestLogEntry>>,
+    /// Recent error log.
     pub error_log: Mutex<VecDeque<ErrorLogEntry>>,
+    /// SSE broadcast channel for real-time updates.
     pub broadcast: broadcast::Sender<String>,
     /// Signals SSE connections to close on graceful shutdown.
     pub shutdown_tx: watch::Sender<bool>,
-    // Activation tracking: counts false→true transitions on engine health
+    /// Chromium activation counter (tracks restarts).
     pub chromium_restarts: AtomicU32,
+    /// Last known Chromium running state (for restart detection).
     pub chromium_was_running: AtomicBool,
+    /// LibreOffice activation counter (tracks restarts).
     pub libreoffice_restarts: AtomicU32,
+    /// Last known LibreOffice running state (for restart detection).
     pub libreoffice_was_running: AtomicBool,
-    // RPS delta tracking
+    /// Previous HTTP request total for RPS delta calculation.
     pub prev_http_total: Mutex<f64>,
-    // Error rate delta tracking
+    /// Previous error total for error rate delta calculation.
     pub prev_error_total: Mutex<f64>,
-    // Live count of all HTTP requests currently in flight (incremented before
-    // next.run(), decremented after) — gives real-time concurrency even for
-    // fast requests that complete between 5s sampler ticks.
+    /// Live count of HTTP requests currently in flight.
     pub active_requests: AtomicU32,
 }
 
 impl ConsoleStore {
+    /// Create a new console store with empty history and configured channels.
     pub fn new() -> Self {
         let (tx, _) = broadcast::channel(BROADCAST_CAP);
         let (shutdown_tx, _) = watch::channel(false);
@@ -93,6 +128,7 @@ impl ConsoleStore {
         }
     }
 
+    /// Record a completed HTTP request to the request log (and error log if status >= 500).
     pub async fn record_request(&self, method: String, route: String, status: u16, duration_ms: u64) {
         use std::time::{SystemTime, UNIX_EPOCH};
         let secs = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
@@ -121,6 +157,7 @@ impl ConsoleStore {
 }
 
 impl Default for ConsoleStore {
+    /// Default console store (same as `new()`).
     fn default() -> Self { Self::new() }
 }
 
@@ -129,91 +166,152 @@ impl Default for ConsoleStore {
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
+/// Full console payload sent to UI via SSE.
 #[derive(Clone, Debug, Serialize)]
 pub struct ConsolePayload {
+    /// Server version string.
     pub version: String,
+    /// Server uptime in seconds.
     pub uptime_seconds: u64,
+    /// Top-level ticker metrics.
     pub ticker: TickerPayload,
+    /// Per-route metrics.
     pub routes: Vec<RoutePayload>,
+    /// Engine status and mini charts.
     pub engines: Vec<EnginePayload>,
+    /// Current concurrency stats.
     pub concurrency: ConcurrencyPayload,
+    /// CPU/memory time series.
     pub resources: ResourcesPayload,
+    /// RPS/latency time series.
     pub throughput: ThroughputPayload,
+    /// Active batch jobs.
     pub batches: Vec<BatchPayload>,
+    /// Recent HTTP requests.
     pub recent_requests: Vec<RequestLogEntry>,
+    /// Recent errors.
     pub recent_errors: Vec<ErrorLogEntry>,
 }
 
+/// Top-level ticker metrics displayed in the header.
 #[derive(Clone, Debug, Serialize)]
 pub struct TickerPayload {
+    /// Current requests per second.
     pub rps: f64,
+    /// p95 latency in milliseconds.
     pub p95_ms: f64,
+    /// Error percentage (0-100).
     pub error_pct: f64,
+    /// Active concurrent requests.
     pub concurrency_active: u32,
+    /// Max allowed concurrent requests.
     pub concurrency_max: u32,
+    /// Chromium status (up/down/n/a).
     pub chromium_status: String,
+    /// Number of Chromium restarts.
     pub chromium_restarts: u32,
+    /// LibreOffice status (up/down/n/a).
     pub libreoffice_status: String,
+    /// Number of LibreOffice restarts.
     pub libreoffice_restarts: u32,
+    /// Current queue size.
     pub queue_size: f64,
+    /// Server uptime in seconds.
     pub uptime_seconds: u64,
 }
 
+/// Per-route metrics from Prometheus.
 #[derive(Clone, Debug, Serialize)]
 pub struct RoutePayload {
+    /// Route path.
     pub path: String,
+    /// HTTP method.
     pub method: String,
+    /// Requests per second.
     pub rps: f64,
+    /// p50 latency in milliseconds.
     pub p50_ms: f64,
+    /// p95 latency in milliseconds.
     pub p95_ms: f64,
+    /// p99 latency in milliseconds.
     pub p99_ms: f64,
+    /// Error percentage (0-100).
     pub error_pct: f64,
+    /// Requests currently in flight.
     pub in_flight: u32,
+    /// Load percentage (0-100).
     pub load_pct: f64,
 }
 
+/// Engine status with mini sparkline.
 #[derive(Clone, Debug, Serialize)]
 pub struct EnginePayload {
+    /// Engine name (Chromium/LibreOffice).
     pub name: String,
+    /// Status (up/down/n/a).
     pub status: String,
+    /// Number of restarts.
     pub restarts: u32,
+    /// Start mode (eager/lazy).
     pub mode: String,
+    /// Mini RPS sparkline (normalized 0-1).
     pub mini_series: Vec<f64>,
 }
 
+/// Concurrency statistics.
 #[derive(Clone, Debug, Serialize)]
 pub struct ConcurrencyPayload {
+    /// Active concurrent requests.
     pub active: u32,
+    /// Max allowed concurrent requests.
     pub max: u32,
+    /// Warning threshold (60% of max).
     pub warn_threshold: u32,
+    /// Critical threshold (85% of max).
     pub crit_threshold: u32,
 }
 
+/// Resource usage time series.
 #[derive(Clone, Debug, Serialize)]
 pub struct ResourcesPayload {
+    /// CPU percentage time series.
     pub cpu_series: Vec<f64>,
+    /// Memory usage time series (MB).
     pub memory_series: Vec<f64>,
+    /// Maximum memory available (MB).
     pub memory_max_mb: f64,
 }
 
+/// Throughput and latency time series.
 #[derive(Clone, Debug, Serialize)]
 pub struct ThroughputPayload {
+    /// RPS time series.
     pub rps_series: Vec<f64>,
+    /// RPS baseline for reference line.
     pub rps_baseline: f64,
+    /// p95 latency time series (seconds).
     pub p95_series: Vec<f64>,
+    /// Target p95 latency (seconds).
     pub p95_target_s: f64,
 }
 
+/// Batch job status.
 #[derive(Clone, Debug, Serialize)]
 pub struct BatchPayload {
+    /// Batch ID.
     pub id: String,
+    /// Status (pending/running/completed/failed).
     pub status: String,
+    /// Progress percentage (0-100).
     pub progress_pct: u8,
+    /// Elapsed time string.
     pub elapsed: String,
 }
 
 // ── build_console_payload ─────────────────────────────────────────────────
 
+/// Build the full console payload from current state.
+/// Called every 5 seconds by the sampler to broadcast to all connected UI clients.
 pub async fn build_console_payload(
     state: &crate::state::AppState,
     started_at: Instant,
@@ -333,6 +431,7 @@ pub async fn build_console_payload(
 
 // ── Route payload: reads Prometheus counters + histograms ─────────────────
 
+/// Build per-route metrics from Prometheus counters and histograms.
 fn build_route_payloads(state: &crate::state::AppState, concurrency_max: u32) -> Vec<RoutePayload> {
     let families = prometheus::gather();
 
@@ -424,14 +523,22 @@ fn percentile_from_histogram(buckets: &[prometheus::proto::Bucket], total_count:
         .unwrap_or(0.0)
 }
 
+/// Build batch job payloads (placeholder - batch worker not yet implemented).
 async fn build_batch_payloads(_state: &crate::state::AppState) -> Vec<BatchPayload> {
     vec![]
 }
 
 /// Total system RAM in MB (cached on first call).
+/// Returns cgroup memory limit if running in a container, otherwise host RAM.
 fn total_memory_mb() -> f64 {
     use once_cell::sync::Lazy;
     static TOTAL_MB: Lazy<f64> = Lazy::new(|| {
+        // Check cgroup memory limit first
+        let cgroup = crate::cgroup::CgroupLimits::detect();
+        if let Some(limit_mb) = cgroup.memory_limit_mb {
+            return limit_mb;
+        }
+        // Fall back to host total memory
         let mut sys = sysinfo::System::new();
         sys.refresh_memory();
         sys.total_memory() as f64 / 1024.0 / 1024.0
@@ -441,9 +548,12 @@ fn total_memory_mb() -> f64 {
 
 // ── spawn_console_sampler ─────────────────────────────────────────────────
 
+/// Spawn the background metrics sampler task.
+/// Collects CPU/memory, engine health, RPS, error rate, and latency every 5 seconds.
 pub fn spawn_console_sampler(state: crate::state::AppState, started_at: Instant) {
     tokio::spawn(async move {
         use sysinfo::{System, RefreshKind, CpuRefreshKind, MemoryRefreshKind};
+        use crate::cgroup::CgroupLimits;
 
         let mut sys = System::new_with_specifics(
             RefreshKind::new()
@@ -454,6 +564,10 @@ pub fn spawn_console_sampler(state: crate::state::AppState, started_at: Instant)
         sys.refresh_cpu_usage();
         tokio::time::sleep(Duration::from_millis(500)).await;
 
+        // Detect cgroup limits once at startup (Docker/Kubernetes)
+        let cgroup = CgroupLimits::detect();
+        let num_host_cpus = sys.cpus().len();
+
         let mut interval = tokio::time::interval(Duration::from_secs(5));
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
@@ -462,11 +576,24 @@ pub fn spawn_console_sampler(state: crate::state::AppState, started_at: Instant)
 
             // ── CPU + memory via sysinfo (cross-platform) ──────────────────
             sys.refresh_cpu_usage();
-            let cpu_pct = sys.global_cpu_usage() as f64;
+            let host_cpu_pct = sys.global_cpu_usage() as f64;
             sys.refresh_memory();
-            let memory_mb = sys.used_memory() as f64 / 1024.0 / 1024.0;
-            // Update Prometheus gauge so /prometheus/metrics reflects RSS
-            state.metrics.process_resident_memory.set(sys.used_memory() as f64);
+
+            // Use cgroup-aware values when running in a container
+            let cpu_pct = if cgroup.is_container {
+                cgroup.cpu_pct_relative_to_limit(host_cpu_pct, num_host_cpus)
+            } else {
+                host_cpu_pct
+            };
+
+            let memory_mb = cgroup.memory_used_mb
+                .unwrap_or_else(|| sys.used_memory() as f64 / 1024.0 / 1024.0);
+
+            // Update Prometheus gauge with cgroup-aware memory if available
+            let memory_bytes = cgroup.memory_used_mb
+                .map(|m| (m * 1024.0 * 1024.0) as u64)
+                .unwrap_or_else(|| sys.used_memory());
+            state.metrics.process_resident_memory.set(memory_bytes as f64);
 
             // ── Engine health: probe directly, don't read stale gauge ──────
             #[cfg(feature = "chromium")]

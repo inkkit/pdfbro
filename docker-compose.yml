@@ -1,4 +1,49 @@
 services:
+  pdfbro-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: pdfbro-dev
+    ports:
+      - "${API_PORT:-3000}:3000"
+    environment:
+      - RUST_LOG=${LOG_LEVEL:-debug},chromiumoxide::handler=error
+      - CHROME_PATH=/usr/bin/chromium
+      - RUST_BACKTRACE=1
+    volumes:
+      # Mount source code for hot reload
+      - ./crates:/app/crates:cached
+      - ./Cargo.toml:/app/Cargo.toml:cached
+      - ./Cargo.lock:/app/Cargo.lock:cached
+      # Cache build artifacts for faster rebuilds
+      - cargo-target:/app/target
+      - cargo-registry:/usr/local/cargo/registry
+    tty: true
+    stdin_open: true
+    profiles: [dev]
+
+  pdfbro-dev-chromium:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: dev-chromium
+    ports:
+      - "${API_PORT:-3000}:3000"
+    environment:
+      - RUST_LOG=${LOG_LEVEL:-debug},chromiumoxide::handler=error
+      - CHROME_PATH=/usr/bin/chromium
+      - RUST_BACKTRACE=1
+    volumes:
+      - ./crates:/app/crates:cached
+      - ./Cargo.toml:/app/Cargo.toml:cached
+      - ./Cargo.lock:/app/Cargo.lock:cached
+      - cargo-target:/app/target
+      - cargo-registry:/usr/local/cargo/registry
+    tty: true
+    stdin_open: true
+    command: ["cargo", "watch", "--poll", "-x", "run -p server -- serve --port 3000 --host 0.0.0.0 --no-default-features --features chromium"]
+    profiles: [dev-chromium]
+
   pdfbro:
     build:
       context: .
@@ -39,3 +84,7 @@ services:
       - RUST_LOG=${LOG_LEVEL:-info}
     tty: true
     profiles: [libreoffice]
+
+volumes:
+  cargo-target:
+  cargo-registry:

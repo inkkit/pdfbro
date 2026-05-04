@@ -14,6 +14,7 @@ pub mod banner;
 pub mod batch_worker;
 pub mod console_store;
 pub mod config;
+pub mod cgroup;
 pub mod download;
 pub mod error;
 pub mod logging;

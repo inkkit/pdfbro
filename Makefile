@@ -27,6 +27,34 @@ build-chromium: ## Build Chromium-only image
 build-libreoffice: ## Build LibreOffice-only image
 	docker build --target pdfbro-libreoffice -t pdfbro:libreoffice -f Dockerfile .
 
+.PHONY: dev
+dev: ## Run development container with hot reload (Chromium + LibreOffice)
+	docker compose --profile dev up pdfbro-dev --build
+
+.PHONY: dev-chromium
+dev-chromium: ## Run dev container with hot reload (Chromium only, ~30% smaller)
+	docker compose --profile dev-chromium up pdfbro-dev-chromium --build
+
+.PHONY: dev-logs
+dev-logs: ## View dev container logs
+	docker compose --profile dev logs -f pdfbro-dev
+
+.PHONY: dev-shell
+dev-shell: ## Open shell in dev container
+	docker compose --profile dev exec pdfbro-dev /bin/bash
+
+.PHONY: dev-build
+dev-build: ## Build inside dev container (useful for testing compilation)
+	docker compose --profile dev run --rm pdfbro-dev cargo build --features "chromium libreoffice"
+
+.PHONY: dev-test
+dev-test: ## Run all tests inside dev container (with Chrome + LibreOffice)
+	docker compose --profile dev run --rm pdfbro-dev cargo test --features "chromium libreoffice" -- --ignored --test-threads=1
+
+.PHONY: dev-stop
+dev-stop: ## Stop all dev containers
+	docker compose --profile dev --profile dev-chromium down
+
 .PHONY: run
 run: ## Run full image (Chromium + LibreOffice) via Docker Compose
 	docker compose up pdfbro

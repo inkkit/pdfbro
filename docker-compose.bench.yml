@@ -13,6 +13,10 @@ services:
           cpus: "2"
           memory: 2g
     environment:
+      # Bench-only quiet default. Per-request tracing on a tight (~10 ms)
+      # workload like pdfengines-merge eats ~30–50% of the request budget
+      # at 300+ RPS. Override on the CLI (`RUST_LOG=info docker compose
+      # up -d`) when you want to watch what the server is doing.
       RUST_LOG: error
 
   gotenberg:
@@ -21,6 +25,12 @@ services:
     command:
       - gotenberg
       - --chromium-allow-list=.*
+      # Match pdfbro's bench-side quiet default. Gotenberg's stock
+      # `info` logs every multipart upload + every conversion which
+      # also taxes the tight workloads. Override with `--log-level=info`
+      # in your local shell if you need request-level logs.
+      - --log-level=error
+      - --api-disable-health-check-logging
     ports:
       - "3002:3000"
     deploy:
