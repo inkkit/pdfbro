@@ -80,11 +80,17 @@ COPY . .
 # binary's exit code to non-zero even when every test passed (see
 # libreofficekit-rs README). Trusting libtest's printed verdict at that
 # point is the documented workaround.
+# Bust ONLY this layer when you want a fresh test run without nuking the
+# apt-install / COPY layers. Pass `--build-arg TEST_RUN_ID=$(date +%s)`
+# to the buildx invocation. The default keeps the layer cacheable so a
+# repeat build with no source changes is a no-op.
+ARG TEST_RUN_ID=0
+
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/app/target \
     bash -c 'set -e -o pipefail; \
-        echo "::compile pass — failing fast on any compile error"; \
+        echo "::compile pass — failing fast on any compile error (TEST_RUN_ID=${TEST_RUN_ID:-0})"; \
         cargo test --no-fail-fast --no-run; \
         echo "::run pass — ignoring LO atexit teardown noise on cargo exit"; \
         set +e; \
