@@ -1,0 +1,150 @@
+# =============================================================================
+# Development Container for pdfbro
+# =============================================================================
+# This container provides a full development environment with:
+# - Rust toolchain (with cargo-watch for hot reload)
+# - Chromium (Chrome) for HTML/URL/Markdown to PDF conversion
+# - LibreOffice for Office document conversion
+# - All fonts and dependencies
+#
+# Usage:
+#   docker compose up pdfbro-dev
+#   # Or with make:
+#   make dev
+# =============================================================================
+
+ARG RUST_VERSION=1.88
+ARG CHROMIUM_VERSION=142.0.7444.175-1
+
+# =============================================================================
+# Stage: dev-base — Rust toolchain + dev tools
+# =============================================================================
+FROM rust:${RUST_VERSION} AS dev-base
+
+# Install cargo-watch for hot reload
+RUN cargo install cargo-watch --locked
+
+# Install system dependencies
+RUN apt-get update -qq && apt-get upgrade -yqq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+        # Basic dev tools
+        git \
+        curl \
+        ca-certificates \
+        # Build essentials
+        build-essential \
+        pkg-config \
+        libssl-dev \
+        # PDF tools
+        qpdf \
+        ghostscript \
+        # Fonts
+        fonts-crosextra-carlito \
+        fonts-crosextra-caladea \
+        fonts-liberation \
+        fonts-liberation2 \
+        fonts-dejavu \
+        fonts-noto-cjk \
+        fonts-noto-color-emoji \
+        fonts-noto \
+        fontconfig \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+WORKDIR /app
+
+# =============================================================================
+# Stage: dev-chromium — dev-base + Chromium
+# =============================================================================
+FROM dev-base AS dev-chromium
+
+ARG CHROMIUM_VERSION
+
+# Install Chromium
+RUN /bin/bash -c \
+    'set -e; \
+    ARCH="$(dpkg --print-architecture)"; \
+    if [[ -n "$CHROMIUM_VERSION" && "$CHROMIUM_VERSION" != "latest" && \
+          ("$ARCH" == "amd64" || "$ARCH" == "arm64") ]]; then \
+      apt-get update -qq && \
+      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends devscripts && \
+      debsnap chromium-common "$CHROMIUM_VERSION" -v --force --binary --architecture "$ARCH" && \
+      debsnap chromium "$CHROMIUM_VERSION" -v --force --binary --architecture "$ARCH" && \
+      dpkg -i --force-depends \
+        "./binary-chromium-common/chromium-common_${CHROMIUM_VERSION}_${ARCH}.deb" \
+        "./binary-chromium/chromium_${CHROMIUM_VERSION}_${ARCH}.deb" && \
+      apt-get install -f -y -qq --no-install-recommends || true && \
+      DEBIAN_FRONTEND=noninteractive apt-get purge -y -qq devscripts && \
+      rm -rf ./binary-chromium-common ./binary-chromium; \
+    else \
+      apt-get update -qq && \
+      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends chromium; \
+    fi' \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Install Chromium runtime libraries
+RUN apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+        libgtk-3-0 libx11-xcb1 libxcomposite1 libxcursor1 \
+        libxdamage1 libxi6 libxtst6 libnss3 libcups2 libxss1 \
+        libxrandr2 libasound2 libatk1.0-0 libatk-bridge2.0-0 \
+        libpangocairo-1.0-0 libpango-1.0-0 libcairo2 \
+        libgdk-pixbuf2.0-0 libglib2.0-0 libgl1-mesa-glx \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+ENV CHROME_PATH=/usr/bin/chromium
+ENV CHROME_BIN=/usr/bin/chromium
+ENV RUST_LOG=info,chromiumoxide::handler=error
+
+# =============================================================================
+# Stage: pdfbro-dev — Full dev environment (Chromium + LibreOffice)
+# =============================================================================
+FROM dev-chromium AS pdfbro-dev
+
+# Install LibreOffice from bookworm-backports
+RUN echo "deb http://deb.debian.org/debian bookworm-backports main" \
+      > /etc/apt/sources.list.d/backports.list && \
+    apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -t bookworm-backports --no-install-recommends \
+        libreoffice-writer \
+        libreoffice-calc \
+        libreoffice-impress \
+        libreoffice-draw \
+        python3-uno && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        python3-minimal \
+        python3-pip && \
+    pip3 install --no-cache-dir --break-system-packages unoserver==2.2.1 && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+ENV SAL_USE_VCLPLUGIN=svp
+ENV GS_BIN=/usr/bin/gs
+
+# Create non-root user for running Chrome
+RUN groupadd --gid 1001 pdfbro && \
+    useradd --uid 1001 --gid pdfbro --shell /bin/bash \
+        --home /home/pdfbro --create-home pdfbro
+
+# Pre-build dependencies for faster startup
+# This layer will be cached; source code changes won't invalidate it
+COPY Cargo.toml Cargo.lock ./
+COPY crates/*/Cargo.toml ./crates/*/
+RUN mkdir -p crates/engine/src crates/server/src crates/cli/src && \
+    echo "fn main() {}" > crates/cli/src/main.rs && \
+    echo "pub fn dummy() {}" > crates/engine/src/lib.rs && \
+    echo "pub fn dummy() {}" > crates/server/src/lib.rs && \
+    cargo build --features "chromium libreoffice" 2>/dev/null || true && \
+    rm -rf crates/
+
+# Set up working directory with proper permissions
+RUN chown -R pdfbro:pdfbro /app
+
+# Switch to non-root user for Chrome
+USER pdfbro
+
+WORKDIR /app
+
+EXPOSE 3000
+
+# Default command: watch for changes and restart server
+# Use --poll for Docker compatibility (file system events may not work in all setups)
+CMD ["cargo", "watch", "--poll", "-x", "run -p server -- serve --port 3000 --host 0.0.0.0"]
