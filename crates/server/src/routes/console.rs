@@ -76,6 +76,7 @@ pub async fn console_asset(
     serve_asset(&path)
 }
 
+/// Serve the console root page (index.html).
 pub async fn console_asset_root() -> axum::response::Response {
     serve_asset("index.html")
 }
