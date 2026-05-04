@@ -181,14 +181,79 @@ fn build_chromiumoxide_config(
 
 /// Default flags every launch passes to Chrome (in addition to
 /// `--headless=new`, which is set via `HeadlessMode::New`).
+///
+/// Layout mirrors the chromedp / Puppeteer baseline lists so behaviour
+/// is consistent with what the rest of the headless-Chrome ecosystem
+/// runs in production. Grouped by what each flag actually does so a
+/// future reader can figure out why a particular flag is in the set
+/// without grepping through Chromium source.
+///
+/// References at time of writing:
+/// - chromedp `DefaultExecAllocatorOptions`:
+///   <https://github.com/chromedp/chromedp/blob/master/allocate.go>
+/// - Puppeteer `defaultArgs()`:
+///   <https://github.com/puppeteer/puppeteer/blob/main/packages/puppeteer-core/src/node/ChromeLauncher.ts>
 const BASELINE_ARGS: &[&str] = &[
+    // ── Rendering / UI surface (what we always wanted) ────────────────
     "--disable-gpu",
     "--hide-scrollbars",
     "--mute-audio",
     "--disable-dev-shm-usage",
-    "--no-zygote",
     "--font-render-hinting=none",
+
+    // ── Tab / renderer throttling — TIER 1 PERF ───────────────────────
+    // Headless Chrome considers every tab "backgrounded" because there's
+    // no front-of-screen window. Without these four flags Chrome
+    // throttles JS, timers, and network in our renderer — directly
+    // inflates p95 tail latency on tight workloads.
+    "--disable-background-networking",
+    "--disable-background-timer-throttling",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-renderer-backgrounding",
+
+    // ── Subprocess + memory ──────────────────────────────────────────
+    // `site-per-process` (default in modern Chrome) creates a separate
+    // renderer process per origin. Necessary for browser security; pure
+    // overhead for headless PDF rendering. The other features here are
+    // either translation prompts, casting/Hangouts preloading, or
+    // ML-driven optimisation hints we don't want firing during a
+    // benchmarked render.
+    "--disable-features=Translate,AcceptCHFrame,MediaRouter,OptimizationHints,site-per-process",
+
+    // ── Startup / load-time noise ────────────────────────────────────
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--disable-default-apps",
+    "--disable-extensions",
+    "--disable-component-extensions-with-background-pages",
+
+    // ── Phone-home / ambient network — closes a common class of
+    //    "occasional latency spike when Chrome decides to fetch X" tail
+    //    causes. None of these are needed for a server doing PDF work.
+    "--disable-breakpad",
+    "--disable-crash-reporter",
+    "--metrics-recording-only",
+    "--safebrowsing-disable-auto-update",
+
+    // ── Quiet Chrome's chattier subsystems ───────────────────────────
+    "--disable-hang-monitor",
+    "--disable-popup-blocking",
+    "--disable-prompt-on-repost",
+    "--disable-sync",
+
+    // ── No system credential / keychain calls. On macOS Chrome will
+    //    block on the system keyring at startup if these aren't set;
+    //    on Linux it can stall waiting for D-Bus secrets services.
+    "--password-store=basic",
+    "--use-mock-keychain",
 ];
+
+// `--no-zygote` was DELIBERATELY removed from the baseline. Zygote is
+// Chrome's pre-forked renderer optimisation — disabling it makes every
+// new tab launch from a cold process. We carried `--no-zygote` from a
+// "headless Chrome in Docker" cargo-cult list; chromedp doesn't pass
+// it, Puppeteer doesn't pass it, and the actual Docker advice is
+// `--no-sandbox` (which we still apply via `config.no_sandbox`).
 
 /// Names looked up on `$PATH`, in order.
 const PATH_BINARIES: &[&str] = &[
@@ -352,5 +417,47 @@ mod tests {
         };
         let resolved = resolve_executable_with(None, Some(""), &path_lookup, &|_| false).unwrap();
         assert_eq!(resolved, PathBuf::from("/usr/bin/chromium"));
+    }
+
+    /// Pins the headless-perf intent on `BASELINE_ARGS` so a future
+    /// well-meaning revert doesn't silently regress p95 latency on
+    /// tight workloads. The four `disable-*` flags below stop Chrome
+    /// from throttling JS / timers / network when it considers a tab
+    /// "backgrounded" — which for a headless server is every tab,
+    /// always.
+    #[test]
+    fn baseline_args_include_throttling_disables() {
+        for required in &[
+            "--disable-background-networking",
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-renderer-backgrounding",
+        ] {
+            assert!(
+                BASELINE_ARGS.contains(required),
+                "BASELINE_ARGS must contain {required} — see launch.rs comments"
+            );
+        }
+    }
+
+    /// Pins the keychain-quiet intent. Without these Chrome can stall
+    /// at startup waiting for system credential stores (macOS Keychain,
+    /// Linux gnome-keyring / kwallet via D-Bus).
+    #[test]
+    fn baseline_args_include_keychain_disables() {
+        assert!(BASELINE_ARGS.contains(&"--password-store=basic"));
+        assert!(BASELINE_ARGS.contains(&"--use-mock-keychain"));
+    }
+
+    /// `--no-zygote` was deliberately removed from the baseline; see
+    /// the comment block right after `BASELINE_ARGS`. If someone
+    /// re-adds it, this test reminds them why not.
+    #[test]
+    fn baseline_args_does_not_include_no_zygote() {
+        assert!(
+            !BASELINE_ARGS.contains(&"--no-zygote"),
+            "--no-zygote disables Chrome's pre-forked-renderer optimisation; \
+             chromedp + Puppeteer both omit it; see launch.rs comments"
+        );
     }
 }
