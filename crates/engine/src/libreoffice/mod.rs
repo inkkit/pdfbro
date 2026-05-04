@@ -502,39 +502,38 @@ fn lok_convert(office: &libreofficekit::Office, input: &Path, opts: &OfficeOptio
     // `EnableMacrosExecution`. Anything else is forwarded *verbatim* to the
     // import filter as the value of `FilterOptions`.
     //
-    // We only opt into options when the file actually needs them, because
-    // some non-extracted leftover values (e.g. `InteractionHandler=0`) can
-    // confuse the writer/word filter's content sniff for genuine documents
-    // and lead to `type detection failed` on perfectly valid `.docx` files
-    // — observed on bookworm-backports LO 26.x with non-ASCII filenames.
+    // `Batch=1` for ALL files. This is the LOK-extracted key that flips LO
+    // into non-interactive mode (`DialogCancelMode::LOKSilent` +
+    // `Silent=true` on the MediaDescriptor) — without it, ANY file that
+    // can't be cleanly type-detected (a malformed .docx, an unknown
+    // extension, a CSV without explicit FilterOptions) pops a UI dialog
+    // and wedges the worker thread inside the uncancellable
+    // `document_load` FFI call indefinitely.
     //
-    // CSV/TSV need help: a bare `document_load` on `.csv` pops the
-    // *Text Import* dialog and wedges the worker forever. `Batch=1` flips
-    // LO into non-interactive mode (extracted by LOK → sets
-    // `DialogCancelMode::LOKSilent` and `Silent=true` on the
-    // MediaDescriptor); the trailing tokens (`44,34,76,1` /
-    // `9,34,76,1`) become the StarCalc CSV import options after
-    // extraction (`fieldSep,textDelim,charSet,firstLineNumber`).
+    // Why not also include `InteractionHandler=0`? Because LOK's
+    // `extractParameter` doesn't recognise that key, so it falls through
+    // to the import filter as a literal `FilterOptions` value. For the
+    // writer/word filter that confuses content sniff and triggers
+    // `type detection failed` on perfectly valid `.docx` files —
+    // observed on bookworm-backports LO 26.x with non-ASCII filenames.
+    // `Batch=1` on its own gets fully consumed by `extractParameter` so
+    // FilterOptions stays empty for non-CSV/TSV.
     //
-    // For everything else we use plain `document_load` and rely on LO's
-    // built-in extension/content detection — same behaviour as the
-    // original implementation, before this code path tried to be clever
-    // about adding "always-on" load options.
+    // CSV/TSV additionally need the StarCalc CSV import token list
+    // (fieldSep, textDelim, charSet, firstLineNumber); after `Batch=1`
+    // is extracted the rest becomes the filter's FilterOptions value.
     let ext = input
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_ascii_lowercase();
-    let csv_opts: Option<&str> = match ext.as_str() {
-        "csv" => Some("Batch=1,44,34,76,1"),
-        "tsv" | "tab" => Some("Batch=1,9,34,76,1"),
-        _ => None,
+    let load_opts: &str = match ext.as_str() {
+        "csv" => "Batch=1,44,34,76,1",
+        "tsv" | "tab" => "Batch=1,9,34,76,1",
+        _ => "Batch=1",
     };
 
-    let load_result = match csv_opts {
-        Some(o) => office.document_load_with_options(&in_url, o),
-        None => office.document_load(&in_url),
-    };
+    let load_result = office.document_load_with_options(&in_url, load_opts);
 
     let mut doc = match load_result {
         Ok(doc) => doc,
