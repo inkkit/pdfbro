@@ -13,7 +13,7 @@ services:
           cpus: "2"
           memory: 2g
     environment:
-      RUST_LOG: error
+      RUST_LOG: info
 
   gotenberg:
     image: gotenberg/gotenberg:8
