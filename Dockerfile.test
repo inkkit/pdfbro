@@ -68,18 +68,30 @@ COPY . .
 # --test-threads=1 because LOK allows only one Office instance per process;
 # integration tests share a single static engine via OnceCell.
 #
-# We trust libtest's printed "test result: ok|FAILED" lines, not cargo's exit
-# code: LibreOffice ≥ 6.5 has a known atexit/teardown bug that bumps the test
+# Two failure modes we care about:
+#   1. Compile errors — libtest never runs, no "test result" line is emitted.
+#      We catch these by running `cargo test --no-run` first; any non-zero exit
+#      there is a real compile failure and must fail the build.
+#   2. Test failures — libtest prints "test result: FAILED" / "failures:".
+#      We catch these by greping the test-run output.
+#
+# We then ignore cargo's exit code on the *test-run* invocation only:
+# LibreOffice ≥ 6.5 has a known atexit/teardown bug that bumps the test
 # binary's exit code to non-zero even when every test passed (see
-# libreofficekit-rs README). The grep at the end fails the build if (and
-# only if) any libtest section actually reported FAILED.
+# libreofficekit-rs README). Trusting libtest's printed verdict at that
+# point is the documented workaround.
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/app/target \
-    bash -c 'set -o pipefail; \
+    bash -c 'set -e -o pipefail; \
+        echo "::compile pass — failing fast on any compile error"; \
+        cargo test --no-fail-fast --no-run; \
+        echo "::run pass — ignoring LO atexit teardown noise on cargo exit"; \
+        set +e; \
         cargo test --no-fail-fast -- --test-threads=1 2>&1 | tee /tmp/cargo_test.log; \
         cargo_status=$?; \
-        if grep -qE "^test result: FAILED|^failures:$" /tmp/cargo_test.log; then \
+        set -e; \
+        if grep -qE "^test result: FAILED|^failures:$|^error\\[" /tmp/cargo_test.log; then \
             echo "::test failures detected in libtest output"; \
             exit 1; \
         fi; \
