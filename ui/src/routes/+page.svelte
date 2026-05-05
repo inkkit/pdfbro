@@ -30,9 +30,9 @@
     let D  = $derived(themeStore.D);
 </script>
 
-<div style="background:{t.bg};color:{t.ink};font-family:'Geist Variable',ui-sans-serif,system-ui,sans-serif;min-height:100vh;padding:{D.gap + 4}px;transition:background 0.25s ease,color 0.25s ease">
+<div style="background:{t.bg};color:{t.ink};font-family:'Geist Variable',ui-sans-serif,system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;padding:{D.gap + 4}px;transition:background 0.25s ease,color 0.25s ease">
     {#if metricsStore.loading}
-        <div style="display:flex;align-items:center;justify-content:center;height:80vh;color:{t.muted}">
+        <div style="display:flex;align-items:center;justify-content:center;flex:1;color:{t.muted}">
             Connecting to pdfbro…
         </div>
     {:else if metricsStore.data}
@@ -44,10 +44,10 @@
             <Ticker ticker={metricsStore.data.ticker} {t} {D} />
         </div>
 
-        <!-- Main split: left (8fr) + side rail (4fr) -->
-        <div style="display:grid;grid-template-columns:8fr 4fr;gap:{D.gap}px;margin-top:{D.gap}px;min-height:0;align-items:start">
+        <!-- Main split: flex:1 so it fills all remaining viewport height -->
+        <div style="display:grid;grid-template-columns:8fr 4fr;gap:{D.gap}px;margin-top:{D.gap}px;flex:1;min-height:0;align-items:stretch">
 
-            <!-- Left column: charts → routes -->
+            <!-- Left column -->
             <div style="display:flex;flex-direction:column;gap:{D.gap}px;min-height:0">
 
                 <!-- Row 1: HTTP throughput charts -->
@@ -59,7 +59,7 @@
                     <MemChart resources={metricsStore.data.resources} {t} {D} />
                 </div>
 
-                <!-- Routes: fills remaining height, scrollable -->
+                <!-- Routes: flex:1 to fill remaining height -->
                 <RoutesTable routes={metricsStore.data.routes} {t} {D} />
             </div>
 
@@ -74,7 +74,7 @@
                     {t} {D}
                 />
                 <Concurrency conc={metricsStore.data.concurrency} {t} {D} />
-                <Batches batches={metricsStore.data.batches} {t} {D} style="flex:1;min-height:0" />
+                <Batches batches={metricsStore.data.batches} {t} {D} style="flex:1;min-height:0;overflow:hidden" />
             </div>
         </div>
     {/if}

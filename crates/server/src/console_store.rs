@@ -828,12 +828,17 @@ pub fn spawn_console_sampler(state: crate::state::AppState, started_at: Instant)
                 match (prev_cpu_usec, new_usec) {
                     (Some(prev), Some(curr)) if curr >= prev => {
                         let delta_usec = (curr - prev) as f64;
-                        // delta_usec / 5_000_000 = fraction of 1 CPU used over 5 s.
-                        // Divide by the cgroup CPU limit (cores) to get % of container quota.
-                        let limit_cores = cgroup.cpu_limit_cores.unwrap_or(num_host_cpus as f64);
-                        let pct = (delta_usec / (5_000_000.0 * limit_cores)) * 100.0;
+                        // delta_usec / 5_000_000_000 = fraction of 1 CPU used over 5 s → multiply
+                        // by 100 to get %. When a CPU limit is set, further normalise by quota so
+                        // 100% = "using all allocated cores". Without a limit show raw % of 1 core
+                        // (matches what `docker stats` displays).
+                        let pct = delta_usec / 5_000_000.0 * 100.0;
+                        let pct = match cgroup.cpu_limit_cores {
+                            Some(limit) if limit > 0.0 => (pct / limit).min(100.0),
+                            _ => pct, // unlimited: show % of 1 CPU (same as docker stats)
+                        };
                         prev_cpu_usec = new_usec;
-                        pct.min(100.0)
+                        pct
                     }
                     _ => {
                         // Not on cgroup v2 — fall back to sysinfo

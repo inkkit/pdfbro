@@ -11,7 +11,7 @@
     let tone = $derived(last > 85 ? t.err : last > 60 ? t.warn : t.ok);
 </script>
 
-<Card {t} title="CPU" sub="% · cgroup-aware">
+<Card {t} title="CPU" sub="% of 1 core · cgroup cpu.stat">
     <div style="padding:{D.pad + 2}px">
         <div style="display:flex;justify-content:space-between;font-size:{D.fz - 1}px;color:{t.muted};margin-bottom:6px">
             <span>usage</span>
