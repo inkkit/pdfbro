@@ -220,6 +220,17 @@ impl SupervisedChromiumEngine {
         self.inner.is_running.load(Ordering::SeqCst)
     }
 
+    /// Seconds since this engine last handled a request. Returns 0 if never used.
+    pub fn idle_secs(&self) -> u64 {
+        let last = self.inner.last_activity.load(Ordering::SeqCst);
+        if last == 0 { return 0; }
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        now.saturating_sub(last)
+    }
+
     /// Shutdown the engine.
     pub async fn shutdown(&self) {
         let mut guard = self.inner.engine.lock().await;
@@ -357,6 +368,17 @@ impl SupervisedLibreOfficeEngine {
     /// Returns true if the LibreOffice engine is currently running.
     pub fn is_running(&self) -> bool {
         self.inner.is_running.load(Ordering::SeqCst)
+    }
+
+    /// Seconds since this engine last handled a request. Returns 0 if never used.
+    pub fn idle_secs(&self) -> u64 {
+        let last = self.inner.last_activity.load(Ordering::SeqCst);
+        if last == 0 { return 0; }
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        now.saturating_sub(last)
     }
 
     /// Convert many files to PDFs in parallel.
