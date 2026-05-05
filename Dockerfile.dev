@@ -169,5 +169,6 @@ EXPOSE 3000
 CMD ["sh", "-c", "\
   cd /app/ui && bun install && bun run build && \
   bun run build:watch & \
-  cd /app && exec cargo watch --poll -x 'run -p server -- serve --port 3000 --host 0.0.0.0' \
+  cd /app && exec cargo watch --poll -w crates/ -w Cargo.toml -w Cargo.lock \
+    -x 'run -p server -- serve --port 3000 --host 0.0.0.0' \
 "]
