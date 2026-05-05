@@ -405,7 +405,7 @@ pub async fn build_console_payload(
             .collect()
     };
 
-    let routes = build_route_payloads(state, concurrency_max);
+    let routes = build_route_payloads(state, concurrency_max).await;
 
     let recent_requests: Vec<RequestLogEntry> = {
         let log = state.console.request_log.lock().await;
@@ -490,7 +490,7 @@ pub async fn build_console_payload(
 // ── Route payload: reads Prometheus counters + histograms ─────────────────
 
 /// Build per-route metrics from Prometheus counters and histograms.
-fn build_route_payloads(state: &crate::state::AppState, concurrency_max: u32) -> Vec<RoutePayload> {
+async fn build_route_payloads(state: &crate::state::AppState, concurrency_max: u32) -> Vec<RoutePayload> {
     let families = prometheus::gather();
 
     // Build count + error map from pdfbro_http_requests_total
@@ -534,21 +534,38 @@ fn build_route_payloads(state: &crate::state::AppState, concurrency_max: u32) ->
         break;
     }
 
-    let load_pct = (concurrency_max as usize).saturating_sub(state.sem.available_permits()) as f64
-        / concurrency_max.max(1) as f64 * 100.0;
+    // Per-route RPS: compute delta from previous totals
+    let route_rps: std::collections::HashMap<String, f64> = {
+        let mut prev = state.console.prev_route_totals.lock().await;
+        route_counts.iter().map(|(route, (total, _))| {
+            let prev_total = prev.get(route).copied().unwrap_or(0.0);
+            let delta = (total - prev_total).max(0.0);
+            prev.insert(route.clone(), *total);
+            (route.clone(), delta / 5.0)
+        }).collect()
+    };
+
+    // Per-route in-flight from active_per_route map
+    let in_flight_map: std::collections::HashMap<String, u32> = {
+        let map = state.console.active_per_route.lock().await;
+        map.clone()
+    };
 
     let mut routes: Vec<RoutePayload> = route_counts.into_iter().map(|(path, (total, errors))| {
         let error_pct = if total > 0.0 { (errors / total) * 100.0 } else { 0.0 };
         let (p50_ms, p95_ms, p99_ms) = route_latency.get(&path).copied().unwrap_or((0.0, 0.0, 0.0));
+        let rps = route_rps.get(&path).copied().unwrap_or(0.0);
+        let in_flight = in_flight_map.get(&path).copied().unwrap_or(0);
+        let load_pct = (in_flight as f64 / concurrency_max.max(1) as f64) * 100.0;
         RoutePayload {
             path,
             method: "POST".to_string(),
-            rps: 0.0,
+            rps,
             p50_ms,
             p95_ms,
             p99_ms,
             error_pct,
-            in_flight: 0,
+            in_flight,
             load_pct,
         }
     }).collect();
