@@ -546,27 +546,31 @@ pub async fn build_console_payload(
 async fn build_route_payloads(state: &crate::state::AppState, concurrency_max: u32) -> Vec<RoutePayload> {
     let families = prometheus::gather();
 
-    // Build count + error map from pdfbro_http_requests_total
-    let mut route_counts: std::collections::HashMap<String, (f64, f64)> = std::collections::HashMap::new();
+    // Build count + error map from pdfbro_http_requests_total.
+    // Key = "METHOD route" to preserve the real HTTP method per endpoint.
+    let mut route_counts: std::collections::HashMap<String, (String, f64, f64)> = std::collections::HashMap::new();
     for family in &families {
         if family.get_name() != "pdfbro_http_requests_total" { continue; }
         for m in family.get_metric() {
             let labels: std::collections::HashMap<_, _> = m.get_label().iter()
                 .map(|l| (l.get_name(), l.get_value()))
                 .collect();
-            let route = labels.get("route").copied().unwrap_or("unknown").to_string();
+            let method = labels.get("method").copied().unwrap_or("GET").to_string();
+            let route  = labels.get("route").copied().unwrap_or("unknown").to_string();
             let status = labels.get("status").copied().unwrap_or("0");
-            let count = m.get_counter().get_value();
-            let entry = route_counts.entry(route).or_insert((0.0, 0.0));
-            entry.0 += count;
+            let count  = m.get_counter().get_value();
+            let key    = format!("{method} {route}");
+            let entry  = route_counts.entry(key).or_insert((method, 0.0, 0.0));
+            entry.1 += count;
             if status.starts_with('5') || status.starts_with('4') {
-                entry.1 += count;
+                entry.2 += count;
             }
         }
         break;
     }
 
-    // Build latency percentiles from pdfbro_http_request_duration_seconds histogram
+    // Build latency percentiles from pdfbro_http_request_duration_seconds histogram.
+    // Key = "METHOD route" to match route_counts.
     let mut route_latency: std::collections::HashMap<String, (f64, f64, f64)> = std::collections::HashMap::new();
     for family in &families {
         if family.get_name() != "pdfbro_http_request_duration_seconds" { continue; }
@@ -574,15 +578,17 @@ async fn build_route_payloads(state: &crate::state::AppState, concurrency_max: u
             let labels: std::collections::HashMap<_, _> = m.get_label().iter()
                 .map(|l| (l.get_name(), l.get_value()))
                 .collect();
-            let route = labels.get("route").copied().unwrap_or("unknown").to_string();
-            let hist = m.get_histogram();
-            let count = hist.get_sample_count();
+            let method = labels.get("method").copied().unwrap_or("GET");
+            let route  = labels.get("route").copied().unwrap_or("unknown");
+            let key    = format!("{method} {route}");
+            let hist   = m.get_histogram();
+            let count  = hist.get_sample_count();
             if count == 0 { continue; }
             let buckets = hist.get_bucket();
             let p50 = percentile_from_histogram(buckets, count, 0.50) * 1000.0;
             let p95 = percentile_from_histogram(buckets, count, 0.95) * 1000.0;
             let p99 = percentile_from_histogram(buckets, count, 0.99) * 1000.0;
-            route_latency.insert(route, (p50, p95, p99));
+            route_latency.insert(key, (p50, p95, p99));
         }
         break;
     }
@@ -590,29 +596,30 @@ async fn build_route_payloads(state: &crate::state::AppState, concurrency_max: u
     // Per-route RPS: compute delta from previous totals
     let route_rps: std::collections::HashMap<String, f64> = {
         let mut prev = state.console.prev_route_totals.lock().await;
-        route_counts.iter().map(|(route, (total, _))| {
-            let prev_total = prev.get(route).copied().unwrap_or(0.0);
+        route_counts.iter().map(|(key, (_, total, _))| {
+            let prev_total = prev.get(key).copied().unwrap_or(0.0);
             let delta = (total - prev_total).max(0.0);
-            prev.insert(route.clone(), *total);
-            (route.clone(), delta / 5.0)
+            prev.insert(key.clone(), *total);
+            (key.clone(), delta / 5.0)
         }).collect()
     };
 
-    // Per-route in-flight from active_per_route map
+    // Per-route in-flight from active_per_route map (keyed by route path only)
     let in_flight_map: std::collections::HashMap<String, u32> = {
         let map = state.console.active_per_route.lock().await;
         map.clone()
     };
 
-    let mut routes: Vec<RoutePayload> = route_counts.into_iter().map(|(path, (total, errors))| {
+    let mut routes: Vec<RoutePayload> = route_counts.into_iter().map(|(key, (method, total, errors))| {
+        let path = key.splitn(2, ' ').nth(1).unwrap_or(&key).to_string();
         let error_pct = if total > 0.0 { (errors / total) * 100.0 } else { 0.0 };
-        let (p50_ms, p95_ms, p99_ms) = route_latency.get(&path).copied().unwrap_or((0.0, 0.0, 0.0));
-        let rps = route_rps.get(&path).copied().unwrap_or(0.0);
+        let (p50_ms, p95_ms, p99_ms) = route_latency.get(&key).copied().unwrap_or((0.0, 0.0, 0.0));
+        let rps = route_rps.get(&key).copied().unwrap_or(0.0);
         let in_flight = in_flight_map.get(&path).copied().unwrap_or(0);
         let load_pct = (in_flight as f64 / concurrency_max.max(1) as f64) * 100.0;
         RoutePayload {
             path,
-            method: "POST".to_string(),
+            method,
             rps,
             p50_ms,
             p95_ms,
