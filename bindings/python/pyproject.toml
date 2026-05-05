@@ -4,20 +4,20 @@ build-backend = "maturin"
 
 [project]
 name = "pdfbro"
-version = "0.1.0"
+version = "0.2.0"
 description = "pdfbro: Rust-native PDF conversion, embeddable in Python."
 readme = "README.md"
-license = { text = "MIT" }
+license = { text = "AGPL-3.0-only" }
 requires-python = ">=3.8"
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Rust",
-  "License :: OSI Approved :: MIT License",
+  "License :: OSI Approved :: GNU Affero General Public License v3",
 ]
 
 [project.urls]
-Homepage = "https://github.com/vel/pdfbro"
-Repository = "https://github.com/vel/pdfbro"
+Homepage = "https://github.com/inkkit/pdfbro"
+Repository = "https://github.com/inkkit/pdfbro"
 
 [tool.maturin]
 manifest-path = "../../crates/py/Cargo.toml"

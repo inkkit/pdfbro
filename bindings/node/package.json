@@ -1,10 +1,10 @@
 {
-  "name": "@vel/pdfbro",
-  "version": "0.1.0",
+  "name": "@inkkit/pdfbro",
+  "version": "0.2.0",
   "description": "pdfbro: Rust-native PDF conversion, embeddable in Node.",
   "main": "index.js",
   "types": "index.d.ts",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "engines": { "node": ">= 18" },
   "napi": {
     "name": "pdfbro-node",
