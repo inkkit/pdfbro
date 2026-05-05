@@ -51,6 +51,10 @@ pub trait PdfBackend: Send + Sync + 'static {
     /// Liveness probe.
     async fn healthy(&self) -> bool;
 
+    /// Non-blocking liveness check based on an atomic flag — safe to call from
+    /// the console sampler without competing for the engine's internal mutex.
+    fn is_alive(&self) -> bool { true }
+
     /// Seconds since the last conversion handled by this engine. Returns 0 if never used.
     fn idle_secs(&self) -> u64 { 0 }
 
@@ -118,6 +122,10 @@ impl PdfBackend for ChromiumBackend {
 
     async fn healthy(&self) -> bool {
         self.inner.healthy().await
+    }
+
+    fn is_alive(&self) -> bool {
+        self.inner.is_running()
     }
 
     fn idle_secs(&self) -> u64 {

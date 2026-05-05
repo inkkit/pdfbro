@@ -13,6 +13,8 @@ services:
     volumes:
       # Mount source code for hot reload
       - ./crates:/app/crates:cached
+      - ./bench:/app/bench:cached
+      - ./ui/build:/app/ui/build:cached
       - ./Cargo.toml:/app/Cargo.toml:cached
       - ./Cargo.lock:/app/Cargo.lock:cached
       # Cache build artifacts for faster rebuilds
@@ -35,6 +37,8 @@ services:
       - RUST_BACKTRACE=1
     volumes:
       - ./crates:/app/crates:cached
+      - ./bench:/app/bench:cached
+      - ./ui/build:/app/ui/build:cached
       - ./Cargo.toml:/app/Cargo.toml:cached
       - ./Cargo.lock:/app/Cargo.lock:cached
       - cargo-target:/app/target

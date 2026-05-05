@@ -16,14 +16,15 @@
     }
 
     let items = $derived([
-        { label: 'RPS',    value: ticker.rps.toFixed(1),             tone: 'ink' as const },
-        { label: 'P50',    value: fmtMs(ticker.p50_ms),              tone: (ticker.p50_ms > 1000 ? 'err' : ticker.p50_ms > 500 ? 'warn' : 'ok') as 'ok' | 'warn' | 'err' },
-        { label: 'P55',    value: fmtMs(ticker.p55_ms),              tone: (ticker.p55_ms > 1000 ? 'err' : ticker.p55_ms > 500 ? 'warn' : 'ok') as 'ok' | 'warn' | 'err' },
-        { label: 'P95',    value: fmtMs(ticker.p95_ms),              tone: (ticker.p95_ms > 2000 ? 'err' : ticker.p95_ms > 1500 ? 'warn' : 'ok') as 'ok' | 'warn' | 'err' },
-        { label: 'Errors', value: `${ticker.error_pct.toFixed(2)}%`, tone: (ticker.error_pct > 1 ? 'err' : ticker.error_pct > 0.5 ? 'warn' : 'ok') as 'ok' | 'warn' | 'err' },
+        { label: 'RPS',    value: ticker.rps.toFixed(1),                      tone: 'ink' as const },
+        { label: 'P50',    value: fmtMs(ticker.p50_ms),                       tone: (ticker.p50_ms > 1000 ? 'err' : ticker.p50_ms > 500 ? 'warn' : 'ok') as 'ok' | 'warn' | 'err' },
+        { label: 'P55',    value: fmtMs(ticker.p55_ms),                       tone: (ticker.p55_ms > 1000 ? 'err' : ticker.p55_ms > 500 ? 'warn' : 'ok') as 'ok' | 'warn' | 'err' },
+        { label: 'P95',    value: fmtMs(ticker.p95_ms),                       tone: (ticker.p95_ms > 2000 ? 'err' : ticker.p95_ms > 1500 ? 'warn' : 'ok') as 'ok' | 'warn' | 'err' },
+        { label: '5XX',    value: `${ticker.server_error_pct.toFixed(2)}%`,   tone: (ticker.server_error_pct > 1 ? 'err' : ticker.server_error_pct > 0 ? 'warn' : 'ok') as 'ok' | 'warn' | 'err' },
+        { label: '429',    value: `${ticker.rate_limit_pct.toFixed(2)}%`,     tone: (ticker.rate_limit_pct > 5 ? 'err' : ticker.rate_limit_pct > 0 ? 'warn' : 'ok') as 'ok' | 'warn' | 'err' },
         { label: 'Conc.',  value: `${ticker.concurrency_active} / ${ticker.concurrency_max}`, tone: 'ink' as const },
-        { label: 'Queue',  value: String(Math.round(ticker.queue_size)), tone: 'ink' as const },
-        { label: 'Uptime', value: fmtUptime(ticker.uptime_seconds),   tone: 'ok' as const },
+        { label: 'Queue',  value: String(Math.round(ticker.queue_size)),       tone: 'ink' as const },
+        { label: 'Uptime', value: fmtUptime(ticker.uptime_seconds),            tone: 'ok' as const },
     ]);
 </script>
 

@@ -26,8 +26,10 @@ pub struct MetricsSample {
     pub p55_ms: f64,
     /// p95 latency in milliseconds.
     pub p95_ms: f64,
-    /// Error percentage (0-100).
-    pub error_pct: f64,
+    /// 5xx server error percentage (0-100).
+    pub server_error_pct: f64,
+    /// 429 rate-limit percentage (0-100).
+    pub rate_limit_pct: f64,
     /// Current queue size.
     pub queue_size: u32,
     /// Active concurrent requests.
@@ -111,8 +113,10 @@ pub struct ConsoleStore {
     pub libreoffice_was_running: AtomicBool,
     /// Previous HTTP request total for RPS delta calculation.
     pub prev_http_total: Mutex<f64>,
-    /// Previous error total for error rate delta calculation.
+    /// Previous 5xx server error total for server_error_pct delta calculation.
     pub prev_error_total: Mutex<f64>,
+    /// Previous 429 rate-limit total for rate_limit_pct delta calculation.
+    pub prev_rate_limit_total: Mutex<f64>,
     /// Previous Chromium conversion total for per-engine RPS delta.
     pub prev_chromium_conv_total: Mutex<f64>,
     /// Previous LibreOffice conversion total for per-engine RPS delta.
@@ -142,6 +146,7 @@ impl ConsoleStore {
             libreoffice_was_running: AtomicBool::new(false),
             prev_http_total: Mutex::new(0.0),
             prev_error_total: Mutex::new(0.0),
+            prev_rate_limit_total: Mutex::new(0.0),
             prev_chromium_conv_total: Mutex::new(0.0),
             prev_libreoffice_conv_total: Mutex::new(0.0),
             prev_route_totals: Mutex::new(HashMap::new()),
@@ -226,8 +231,10 @@ pub struct TickerPayload {
     pub p55_ms: f64,
     /// p95 latency in milliseconds.
     pub p95_ms: f64,
-    /// Error percentage (0-100).
-    pub error_pct: f64,
+    /// 5xx server error percentage (0-100).
+    pub server_error_pct: f64,
+    /// 429 rate-limit percentage (0-100).
+    pub rate_limit_pct: f64,
     /// Active concurrent requests.
     pub concurrency_active: u32,
     /// Max allowed concurrent requests.
@@ -372,7 +379,8 @@ pub async fn build_console_payload(
 
     let (ts_series, rps_series, p95_series, cpu_series, memory_series,
          chromium_conv_series, libreoffice_conv_series, queue_wait_p95_series,
-         last_rps, last_p50_ms, last_p55_ms, last_p95_ms, last_error_pct) = {
+         last_rps, last_p50_ms, last_p55_ms, last_p95_ms,
+         last_server_error_pct, last_rate_limit_pct) = {
         let history = state.console.history.lock().await;
         let ts_series: Vec<u64>   = history.samples.iter().map(|s| s.ts).collect();
         let rps_series: Vec<f64>  = history.samples.iter().map(|s| s.rps).collect();
@@ -382,14 +390,16 @@ pub async fn build_console_payload(
         let chromium_conv_series: Vec<f64>    = history.samples.iter().map(|s| s.chromium_conv_rps).collect();
         let libreoffice_conv_series: Vec<f64> = history.samples.iter().map(|s| s.libreoffice_conv_rps).collect();
         let queue_wait_p95_series: Vec<f64>   = history.samples.iter().map(|s| s.queue_wait_p95_ms).collect();
-        let last_rps       = rps_series.last().copied().unwrap_or(0.0);
-        let last_p50_ms    = history.samples.back().map_or(0.0, |s| s.p50_ms);
-        let last_p55_ms    = history.samples.back().map_or(0.0, |s| s.p55_ms);
-        let last_p95_ms    = p95_series.last().copied().unwrap_or(0.0) * 1000.0;
-        let last_error_pct = history.samples.back().map_or(0.0, |s| s.error_pct);
+        let last_rps    = rps_series.last().copied().unwrap_or(0.0);
+        let last_p50_ms = history.samples.back().map_or(0.0, |s| s.p50_ms);
+        let last_p55_ms = history.samples.back().map_or(0.0, |s| s.p55_ms);
+        let last_p95_ms = p95_series.last().copied().unwrap_or(0.0) * 1000.0;
+        let last_server_error_pct = history.samples.back().map_or(0.0, |s| s.server_error_pct);
+        let last_rate_limit_pct   = history.samples.back().map_or(0.0, |s| s.rate_limit_pct);
         (ts_series, rps_series, p95_series, cpu_series, memory_series,
          chromium_conv_series, libreoffice_conv_series, queue_wait_p95_series,
-         last_rps, last_p50_ms, last_p55_ms, last_p95_ms, last_error_pct)
+         last_rps, last_p50_ms, last_p55_ms, last_p95_ms,
+         last_server_error_pct, last_rate_limit_pct)
     };
 
     let queue_size = state.metrics.queue_size.get();
@@ -437,7 +447,8 @@ pub async fn build_console_payload(
             p50_ms: last_p50_ms,
             p55_ms: last_p55_ms,
             p95_ms: last_p95_ms,
-            error_pct: last_error_pct,
+            server_error_pct: last_server_error_pct,
+            rate_limit_pct: last_rate_limit_pct,
             concurrency_active,
             concurrency_max,
             queue_size,
@@ -820,10 +831,11 @@ pub fn spawn_console_sampler(state: crate::state::AppState, started_at: Instant)
                 .unwrap_or_else(|| sys.used_memory());
             state.metrics.process_resident_memory.set(memory_bytes as f64);
 
-            // ── Engine health: probe directly, don't read stale gauge ──────
+            // ── Engine health: use atomic is_alive() — never blocks on the
+            // engine's internal mutex, so heavy batch load can't stall the sampler.
             #[cfg(feature = "chromium")]
             let chromium_up = match state.chromium.as_ref() {
-                Some(be) => be.healthy().await,
+                Some(be) => be.is_alive(),
                 None => false,
             };
             #[cfg(not(feature = "chromium"))]
@@ -867,25 +879,37 @@ pub fn spawn_console_sampler(state: crate::state::AppState, started_at: Instant)
                 .map(|f| f.get_metric().iter().map(|m| m.get_counter().get_value()).sum())
                 .unwrap_or(0.0);
 
-            let error_total: f64 = families.iter()
+            // 5xx = server errors; 429 = rate limits; 4xx (excl. 429) = client mistakes, ignored
+            let server_error_total: f64 = families.iter()
                 .find(|f| f.get_name() == "pdfbro_http_requests_total")
                 .map(|f| f.get_metric().iter()
                     .filter(|m| m.get_label().iter()
-                        .any(|l| l.get_name() == "status"
-                            && (l.get_value().starts_with('5') || l.get_value().starts_with('4'))))
+                        .any(|l| l.get_name() == "status" && l.get_value().starts_with('5')))
                     .map(|m| m.get_counter().get_value()).sum())
                 .unwrap_or(0.0);
 
-            let (rps, error_pct) = {
+            let rate_limit_total: f64 = families.iter()
+                .find(|f| f.get_name() == "pdfbro_http_requests_total")
+                .map(|f| f.get_metric().iter()
+                    .filter(|m| m.get_label().iter()
+                        .any(|l| l.get_name() == "status" && l.get_value() == "429"))
+                    .map(|m| m.get_counter().get_value()).sum())
+                .unwrap_or(0.0);
+
+            let (rps, server_error_pct, rate_limit_pct) = {
                 let mut prev_http = state.console.prev_http_total.lock().await;
                 let mut prev_err  = state.console.prev_error_total.lock().await;
-                let http_delta  = (http_total  - *prev_http).max(0.0);
-                let error_delta = (error_total - *prev_err).max(0.0);
-                let rps = http_delta / 5.0;
-                let epct = if http_delta > 0.0 { (error_delta / http_delta) * 100.0 } else { 0.0 };
+                let mut prev_rl   = state.console.prev_rate_limit_total.lock().await;
+                let http_delta         = (http_total         - *prev_http).max(0.0);
+                let server_error_delta = (server_error_total - *prev_err).max(0.0);
+                let rate_limit_delta   = (rate_limit_total   - *prev_rl).max(0.0);
+                let rps   = http_delta / 5.0;
+                let sepct = if http_delta > 0.0 { (server_error_delta / http_delta) * 100.0 } else { 0.0 };
+                let rlpct = if http_delta > 0.0 { (rate_limit_delta   / http_delta) * 100.0 } else { 0.0 };
                 *prev_http = http_total;
-                *prev_err  = error_total;
-                (rps, epct)
+                *prev_err  = server_error_total;
+                *prev_rl   = rate_limit_total;
+                (rps, sepct, rlpct)
             };
 
             // ── p95 from histogram (global, across all routes) ─────────────
@@ -957,7 +981,8 @@ pub fn spawn_console_sampler(state: crate::state::AppState, started_at: Instant)
                 p50_ms,
                 p55_ms,
                 p95_ms,
-                error_pct,
+                server_error_pct,
+                rate_limit_pct,
                 queue_size: state.metrics.queue_size.get() as u32,
                 concurrency_active,
                 cpu_pct,

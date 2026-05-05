@@ -128,15 +128,25 @@ RUN groupadd --gid 1001 pdfbro && \
 # This layer will be cached; source code changes won't invalidate it
 COPY Cargo.toml Cargo.lock ./
 COPY crates/*/Cargo.toml ./crates/*/
-RUN mkdir -p crates/engine/src crates/server/src crates/cli/src && \
+COPY bench/Cargo.toml ./bench/
+RUN mkdir -p crates/engine/src crates/server/src crates/cli/src bench/src && \
     echo "fn main() {}" > crates/cli/src/main.rs && \
     echo "pub fn dummy() {}" > crates/engine/src/lib.rs && \
     echo "pub fn dummy() {}" > crates/server/src/lib.rs && \
+    echo "fn main() {}" > bench/src/main.rs && \
     cargo build --features "chromium libreoffice" 2>/dev/null || true && \
-    rm -rf crates/
+    rm -rf crates/ bench/
 
-# Set up working directory with proper permissions
-RUN chown -R pdfbro:pdfbro /app
+# Stub UI build directory — gives rust-embed a valid folder at compile time.
+# At runtime the docker-compose volume mount overlays ./ui/build here.
+RUN mkdir -p /app/ui/build && \
+    printf '<!doctype html><html><body>dev</body></html>' > /app/ui/build/index.html
+
+# Pre-create /app/target so the cargo-target named volume is seeded with
+# the right owner (Docker seeds an empty named volume from image content).
+# Also chown the cargo registry for the same reason.
+RUN mkdir -p /app/target && \
+    chown -R pdfbro:pdfbro /app /usr/local/cargo
 
 # Switch to non-root user for Chrome
 USER pdfbro

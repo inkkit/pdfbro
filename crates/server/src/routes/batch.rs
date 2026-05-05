@@ -67,6 +67,21 @@ pub async fn batch_submit(
     let batch_state = batch_manager.create_batch(request.clone()).await;
     let batch_id = batch_state.id.clone();
 
+    // Persist uploaded files so the background worker can read them.
+    // URL-only batches produce no files; this is a no-op for those.
+    if !form.files.is_empty() {
+        let input_dir = batch_manager.batch_input_dir(&batch_id).await;
+        tokio::fs::create_dir_all(&input_dir).await.map_err(|e| {
+            ApiError::Internal(format!("failed to create batch input dir: {e}"))
+        })?;
+        for uploaded in &form.files {
+            let dest = input_dir.join(&uploaded.filename);
+            tokio::fs::copy(&uploaded.path, &dest).await.map_err(|e| {
+                ApiError::Internal(format!("failed to persist uploaded file: {e}"))
+            })?;
+        }
+    }
+
     // Start background processing
     let state_manager = batch_manager.clone();
     let app_state = state.clone();

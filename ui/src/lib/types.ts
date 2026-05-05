@@ -5,7 +5,8 @@ export interface MetricsSample {
     p50_ms: number;
     p55_ms: number;
     p95_ms: number;
-    error_pct: number;
+    server_error_pct: number;
+    rate_limit_pct: number;
     queue_size: number;
     concurrency_active: number;
     cpu_pct: number;
@@ -20,7 +21,8 @@ export interface TickerPayload {
     p50_ms: number;
     p55_ms: number;
     p95_ms: number;
-    error_pct: number;
+    server_error_pct: number;
+    rate_limit_pct: number;
     concurrency_active: number;
     concurrency_max: number;
     queue_size: number;
