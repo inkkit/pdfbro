@@ -220,6 +220,10 @@ pub struct ConsolePayload {
 pub struct TickerPayload {
     /// Current requests per second.
     pub rps: f64,
+    /// p50 latency in milliseconds.
+    pub p50_ms: f64,
+    /// p55 latency in milliseconds.
+    pub p55_ms: f64,
     /// p95 latency in milliseconds.
     pub p95_ms: f64,
     /// Error percentage (0-100).
@@ -228,14 +232,6 @@ pub struct TickerPayload {
     pub concurrency_active: u32,
     /// Max allowed concurrent requests.
     pub concurrency_max: u32,
-    /// Chromium status (up/down/n/a).
-    pub chromium_status: String,
-    /// Number of Chromium restarts.
-    pub chromium_restarts: u32,
-    /// LibreOffice status (up/down/n/a).
-    pub libreoffice_status: String,
-    /// Number of LibreOffice restarts.
-    pub libreoffice_restarts: u32,
     /// Current queue size.
     pub queue_size: f64,
     /// Server uptime in seconds.
@@ -278,6 +274,14 @@ pub struct EnginePayload {
     pub mode: String,
     /// Mini RPS sparkline (normalized 0-1).
     pub mini_series: Vec<f64>,
+    /// Total conversions processed by this engine.
+    pub conversions_total: u64,
+    /// Error rate for this engine (0-100).
+    pub error_rate: f64,
+    /// Total bytes processed in MB.
+    pub bytes_mb: f64,
+    /// Seconds since last conversion (idle time).
+    pub idle_secs: u64,
 }
 
 /// Concurrency statistics.
@@ -291,6 +295,10 @@ pub struct ConcurrencyPayload {
     pub warn_threshold: u32,
     /// Critical threshold (85% of max).
     pub crit_threshold: u32,
+    /// p95 queue wait time in milliseconds.
+    pub queue_wait_p95_ms: f64,
+    /// Number of requests currently processing in queue.
+    pub queue_processing: u32,
 }
 
 /// Resource usage time series.
@@ -307,6 +315,8 @@ pub struct ResourcesPayload {
 /// Throughput and latency time series.
 #[derive(Clone, Debug, Serialize)]
 pub struct ThroughputPayload {
+    /// Unix timestamps for each sample.
+    pub ts_series: Vec<u64>,
     /// RPS time series.
     pub rps_series: Vec<f64>,
     /// RPS baseline for reference line.
@@ -315,6 +325,12 @@ pub struct ThroughputPayload {
     pub p95_series: Vec<f64>,
     /// Target p95 latency (seconds).
     pub p95_target_s: f64,
+    /// Chromium conversions per second time series.
+    pub chromium_conv_series: Vec<f64>,
+    /// LibreOffice conversions per second time series.
+    pub libreoffice_conv_series: Vec<f64>,
+    /// p95 queue wait time series (milliseconds).
+    pub queue_wait_p95_series: Vec<f64>,
 }
 
 /// Batch job status.
@@ -328,6 +344,14 @@ pub struct BatchPayload {
     pub progress_pct: u8,
     /// Elapsed time string.
     pub elapsed: String,
+    /// Total number of items in the batch.
+    pub total_items: usize,
+    /// Number of completed items.
+    pub completed_items: usize,
+    /// Number of failed items.
+    pub failed_items: usize,
+    /// Output mode (zip/stream/etc).
+    pub output_mode: String,
 }
 
 // ── build_console_payload ─────────────────────────────────────────────────
