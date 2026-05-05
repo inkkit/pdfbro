@@ -6,7 +6,12 @@
     import Pill from '../shared/Pill.svelte';
     import BarSeries from '../shared/BarSeries.svelte';
 
-    let { engines, t, D }: { engines: EnginePayload[]; t: Theme; D: { fz: number; pad: number } } = $props();
+    let { engines, convRps, t, D }: {
+        engines: EnginePayload[];
+        convRps: Record<string, number>;
+        t: Theme;
+        D: { fz: number; pad: number };
+    } = $props();
 
     function engineTone(e: EnginePayload): 'ok' | 'warn' | 'err' | 'ink' {
         if (e.status === 'n/a') return 'ink';
@@ -40,6 +45,9 @@
                     <div style="display:flex;align-items:center;gap:6px">
                         <strong style="font-size:{D.fz + 0.5}px">{e.name}</strong>
                         <Pill tone={engineTone(e)} {t}>{e.status.toUpperCase()}</Pill>
+                        {#if (convRps[e.name.toLowerCase()] ?? 0) > 0}
+                            <span style="font-family:ui-monospace,monospace;font-size:9px;color:{t.ok};background:{t.faint};padding:1px 5px;border-radius:3px">{(convRps[e.name.toLowerCase()] ?? 0).toFixed(2)} c/s</span>
+                        {/if}
                     </div>
                     <span style="color:{t.muted};font-size:10px;font-family:ui-monospace,monospace">
                         {e.restarts} activation{e.restarts !== 1 ? 's' : ''} · {e.mode}

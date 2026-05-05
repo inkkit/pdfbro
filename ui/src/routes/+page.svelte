@@ -9,10 +9,9 @@
     import Engines from '$lib/components/side-rail/Engines.svelte';
     import Concurrency from '$lib/components/side-rail/Concurrency.svelte';
     import Batches from '$lib/components/side-rail/Batches.svelte';
-    import Resources from '$lib/components/side-rail/Resources.svelte';
     import ThroughputStrip from '$lib/components/ThroughputStrip.svelte';
-    import EngineConvChart from '$lib/components/EngineConvChart.svelte';
-    import QueueWaitChart from '$lib/components/QueueWaitChart.svelte';
+    import CpuChart from '$lib/components/CpuChart.svelte';
+    import MemChart from '$lib/components/MemChart.svelte';
 
     onMount(() => metricsStore.start());
     onDestroy(() => metricsStore.stop());
@@ -54,10 +53,10 @@
                 <!-- Row 1: HTTP throughput charts -->
                 <ThroughputStrip throughput={metricsStore.data.throughput} {t} {D} />
 
-                <!-- Row 2: engine conv + queue wait -->
+                <!-- Row 2: CPU + Memory charts -->
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:{D.gap}px">
-                    <EngineConvChart throughput={metricsStore.data.throughput} {t} {D} />
-                    <QueueWaitChart throughput={metricsStore.data.throughput} {t} {D} />
+                    <CpuChart resources={metricsStore.data.resources} {t} {D} />
+                    <MemChart resources={metricsStore.data.resources} {t} {D} />
                 </div>
 
                 <!-- Routes: fills remaining height, scrollable -->
@@ -66,10 +65,16 @@
 
             <!-- Right rail -->
             <div style="display:flex;flex-direction:column;gap:{D.gap}px">
-                <Engines engines={metricsStore.data.engines} {t} {D} />
+                <Engines
+                    engines={metricsStore.data.engines}
+                    convRps={{
+                        chromium: metricsStore.data.throughput.chromium_conv_series.at(-1) ?? 0,
+                        libreoffice: metricsStore.data.throughput.libreoffice_conv_series.at(-1) ?? 0,
+                    }}
+                    {t} {D}
+                />
                 <Concurrency conc={metricsStore.data.concurrency} {t} {D} />
-                <Batches batches={metricsStore.data.batches} {t} {D} />
-                <Resources resources={metricsStore.data.resources} {t} {D} />
+                <Batches batches={metricsStore.data.batches} {t} {D} style="flex:1;min-height:0" />
             </div>
         </div>
     {/if}

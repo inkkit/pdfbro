@@ -6,7 +6,7 @@
     import Pill from '../shared/Pill.svelte';
     import SlimBar from '../shared/SlimBar.svelte';
 
-    let { batches, t, D }: { batches: BatchPayload[]; t: Theme; D: { pad: number; fz: number; rowPy: number } } = $props();
+    let { batches, t, D, style = '' }: { batches: BatchPayload[]; t: Theme; D: { pad: number; fz: number; rowPy: number }; style?: string } = $props();
 
     function batchTone(status: string): 'ok' | 'warn' | 'err' | 'accent' | 'ink' {
         if (status === 'failed')    return 'err';
@@ -24,7 +24,7 @@
     const SCROLL_H = 240; // px — fixed height for the scrollable list
 </script>
 
-<Card {t} title="Batches" sub="{queuedCnt} queued · {runningCnt} running · {doneCnt} done">
+<Card {t} title="Batches" sub="{queuedCnt} queued · {runningCnt} running · {doneCnt} done" {style}>
     {#if active.length === 0}
         <div style="padding:{D.pad}px;color:{t.muted};font-size:{D.fz}px">
             {doneCnt > 0 ? `${doneCnt} job${doneCnt > 1 ? 's' : ''} completed` : 'No active batches'}
