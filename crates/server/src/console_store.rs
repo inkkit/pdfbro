@@ -1,7 +1,7 @@
 // crates/server/src/console_store.rs
 //! In-memory store for console metrics, request logs, and SSE broadcasting.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU32};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex, broadcast, watch};
@@ -105,6 +105,8 @@ pub struct ConsoleStore {
     pub prev_error_total: Mutex<f64>,
     /// Live count of HTTP requests currently in flight.
     pub active_requests: AtomicU32,
+    /// Per-route count of HTTP requests currently in flight.
+    pub active_per_route: Mutex<HashMap<String, u32>>,
 }
 
 impl ConsoleStore {
@@ -125,6 +127,7 @@ impl ConsoleStore {
             prev_http_total: Mutex::new(0.0),
             prev_error_total: Mutex::new(0.0),
             active_requests: AtomicU32::new(0),
+            active_per_route: Mutex::new(HashMap::new()),
         }
     }
 

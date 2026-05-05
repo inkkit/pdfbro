@@ -392,9 +392,19 @@ async fn console_log_middleware(
 
     use std::sync::atomic::Ordering;
     state.console.active_requests.fetch_add(1, Ordering::SeqCst);
+    {
+        let mut map = state.console.active_per_route.lock().await;
+        *map.entry(path.clone()).or_insert(0) += 1;
+    }
     let start = Instant::now();
     let response = next.run(req).await;
     state.console.active_requests.fetch_sub(1, Ordering::SeqCst);
+    {
+        let mut map = state.console.active_per_route.lock().await;
+        if let Some(c) = map.get_mut(&path) {
+            *c = c.saturating_sub(1);
+        }
+    }
     let elapsed = start.elapsed();
     let duration_ms = elapsed.as_millis() as u64;
     let status = response.status().as_u16();
