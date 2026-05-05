@@ -21,8 +21,8 @@ pub use cache::{cache_dir, cached_chrome};
 use std::path::PathBuf;
 
 /// Pinned Chrome-for-Testing version. Bumped per pdfbro release.
-/// Single source of truth: `bindings/CHROME_VERSION` mirrors this string.
-pub const CHROME_VERSION: &str = include_str!("../../../../bindings/CHROME_VERSION");
+/// File lives at `crates/engine/CHROME_VERSION`; keep `bindings/CHROME_VERSION` in sync.
+pub const CHROME_VERSION: &str = include_str!("../../CHROME_VERSION");
 
 /// Options controlling [`ensure_chrome`].
 #[derive(Debug, Clone)]

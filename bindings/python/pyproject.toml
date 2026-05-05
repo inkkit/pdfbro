@@ -25,5 +25,3 @@ module-name = "pdfbro._native"
 features = ["pyo3/extension-module"]
 python-source = "."
 strip = true
-# CHROME_VERSION lives outside the crate dir; must be explicit so it's included in the sdist
-include = [{ path = "bindings/CHROME_VERSION", format = ["sdist"] }]
