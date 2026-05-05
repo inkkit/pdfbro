@@ -45,7 +45,7 @@
         </div>
 
         <!-- Main split: left (8fr) + side rail (4fr) -->
-        <div style="display:grid;grid-template-columns:8fr 4fr;gap:{D.gap}px;margin-top:{D.gap}px;min-height:0">
+        <div style="display:grid;grid-template-columns:8fr 4fr;gap:{D.gap}px;margin-top:{D.gap}px;min-height:0;align-items:start">
 
             <!-- Left column: charts → routes -->
             <div style="display:flex;flex-direction:column;gap:{D.gap}px;min-height:0">
@@ -64,7 +64,7 @@
             </div>
 
             <!-- Right rail -->
-            <div style="display:flex;flex-direction:column;gap:{D.gap}px">
+            <div style="display:flex;flex-direction:column;gap:{D.gap}px;min-height:0">
                 <Engines
                     engines={metricsStore.data.engines}
                     convRps={{

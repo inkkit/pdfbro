@@ -24,6 +24,9 @@ FROM rust:${RUST_VERSION} AS dev-base
 # Install cargo-watch for hot reload
 RUN cargo install cargo-watch --locked
 
+# Install bun (used to build the operator console UI inside the container)
+RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash
+
 # Install system dependencies
 RUN apt-get update -qq && apt-get upgrade -yqq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
@@ -138,9 +141,11 @@ RUN mkdir -p crates/engine/src crates/server/src crates/cli/src bench/src && \
     rm -rf crates/ bench/
 
 # Stub UI build directory — gives rust-embed a valid folder at compile time.
-# At runtime the docker-compose volume mount overlays ./ui/build here.
+# The docker-compose volume mount will shadow /app/ui with the host source tree,
+# and the entrypoint script does a real bun build before starting the server.
 RUN mkdir -p /app/ui/build && \
-    printf '<!doctype html><html><body>dev</body></html>' > /app/ui/build/index.html
+    printf '<!doctype html><html><body>dev</body></html>' > /app/ui/build/index.html && \
+    mkdir -p /app/ui/node_modules
 
 # Pre-create /app/target so the cargo-target named volume is seeded with
 # the right owner (Docker seeds an empty named volume from image content).
@@ -155,6 +160,14 @@ WORKDIR /app
 
 EXPOSE 3000
 
-# Default command: watch for changes and restart server
-# Use --poll for Docker compatibility (file system events may not work in all setups)
-CMD ["cargo", "watch", "--poll", "-x", "run -p server -- serve --port 3000 --host 0.0.0.0"]
+# On startup:
+#   1. Install/update UI deps inside the container (node_modules named volume keeps
+#      Linux binaries separate from the macOS host).
+#   2. Do an initial production build so rust-embed serves the latest UI immediately.
+#   3. Start vite build --watch in the background so UI changes rebuild automatically.
+#   4. Start cargo watch in the foreground for Rust hot-reload.
+CMD ["sh", "-c", "\
+  cd /app/ui && bun install && bun run build && \
+  bun run build:watch & \
+  cd /app && exec cargo watch --poll -x 'run -p server -- serve --port 3000 --host 0.0.0.0' \
+"]

@@ -14,7 +14,10 @@ services:
       # Mount source code for hot reload
       - ./crates:/app/crates:cached
       - ./bench:/app/bench:cached
-      - ./ui/build:/app/ui/build:cached
+      # Mount full UI source so bun can rebuild it inside the container.
+      # A named volume overlays node_modules so Linux binaries don't bleed onto the host.
+      - ./ui:/app/ui:cached
+      - ui-node-modules:/app/ui/node_modules
       - ./Cargo.toml:/app/Cargo.toml:cached
       - ./Cargo.lock:/app/Cargo.lock:cached
       # Cache build artifacts for faster rebuilds
@@ -38,14 +41,18 @@ services:
     volumes:
       - ./crates:/app/crates:cached
       - ./bench:/app/bench:cached
-      - ./ui/build:/app/ui/build:cached
+      - ./ui:/app/ui:cached
+      - ui-node-modules:/app/ui/node_modules
       - ./Cargo.toml:/app/Cargo.toml:cached
       - ./Cargo.lock:/app/Cargo.lock:cached
       - cargo-target:/app/target
       - cargo-registry:/usr/local/cargo/registry
     tty: true
     stdin_open: true
-    command: ["cargo", "watch", "--poll", "-x", "run -p server -- serve --port 3000 --host 0.0.0.0 --no-default-features --features chromium"]
+    command:
+      - sh
+      - -c
+      - "cd /app/ui && bun install && bun run build && bun run build:watch & cd /app && exec cargo watch --poll -x 'run -p server -- serve --port 3000 --host 0.0.0.0 --no-default-features --features chromium'"
     profiles: [dev-chromium]
 
   pdfbro:
@@ -92,3 +99,4 @@ services:
 volumes:
   cargo-target:
   cargo-registry:
+  ui-node-modules:
