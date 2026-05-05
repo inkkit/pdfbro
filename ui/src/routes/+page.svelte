@@ -11,7 +11,8 @@
     import Batches from '$lib/components/side-rail/Batches.svelte';
     import Resources from '$lib/components/side-rail/Resources.svelte';
     import ThroughputStrip from '$lib/components/ThroughputStrip.svelte';
-    import ActivityStrip from '$lib/components/ActivityStrip.svelte';
+    import EngineConvChart from '$lib/components/EngineConvChart.svelte';
+    import QueueWaitChart from '$lib/components/QueueWaitChart.svelte';
 
     onMount(() => metricsStore.start());
     onDestroy(() => metricsStore.stop());
@@ -44,25 +45,32 @@
             <Ticker ticker={metricsStore.data.ticker} {t} {D} />
         </div>
 
-        <!-- Main split: routes (8fr) + side rail (4fr) -->
-        <div style="display:grid;grid-template-columns:8fr 4fr;gap:{D.gap}px;margin-top:{D.gap}px">
-            <RoutesTable routes={metricsStore.data.routes} {t} {D} />
+        <!-- Main split: left (8fr) + side rail (4fr) -->
+        <div style="display:grid;grid-template-columns:8fr 4fr;gap:{D.gap}px;margin-top:{D.gap}px;min-height:0">
+
+            <!-- Left column: charts → routes -->
+            <div style="display:flex;flex-direction:column;gap:{D.gap}px;min-height:0">
+
+                <!-- Row 1: HTTP throughput charts -->
+                <ThroughputStrip throughput={metricsStore.data.throughput} {t} {D} />
+
+                <!-- Row 2: engine conv + queue wait -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:{D.gap}px">
+                    <EngineConvChart throughput={metricsStore.data.throughput} {t} {D} />
+                    <QueueWaitChart throughput={metricsStore.data.throughput} {t} {D} />
+                </div>
+
+                <!-- Routes: fills remaining height, scrollable -->
+                <RoutesTable routes={metricsStore.data.routes} {t} {D} />
+            </div>
+
+            <!-- Right rail -->
             <div style="display:flex;flex-direction:column;gap:{D.gap}px">
                 <Engines engines={metricsStore.data.engines} {t} {D} />
                 <Concurrency conc={metricsStore.data.concurrency} {t} {D} />
                 <Batches batches={metricsStore.data.batches} {t} {D} />
                 <Resources resources={metricsStore.data.resources} {t} {D} />
             </div>
-        </div>
-
-        <!-- Throughput strip -->
-        <div style="margin-top:{D.gap}px">
-            <ThroughputStrip throughput={metricsStore.data.throughput} {t} {D} />
-        </div>
-
-        <!-- Activity -->
-        <div style="margin-top:{D.gap}px">
-            <ActivityStrip requests={metricsStore.data.recent_requests} errors={metricsStore.data.recent_errors} {t} {D} />
         </div>
     {/if}
 </div>
