@@ -1,5 +1,6 @@
 //! Shared response utilities used by multiple route modules.
 
+use std::collections::HashMap;
 use std::io::Write;
 
 use axum::body::Bytes;
@@ -122,6 +123,25 @@ pub fn build_zip(filenames: &[String], blobs: &[Vec<u8>]) -> ApiResult<Vec<u8>> 
     out.write_all(&0u16.to_le_bytes()).ok(); // comment len
 
     Ok(out)
+}
+
+/// Apply password encryption to a PDF if `userPassword` or `ownerPassword` is in the form map.
+/// Returns the PDF unchanged if neither password is provided.
+pub async fn apply_encryption(pdf: Vec<u8>, map: &HashMap<String, String>) -> ApiResult<Vec<u8>> {
+    let user_pass = map.get("userPassword").filter(|s| !s.is_empty()).map(|s| s.as_str());
+    let owner_pass = map.get("ownerPassword").filter(|s| !s.is_empty()).map(|s| s.as_str());
+    if user_pass.is_none() && owner_pass.is_none() {
+        return Ok(pdf);
+    }
+    engine::encrypt::encrypt_pdf(
+        &pdf,
+        user_pass,
+        owner_pass,
+        engine::encrypt::EncryptionAlgorithm::Aes256,
+        engine::encrypt::Permissions::allow_all(),
+    )
+    .await
+    .map_err(|e| ApiError::Internal(e.to_string()))
 }
 
 fn crc32(data: &[u8]) -> u32 {

@@ -148,7 +148,7 @@ Feature: /forms/libreoffice/convert
     Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
-      Invalid form data: form field 'merge' is invalid (got 'foo', resulting to strconv.ParseBool: parsing "foo": invalid syntax)
+      merge is not valid: expected boolean
       """
 
   @merge

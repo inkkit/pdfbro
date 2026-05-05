@@ -11,11 +11,11 @@ use std::time::Instant;
 use axum::extract::{Multipart, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::Response;
-use engine::{Cookie, MediaType, PageRanges, PdfOptions, RequestContext, WaitCondition, CaptureMode, ScreenshotFormat, ScreenshotOptions};
+use engine::{Cookie, MediaType, PageRanges, PdfAProfile, PdfOptions, RequestContext, WaitCondition, CaptureMode, ScreenshotFormat, ScreenshotOptions};
 
 use crate::error::{ApiError, ApiResult};
 use crate::multipart::FormFields;
-use crate::routes::util::{output_filename, pdf_response};
+use crate::routes::util::{apply_encryption, output_filename, pdf_response};
 use crate::state::AppState;
 
 const INDEX_HTML: &str = "index.html";
@@ -43,6 +43,8 @@ pub async fn chromium_html(
     apply_header_footer_files(&mut opts, &form).await?;
     opts.validate()?;
     let ctx = parse_request_context(&form.map)?;
+    let native_page_ranges = parse_native_page_ranges(&form.map)?;
+    validate_chromium_extra_fields(&form.map)?;
 
     if let Some(resp) = crate::webhook::maybe_spawn_webhook(
         &headers,
@@ -93,7 +95,9 @@ pub async fn chromium_html(
     }
 
     let pdf = result?;
+    validate_native_page_ranges_against_pdf(&pdf, &native_page_ranges)?;
     let pdf = apply_metadata_field(pdf, &form.map).await?;
+    let pdf = apply_encryption(pdf, &form.map).await?;
     Ok(pdf_response(pdf, &output_filename(&headers, "result")))
 }
 
@@ -251,6 +255,7 @@ pub async fn chromium_markdown(
 
         let pdf = result?;
         let pdf = apply_metadata_field(pdf, &form.map).await?;
+        let pdf = apply_encryption(pdf, &form.map).await?;
         return Ok(pdf_response(pdf, &output_filename(&headers, "result")));
     }
 
@@ -316,6 +321,7 @@ pub async fn chromium_markdown(
 
     let pdf = result?;
     let pdf = apply_metadata_field(pdf, &form.map).await?;
+    let pdf = apply_encryption(pdf, &form.map).await?;
     Ok(pdf_response(pdf, &output_filename(&headers, "result")))
 }
 
@@ -643,6 +649,84 @@ pub fn parse_pdf_options(map: &HashMap<String, String>) -> ApiResult<PdfOptions>
     }
 
     Ok(opts)
+}
+
+/// Parse and validate the `nativePageRanges` form field.
+/// Returns `None` if the field is absent or empty.
+/// Returns a parse error if the value is not a valid page-range expression.
+fn parse_native_page_ranges(map: &HashMap<String, String>) -> ApiResult<Option<(PageRanges, String)>> {
+    let Some(raw) = map.get("nativePageRanges").filter(|s| !s.is_empty()) else {
+        return Ok(None);
+    };
+    let trimmed = raw.trim();
+    match PageRanges::parse(trimmed) {
+        Ok(ranges) => Ok(Some((ranges, trimmed.to_string()))),
+        Err(_) => Err(ApiError::InvalidField {
+            field: "nativePageRanges",
+            message: format!(
+                "Chromium does not handle the page ranges '{trimmed}' (nativePageRanges) syntax"
+            ),
+        }),
+    }
+}
+
+/// After rendering, verify that the nativePageRanges (if provided) do not
+/// exceed the actual page count of the rendered PDF.
+fn validate_native_page_ranges_against_pdf(
+    pdf: &[u8],
+    native: &Option<(PageRanges, String)>,
+) -> ApiResult<()> {
+    let Some((ranges, raw)) = native else {
+        return Ok(());
+    };
+    let page_count = lopdf::Document::load_mem(pdf)
+        .map(|doc| doc.get_pages().len() as u32)
+        .unwrap_or(0);
+    // If none of the requested pages fall within [1, page_count], the range
+    // exceeds the document's actual page count.
+    if ranges.expand(page_count).is_empty() {
+        return Err(ApiError::InvalidField {
+            field: "nativePageRanges",
+            message: format!(
+                "The page ranges '{raw}' (nativePageRanges) exceeds the page count"
+            ),
+        });
+    }
+    Ok(())
+}
+
+/// Validate extra fields that are accepted by the chromium handlers but not
+/// part of core `PdfOptions` parsing: `splitMode`, `pdfa`, `pdfua`.
+fn validate_chromium_extra_fields(map: &HashMap<String, String>) -> ApiResult<()> {
+    if let Some(mode) = map.get("splitMode").filter(|s| !s.is_empty()) {
+        match mode.as_str() {
+            "intervals" | "pages" => {}
+            other => {
+                return Err(ApiError::InvalidField {
+                    field: "splitMode",
+                    message: format!("invalid splitMode '{other}': expected 'intervals' or 'pages'"),
+                });
+            }
+        }
+    }
+    if let Some(pdfa) = map.get("pdfa").filter(|s| !s.is_empty()) {
+        pdfa.parse::<PdfAProfile>().map_err(|_| ApiError::InvalidField {
+            field: "pdfa",
+            message: format!("invalid PDF/A profile '{pdfa}'"),
+        })?;
+    }
+    if let Some(pdfua) = map.get("pdfua").filter(|s| !s.is_empty()) {
+        match pdfua.trim().to_ascii_lowercase().as_str() {
+            "true" | "false" | "1" | "0" | "yes" | "no" | "on" | "off" => {}
+            other => {
+                return Err(ApiError::InvalidField {
+                    field: "pdfua",
+                    message: format!("expected boolean, got `{other}`"),
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Build a [`RequestContext`] from the captured form map.

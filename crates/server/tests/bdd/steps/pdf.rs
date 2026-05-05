@@ -271,6 +271,67 @@ fn extract_named_pdf(body: &[u8], filename: &str) -> Vec<u8> {
     panic!("File {filename} not found in ZIP response");
 }
 
+/// Step: Then the response PDF(s) should pass PDF/A validation
+pub async fn check_response_pdfa_valid(world: &mut PdfBroWorld) {
+    let body = world.body.as_ref().expect("No response body");
+    if body.starts_with(b"%PDF") {
+        match verapdf_validate(body) {
+            Some((true, _)) => {}
+            Some((false, n)) => panic!("Response PDF failed PDF/A validation with {n} failed rule(s)"),
+            None => eprintln!("WARN: verapdf not available; skipping PDF/A check"),
+        }
+    } else {
+        use std::io::{Cursor, Read};
+        let mut archive = zip::ZipArchive::new(Cursor::new(body))
+            .expect("Response is neither a PDF nor a ZIP");
+        for i in 0..archive.len() {
+            let mut entry = archive.by_index(i).expect("Failed to read ZIP entry");
+            let name = entry.name().to_string();
+            if name.ends_with(".pdf") {
+                let mut buf = Vec::new();
+                entry.read_to_end(&mut buf).expect("Failed to read ZIP entry");
+                match verapdf_validate(&buf) {
+                    Some((true, _)) => {}
+                    Some((false, n)) => panic!("{name} failed PDF/A validation with {n} failed rule(s)"),
+                    None => eprintln!("WARN: verapdf not available; skipping PDF/A check for {name}"),
+                }
+            }
+        }
+    }
+}
+
+/// Step: Then the response PDF(s) should be encrypted
+pub async fn check_response_encrypted(world: &mut PdfBroWorld) {
+    let body = world.body.as_ref().expect("No response body");
+    if body.starts_with(b"%PDF") {
+        assert!(is_pdf_encrypted(body), "Response PDF is not encrypted");
+    } else {
+        use std::io::{Cursor, Read};
+        let mut archive = zip::ZipArchive::new(Cursor::new(body))
+            .expect("Response is neither a PDF nor a ZIP");
+        for i in 0..archive.len() {
+            let mut entry = archive.by_index(i).expect("Failed to read ZIP entry");
+            let name = entry.name().to_string();
+            if name.ends_with(".pdf") {
+                let mut buf = Vec::new();
+                entry.read_to_end(&mut buf).expect("Failed to read ZIP entry");
+                assert!(is_pdf_encrypted(&buf), "{name} is not encrypted");
+            }
+        }
+    }
+}
+
+fn is_pdf_encrypted(bytes: &[u8]) -> bool {
+    match lopdf::Document::load_mem(bytes) {
+        Ok(doc) => doc.trailer.get(b"Encrypt").is_ok(),
+        Err(_) => {
+            // lopdf can fail to load encrypted PDFs; fall back to scanning for /Encrypt
+            let tail = &bytes[bytes.len().saturating_sub(8192)..];
+            tail.windows(8).any(|w| w == b"/Encrypt")
+        }
+    }
+}
+
 /// Step: Then the "foo.pdf" PDF should pass PDF/A validation
 pub async fn check_pdfa_valid(world: &mut PdfBroWorld, filename: String) {
     let body = world.body.as_ref().expect("No response body");

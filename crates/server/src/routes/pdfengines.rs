@@ -10,7 +10,7 @@ use engine::pdfops::{self, Metadata, SplitMode};
 
 use crate::error::{ApiError, ApiResult};
 use crate::multipart::{FormFields, UploadedFile};
-use crate::routes::util::{build_zip, output_filename, pdf_response, zip_response};
+use crate::routes::util::{apply_encryption, build_zip, output_filename, pdf_response, zip_response};
 use crate::state::AppState;
 use engine::Bookmark;
 use engine::PdfAProfile;
@@ -42,8 +42,27 @@ pub async fn pdfengines_merge(
         });
     }
 
+    // Validate pdfa/pdfua if either is explicitly provided
+    let pdfa_raw = form.map.get("pdfa").filter(|s| !s.is_empty());
+    let pdfua_raw = form.map.get("pdfua").filter(|s| !s.is_empty());
+    if pdfa_raw.is_some() || pdfua_raw.is_some() {
+        let pdfua_valid = pdfua_raw.map(|s| s == "true").unwrap_or(false);
+        if pdfa_raw.is_none() && !pdfua_valid {
+            return Err(ApiError::InvalidField {
+                field: "pdfa",
+                message: "either 'pdfa' or 'pdfua' form fields must be provided".to_string(),
+            });
+        }
+        if let Some(pdfa) = pdfa_raw {
+            pdfa.parse::<PdfAProfile>().map_err(|_| ApiError::InvalidField {
+                field: "pdfa",
+                message: "either 'pdfa' or 'pdfua' form fields must be provided".to_string(),
+            })?;
+        }
+    }
+
     // Validate: PDF/A + Encrypt is not supported
-    let has_pdfa = form.map.get("pdfa").filter(|s| !s.is_empty()).is_some();
+    let has_pdfa = pdfa_raw.is_some();
     let has_encrypt = form.map.get("userPassword").filter(|s| !s.is_empty()).is_some()
         || form.map.get("ownerPassword").filter(|s| !s.is_empty()).is_some();
     if has_pdfa && has_encrypt {
@@ -181,6 +200,7 @@ pub async fn pdfengines_merge(
         merged
     };
 
+    let merged = apply_encryption(merged, &form.map).await?;
     let filename = output_filename(&headers, "result");
     Ok(pdf_response(merged, &filename))
 }
@@ -208,8 +228,27 @@ pub async fn pdfengines_split(
         return Err(ApiError::MissingFile("files".to_string()));
     }
 
+    // Validate pdfa/pdfua if either is explicitly provided
+    let pdfa_raw = form.map.get("pdfa").filter(|s| !s.is_empty());
+    let pdfua_raw = form.map.get("pdfua").filter(|s| !s.is_empty());
+    if pdfa_raw.is_some() || pdfua_raw.is_some() {
+        let pdfua_valid = pdfua_raw.map(|s| s == "true").unwrap_or(false);
+        if pdfa_raw.is_none() && !pdfua_valid {
+            return Err(ApiError::InvalidField {
+                field: "pdfa",
+                message: "either 'pdfa' or 'pdfua' form fields must be provided".to_string(),
+            });
+        }
+        if let Some(pdfa) = pdfa_raw {
+            pdfa.parse::<PdfAProfile>().map_err(|_| ApiError::InvalidField {
+                field: "pdfa",
+                message: "either 'pdfa' or 'pdfua' form fields must be provided".to_string(),
+            })?;
+        }
+    }
+
     // Validate: PDF/A + Encrypt is not supported
-    let has_pdfa = form.map.get("pdfa").filter(|s| !s.is_empty()).is_some();
+    let has_pdfa = pdfa_raw.is_some();
     let has_encrypt = form.map.get("userPassword").filter(|s| !s.is_empty()).is_some()
         || form.map.get("ownerPassword").filter(|s| !s.is_empty()).is_some();
     if has_pdfa && has_encrypt {
@@ -288,16 +327,24 @@ pub async fn pdfengines_split(
 
     // Single-file, single-chunk, no-unify → return as PDF
     if all_chunks.len() == 1 && files.len() == 1 && !unify {
+        let chunk = apply_encryption(all_chunks.pop().unwrap(), &form.map).await?;
         let filename = output_filename(&headers, &input_stem);
-        return Ok(pdf_response(all_chunks.pop().unwrap(), &filename));
+        return Ok(pdf_response(chunk, &filename));
     }
 
     if unify && mode_was_pages && files.len() == 1 {
         let merged = tokio::task::spawn_blocking(move || merge_blobs(&all_chunks))
             .await
             .map_err(|e| ApiError::Internal(e.to_string()))??;
+        let merged = apply_encryption(merged, &form.map).await?;
         let filename = output_filename(&headers, &input_stem);
         return Ok(pdf_response(merged, &filename));
+    }
+
+    // Encrypt each chunk individually before building the ZIP
+    let mut encrypted_chunks = Vec::with_capacity(all_chunks.len());
+    for chunk in all_chunks {
+        encrypted_chunks.push(apply_encryption(chunk, &form.map).await?);
     }
 
     let zip_name = {
@@ -308,7 +355,7 @@ pub async fn pdfengines_split(
             .unwrap_or("result");
         format!("{stem}.zip")
     };
-    let zip = build_zip(&all_names, &all_chunks)?;
+    let zip = build_zip(&all_names, &encrypted_chunks)?;
     Ok(zip_response(zip, &zip_name))
 }
 
@@ -1034,7 +1081,7 @@ pub async fn pdfengines_watermark(
                 .map_err(|e| ApiError::Internal(e.to_string()))?;
             WatermarkKind::ImagePng { bytes }
         }
-        _ => {
+        "text" => {
             let text = form.map.get("watermarkExpression")
                 .or_else(|| form.map.get("watermark"))
                 .or_else(|| form.map.get("text"))
@@ -1046,6 +1093,10 @@ pub async fn pdfengines_watermark(
                 color: [0.5, 0.5, 0.5, 0.5],
             }
         }
+        other => return Err(ApiError::InvalidField {
+            field: "watermarkSource",
+            message: format!("must be one of: text, image, pdf (got '{other}')"),
+        }),
     };
 
     let opts = parse_watermark_options(&form.map, kind)?;
@@ -1119,7 +1170,7 @@ pub async fn pdfengines_stamp(
                 .map_err(|e| ApiError::Internal(e.to_string()))?;
             WatermarkKind::ImagePng { bytes }
         }
-        _ => {
+        "text" => {
             let text = form.map.get("stampExpression")
                 .or_else(|| form.map.get("stamp"))
                 .or_else(|| form.map.get("text"))
@@ -1131,6 +1182,10 @@ pub async fn pdfengines_stamp(
                 color: [0.5, 0.5, 0.5, 0.5],
             }
         }
+        other => return Err(ApiError::InvalidField {
+            field: "stampSource",
+            message: format!("must be one of: text, image, pdf (got '{other}')"),
+        }),
     };
 
     let opts = parse_watermark_options(&form.map, kind)?;

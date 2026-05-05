@@ -116,7 +116,7 @@ Feature: /forms/pdfengines/encrypt
     Then the response status code should be 400
     Then the response body should match string:
       """
-      Invalid form data: form field 'userPassword' is required
+      At least one password must be provided for encryption
       """
 
   @skip

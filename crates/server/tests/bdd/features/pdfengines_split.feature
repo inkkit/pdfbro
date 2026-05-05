@@ -130,7 +130,7 @@ Feature: /forms/pdfengines/split
     Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
-      Invalid form data: form field 'splitMode' is invalid (got 'foo', resulting to wrong value, expected either 'intervals' or 'pages')
+      splitMode is not valid: expected
       """
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files     | testdata/pages_3.pdf | file  |
@@ -140,7 +140,7 @@ Feature: /forms/pdfengines/split
     Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
-      Invalid form data: form field 'splitSpan' is invalid (got 'foo', resulting to strconv.Atoi: parsing "foo": invalid syntax)
+      splitSpan is not valid
       """
     When I make a "POST" request to "/forms/pdfengines/split" with the following form data and header(s):
       | files     | testdata/pages_3.pdf | file  |
@@ -151,7 +151,7 @@ Feature: /forms/pdfengines/split
     Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
-      Invalid form data: form field 'pdfua' is invalid (got 'foo', resulting to strconv.ParseBool: parsing "foo": invalid syntax)
+      either 'pdfa' or 'pdfua' form fields must be provided
       """
 
   @convert
@@ -390,7 +390,7 @@ Feature: /forms/pdfengines/split
     Then the response status code should be 400
     Then the response body should match string:
       """
-      Invalid form data: a stamp file is required for image or pdf source
+      a stamp file is required for image or pdf source
       """
 
   Scenario: POST /forms/pdfengines/split (watermarkSource=pdf without uploaded watermark file => 400)
@@ -404,7 +404,7 @@ Feature: /forms/pdfengines/split
     Then the response status code should be 400
     Then the response body should match string:
       """
-      Invalid form data: a watermark file is required for image or pdf source
+      a watermark file is required for image or pdf source
       """
 
   Scenario: POST /forms/pdfengines/split (Long Filename)

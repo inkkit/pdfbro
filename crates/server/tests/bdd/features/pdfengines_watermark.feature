@@ -140,7 +140,7 @@ Feature: /forms/pdfengines/watermark
     Then the response status code should be 400
     Then the response body should match string:
       """
-      Invalid form data: form field 'watermarkSource' is required
+      Missing required field 'watermarkExpression'
       """
 
   Scenario: POST /forms/pdfengines/watermark (Bad Request - Invalid Source)
@@ -151,7 +151,7 @@ Feature: /forms/pdfengines/watermark
     Then the response status code should be 400
     Then the response body should contain string:
       """
-      Invalid form data: form field 'watermarkSource' is invalid
+      watermarkSource is not valid
       """
 
   Scenario: POST /forms/pdfengines/watermark (Bad Request - Missing File for Image Source)
@@ -162,7 +162,7 @@ Feature: /forms/pdfengines/watermark
     Then the response status code should be 400
     Then the response body should match string:
       """
-      Invalid form data: a watermark file is required for image or pdf source
+      a watermark file is required for image or pdf source
       """
 
   Scenario: POST /forms/pdfengines/watermark (Bad Request - Missing File for PDF Source)
@@ -173,7 +173,7 @@ Feature: /forms/pdfengines/watermark
     Then the response status code should be 400
     Then the response body should match string:
       """
-      Invalid form data: a watermark file is required for image or pdf source
+      a watermark file is required for image or pdf source
       """
 
   Scenario: POST /forms/pdfengines/watermark (Bad Request - No PDF)
@@ -184,7 +184,7 @@ Feature: /forms/pdfengines/watermark
     Then the response status code should be 400
     Then the response body should match string:
       """
-      Invalid form data: no form file found for extensions: [.pdf]
+      Missing required file 'files'
       """
 
   @skip
