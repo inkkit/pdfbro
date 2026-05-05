@@ -696,9 +696,61 @@ fn engine_bytes_total(families: &[prometheus::proto::MetricFamily], engine: &str
         .unwrap_or(0.0)
 }
 
-/// Build batch job payloads (placeholder - batch worker not yet implemented).
-async fn build_batch_payloads(_state: &crate::state::AppState) -> Vec<BatchPayload> {
-    vec![]
+async fn build_batch_payloads(state: &crate::state::AppState) -> Vec<BatchPayload> {
+    let Some(ref manager) = state.batch_manager else { return vec![]; };
+
+    let ids = manager.list_batches().await;
+    let mut batches: Vec<BatchPayload> = Vec::new();
+
+    for id in &ids {
+        let Some(b) = manager.get_batch(id).await else { continue };
+        if b.is_expired() { continue; }
+
+        let progress = b.progress();
+        let progress_pct = if progress.total > 0 {
+            ((progress.completed + progress.failed) * 100 / progress.total) as u8
+        } else {
+            0
+        };
+
+        let elapsed_secs = b.submitted_at.elapsed().unwrap_or_default().as_secs();
+        let elapsed = if elapsed_secs < 60 {
+            format!("{}s", elapsed_secs)
+        } else {
+            format!("{}m {}s", elapsed_secs / 60, elapsed_secs % 60)
+        };
+
+        let status = match b.status {
+            crate::routes::batch_types::BatchStatus::Queued     => "queued",
+            crate::routes::batch_types::BatchStatus::Processing => "running",
+            crate::routes::batch_types::BatchStatus::Completed  => "completed",
+            crate::routes::batch_types::BatchStatus::Failed     => "failed",
+        }.to_string();
+
+        let output_mode = match b.request.output_mode {
+            crate::routes::batch_types::OutputMode::Zip   => "zip",
+            crate::routes::batch_types::OutputMode::Merge => "merge",
+        }.to_string();
+
+        batches.push(BatchPayload {
+            id: id.to_string(),
+            status,
+            progress_pct,
+            elapsed,
+            total_items:     progress.total,
+            completed_items: progress.completed,
+            failed_items:    progress.failed,
+            output_mode,
+        });
+    }
+
+    // Running first, then queued, then completed/failed; cap at 10
+    batches.sort_by(|a, b| {
+        let order = |s: &str| match s { "running" => 0, "queued" => 1, _ => 2 };
+        order(&a.status).cmp(&order(&b.status))
+    });
+    batches.truncate(10);
+    batches
 }
 
 /// Total system RAM in MB (cached on first call).
