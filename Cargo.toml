@@ -4,7 +4,7 @@ members = ["crates/*", "bench"]
 default-members = ["crates/engine", "crates/server", "crates/cli"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.0.2"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/vel/pdfbro"
