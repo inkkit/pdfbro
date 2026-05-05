@@ -424,14 +424,12 @@ pub async fn build_console_payload(
         uptime_seconds,
         ticker: TickerPayload {
             rps: last_rps,
+            p50_ms: 0.0,
+            p55_ms: 0.0,
             p95_ms: last_p95_ms,
             error_pct: last_error_pct,
             concurrency_active,
             concurrency_max,
-            chromium_status: chromium_status.clone(),
-            chromium_restarts,
-            libreoffice_status: libreoffice_status.clone(),
-            libreoffice_restarts,
             queue_size,
             uptime_seconds,
         },
@@ -445,6 +443,10 @@ pub async fn build_console_payload(
                 restarts: chromium_restarts,
                 mode: if state.config.chromium_lazy_start { "lazy".to_string() } else { "eager".to_string() },
                 mini_series: mini.clone(),
+                conversions_total: 0,
+                error_rate: 0.0,
+                bytes_mb: 0.0,
+                idle_secs: 0,
             });
             #[cfg(feature = "libreoffice")]
             engines.push(EnginePayload {
@@ -453,6 +455,10 @@ pub async fn build_console_payload(
                 restarts: libreoffice_restarts,
                 mode: if state.config.libreoffice_lazy_start { "lazy".to_string() } else { "eager".to_string() },
                 mini_series: mini,
+                conversions_total: 0,
+                error_rate: 0.0,
+                bytes_mb: 0.0,
+                idle_secs: 0,
             });
             engines
         },
@@ -461,13 +467,19 @@ pub async fn build_console_payload(
             max: concurrency_max,
             warn_threshold: (concurrency_max as f64 * 0.60) as u32,
             crit_threshold: (concurrency_max as f64 * 0.85) as u32,
+            queue_wait_p95_ms: 0.0,
+            queue_processing: 0,
         },
         resources: ResourcesPayload { cpu_series, memory_series, memory_max_mb },
         throughput: ThroughputPayload {
+            ts_series: vec![],
             rps_series,
             rps_baseline: 0.0,
             p95_series,
             p95_target_s: 2.0,
+            chromium_conv_series: vec![],
+            libreoffice_conv_series: vec![],
+            queue_wait_p95_series: vec![],
         },
         batches,
         recent_requests,
