@@ -46,7 +46,7 @@
                         <strong style="font-size:{D.fz + 0.5}px">{e.name}</strong>
                         <Pill tone={engineTone(e)} {t}>{e.status.toUpperCase()}</Pill>
                         {#if (convRps[e.name.toLowerCase()] ?? 0) > 0}
-                            <span style="font-family:ui-monospace,monospace;font-size:9px;color:{t.ok};background:{t.faint};padding:1px 5px;border-radius:3px">{(convRps[e.name.toLowerCase()] ?? 0).toFixed(2)} c/s</span>
+                            <span style="font-family:ui-monospace,monospace;font-size:9px;color:{t.ok};background:{t.faint};padding:1px 5px;border-radius:3px">{(convRps[e.name.toLowerCase()] ?? 0).toFixed(2)} conv/s</span>
                         {/if}
                     </div>
                     <span style="color:{t.muted};font-size:10px;font-family:ui-monospace,monospace">
@@ -65,7 +65,7 @@
                 {/if}
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;margin-top:5px;font-size:9px;font-family:ui-monospace,monospace">
                     <div style="background:{t.faint};border-radius:3px;padding:3px 5px">
-                        <div style="color:{t.muted}">conv</div>
+                        <div style="color:{t.muted}">total conv</div>
                         <div style="font-weight:600">{e.conversions_total}</div>
                     </div>
                     <div style="background:{t.faint};border-radius:3px;padding:3px 5px">

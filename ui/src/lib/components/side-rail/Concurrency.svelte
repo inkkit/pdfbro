@@ -79,10 +79,11 @@
         <!-- Queue stats row -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
             <div style="background:{t.faint};border-radius:4px;padding:4px 8px;font-size:10px;font-family:ui-monospace,monospace">
-                <div style="color:{t.muted};font-size:9px;text-transform:uppercase;letter-spacing:0.04em">queue wait p95</div>
+                <div style="color:{t.muted};font-size:9px;text-transform:uppercase;letter-spacing:0.04em">wait p95</div>
                 <div style="font-weight:600;color:{conc.queue_wait_p95_ms > 5000 ? t.err : conc.queue_wait_p95_ms > 1000 ? t.warn : t.ok}">
                     {conc.queue_wait_p95_ms >= 1000 ? `${(conc.queue_wait_p95_ms / 1000).toFixed(1)}s` : `${conc.queue_wait_p95_ms.toFixed(0)}ms`}
                 </div>
+                <div style="color:{t.muted};font-size:8px;margin-top:1px">time before slot acquired</div>
             </div>
             <div style="background:{t.faint};border-radius:4px;padding:4px 8px;font-size:10px;font-family:ui-monospace,monospace">
                 <div style="color:{t.muted};font-size:9px;text-transform:uppercase;letter-spacing:0.04em">processing</div>
