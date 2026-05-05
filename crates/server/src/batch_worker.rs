@@ -94,7 +94,15 @@ async fn process_items(
         let input_dir = input_dir.clone();
 
         let handle = tokio::spawn(async move {
+            let wait_start = std::time::Instant::now();
             let _permit = permit.acquire().await.expect("semaphore closed");
+            let wait_secs = wait_start.elapsed().as_secs_f64();
+
+            // Record how long this item waited for a semaphore slot.
+            app_state.metrics.queue_wait
+                .with_label_values(&["success"])
+                .observe(wait_secs);
+            app_state.metrics.queue_processing.inc();
 
             {
                 let mut batch = state_manager.get_batch(&batch_id).await.expect("batch disappeared");
@@ -123,6 +131,7 @@ async fn process_items(
                 state_manager.update_batch(batch).await;
             }
 
+            app_state.metrics.queue_processing.dec();
             result
         });
 

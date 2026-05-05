@@ -802,7 +802,10 @@ pub fn spawn_console_sampler(state: crate::state::AppState, started_at: Instant)
 
         // Detect cgroup limits once at startup (Docker/Kubernetes)
         let cgroup = CgroupLimits::detect();
-        let num_host_cpus = sys.cpus().len();
+        let num_host_cpus = sys.cpus().len().max(1);
+
+        // For cgroup v2 CPU tracking: keep running total so we can delta each tick.
+        let mut prev_cpu_usec: Option<u64> = crate::cgroup::read_cpu_usage_usec();
 
         let mut interval = tokio::time::interval(Duration::from_secs(5));
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -810,26 +813,43 @@ pub fn spawn_console_sampler(state: crate::state::AppState, started_at: Instant)
         loop {
             interval.tick().await;
 
-            // ── CPU + memory via sysinfo (cross-platform) ──────────────────
-            sys.refresh_cpu_usage();
-            let host_cpu_pct = sys.global_cpu_usage() as f64;
-            sys.refresh_memory();
-
-            // Use cgroup-aware values when running in a container
-            let cpu_pct = if cgroup.is_container {
-                cgroup.cpu_pct_relative_to_limit(host_cpu_pct, num_host_cpus)
-            } else {
-                host_cpu_pct
+            // ── CPU ────────────────────────────────────────────────────────
+            // Prefer cgroup v2 cpu.stat delta (accurate per-container %).
+            // Fall back to sysinfo global_cpu_usage when not in a container.
+            let cpu_pct = {
+                let new_usec = crate::cgroup::read_cpu_usage_usec();
+                match (prev_cpu_usec, new_usec) {
+                    (Some(prev), Some(curr)) if curr >= prev => {
+                        let delta_usec = (curr - prev) as f64;
+                        // delta_usec / 5_000_000 = fraction of 1 CPU used over 5 s.
+                        // Divide by the cgroup CPU limit (cores) to get % of container quota.
+                        let limit_cores = cgroup.cpu_limit_cores.unwrap_or(num_host_cpus as f64);
+                        let pct = (delta_usec / (5_000_000.0 * limit_cores)) * 100.0;
+                        prev_cpu_usec = new_usec;
+                        pct.min(100.0)
+                    }
+                    _ => {
+                        // Not on cgroup v2 — fall back to sysinfo
+                        prev_cpu_usec = new_usec;
+                        sys.refresh_cpu_usage();
+                        let host_pct = sys.global_cpu_usage() as f64;
+                        if cgroup.is_container {
+                            cgroup.cpu_pct_relative_to_limit(host_pct, num_host_cpus).min(100.0)
+                        } else {
+                            host_pct
+                        }
+                    }
+                }
             };
 
-            let memory_mb = cgroup.memory_used_mb
+            // ── Memory ─────────────────────────────────────────────────────
+            // Re-read cgroup memory.current each tick (stale startup snapshot is wrong).
+            sys.refresh_memory();
+            let memory_mb = crate::cgroup::read_memory_used_mb()
                 .unwrap_or_else(|| sys.used_memory() as f64 / 1024.0 / 1024.0);
 
-            // Update Prometheus gauge with cgroup-aware memory if available
-            let memory_bytes = cgroup.memory_used_mb
-                .map(|m| (m * 1024.0 * 1024.0) as u64)
-                .unwrap_or_else(|| sys.used_memory());
-            state.metrics.process_resident_memory.set(memory_bytes as f64);
+            // Update Prometheus gauge
+            state.metrics.process_resident_memory.set(memory_mb * 1024.0 * 1024.0);
 
             // ── Engine health: use atomic is_alive() — never blocks on the
             // engine's internal mutex, so heavy batch load can't stall the sampler.

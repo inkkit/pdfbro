@@ -151,6 +151,34 @@ impl CgroupLimits {
     }
 }
 
+/// Read current memory usage in MB fresh from cgroup (called every sampler tick).
+/// Tries cgroup v2 then v1; returns None when not running in a container.
+pub fn read_memory_used_mb() -> Option<f64> {
+    if let Ok(s) = fs::read_to_string("/sys/fs/cgroup/memory.current") {
+        if let Ok(bytes) = s.trim().parse::<u64>() {
+            return Some(bytes as f64 / 1024.0 / 1024.0);
+        }
+    }
+    if let Ok(s) = fs::read_to_string("/sys/fs/cgroup/memory/memory.usage_in_bytes") {
+        if let Ok(bytes) = s.trim().parse::<u64>() {
+            return Some(bytes as f64 / 1024.0 / 1024.0);
+        }
+    }
+    None
+}
+
+/// Read cumulative CPU usage in microseconds from cgroup v2 `cpu.stat`.
+/// Returns None when not on cgroup v2 or the file is absent.
+pub fn read_cpu_usage_usec() -> Option<u64> {
+    let content = fs::read_to_string("/sys/fs/cgroup/cpu.stat").ok()?;
+    for line in content.lines() {
+        if let Some(rest) = line.strip_prefix("usage_usec ") {
+            return rest.trim().parse().ok();
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -7,8 +7,9 @@
 
     let { conc, t, D }: { conc: ConcurrencyPayload; t: Theme; D: { pad: number; fz: number } } = $props();
 
-    let tone = $derived((conc.active >= conc.crit_threshold ? 'err' : conc.active >= conc.warn_threshold ? 'warn' : 'ok') as 'ok' | 'warn' | 'err');
+    let tone = $derived((conc.active >= conc.crit_threshold ? 'warn' : conc.active >= conc.warn_threshold ? 'warn' : 'ok') as 'ok' | 'warn' | 'err');
     let pct = $derived(Math.round((conc.active / Math.max(1, conc.max)) * 100));
+    let statusLabel = $derived(conc.active > conc.max ? 'BUSY' : tone === 'warn' ? 'WARN' : 'OK');
 
     let hoveredSlot = $state<number | null>(null);
 
@@ -34,7 +35,7 @@
             <div style="font-family:ui-monospace,monospace;font-size:26px;font-weight:600;letter-spacing:-0.01em">
                 {conc.active}<span style="color:{t.muted};font-weight:400"> / {conc.max}</span>
             </div>
-            <Pill {tone} {t}>{pct}% · {tone}</Pill>
+            <Pill {tone} {t}>{Math.min(pct, 100)}% · {statusLabel}</Pill>
         </div>
 
         <!-- Slot grid -->
