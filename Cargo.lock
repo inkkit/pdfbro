@@ -694,7 +694,7 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
 name = "cli"
-version = "0.0.2"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -1120,7 +1120,7 @@ dependencies = [
 
 [[package]]
 name = "engine"
-version = "0.0.2"
+version = "0.1.0"
 dependencies = [
  "axum 0.8.9",
  "chromiumoxide",
@@ -2049,7 +2049,7 @@ dependencies = [
 
 [[package]]
 name = "js"
-version = "0.0.2"
+version = "0.1.0"
 dependencies = [
  "engine",
  "napi",
@@ -2914,7 +2914,7 @@ checksum = "e0c5ccf5294c6ccd63a74f1565028353830a9c2f5eb0c682c355c471726a6e3f"
 
 [[package]]
 name = "py"
-version = "0.0.2"
+version = "0.1.0"
 dependencies = [
  "engine",
  "parking_lot",
@@ -3696,7 +3696,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.0.2"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
