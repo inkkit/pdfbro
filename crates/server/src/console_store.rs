@@ -598,6 +598,62 @@ fn percentile_from_histogram(buckets: &[prometheus::proto::Bucket], total_count:
         .unwrap_or(0.0)
 }
 
+/// Extract a percentile (ms) from a named Prometheus histogram by aggregating all label combinations.
+fn global_histogram_pct(families: &[prometheus::proto::MetricFamily], name: &str, pct: f64) -> f64 {
+    let Some(family) = families.iter().find(|f| f.get_name() == name) else { return 0.0; };
+    let mut agg_count = 0u64;
+    let mut agg_buckets: Vec<(f64, u64)> = Vec::new();
+    for m in family.get_metric() {
+        let hist = m.get_histogram();
+        agg_count += hist.get_sample_count();
+        for (i, b) in hist.get_bucket().iter().enumerate() {
+            if agg_buckets.len() <= i {
+                agg_buckets.push((b.get_upper_bound(), b.get_cumulative_count()));
+            } else {
+                agg_buckets[i].1 += b.get_cumulative_count();
+            }
+        }
+    }
+    if agg_count == 0 || agg_buckets.is_empty() { return 0.0; }
+    let target = (agg_count as f64 * pct) as u64;
+    let mut prev_count = 0u64;
+    let mut prev_bound = 0.0f64;
+    for (bound, count) in &agg_buckets {
+        if bound.is_infinite() { break; }
+        if *count >= target {
+            if *count == prev_count { return prev_bound * 1000.0; }
+            return (prev_bound + (bound - prev_bound)
+                * ((target - prev_count) as f64 / (count - prev_count) as f64)) * 1000.0;
+        }
+        prev_count = *count;
+        prev_bound = *bound;
+    }
+    agg_buckets.iter().rev().find(|(b, _)| !b.is_infinite())
+        .map(|(b, _)| b * 1000.0).unwrap_or(0.0)
+}
+
+/// Sum a counter metric for a specific engine label value.
+fn engine_conv_total(families: &[prometheus::proto::MetricFamily], engine: &str) -> f64 {
+    families.iter()
+        .find(|f| f.get_name() == "pdfbro_conversions_total")
+        .map(|f| f.get_metric().iter()
+            .filter(|m| m.get_label().iter().any(|l| l.get_name() == "engine" && l.get_value() == engine))
+            .map(|m| m.get_counter().get_value())
+            .sum())
+        .unwrap_or(0.0)
+}
+
+/// Total bytes processed by an engine from pdfbro_conversion_bytes_total.
+fn engine_bytes_total(families: &[prometheus::proto::MetricFamily], engine: &str) -> f64 {
+    families.iter()
+        .find(|f| f.get_name() == "pdfbro_conversion_bytes_total")
+        .map(|f| f.get_metric().iter()
+            .filter(|m| m.get_label().iter().any(|l| l.get_name() == "engine" && l.get_value() == engine))
+            .map(|m| m.get_counter().get_value())
+            .sum())
+        .unwrap_or(0.0)
+}
+
 /// Build batch job payloads (placeholder - batch worker not yet implemented).
 async fn build_batch_payloads(_state: &crate::state::AppState) -> Vec<BatchPayload> {
     vec![]
@@ -775,6 +831,26 @@ pub fn spawn_console_sampler(state: crate::state::AppState, started_at: Instant)
                 })
                 .unwrap_or(0.0);
 
+            // ── p50 + p55 from HTTP duration histogram ─────────────────────
+            let p50_ms = global_histogram_pct(&families, "pdfbro_http_request_duration_seconds", 0.50);
+            let p55_ms = global_histogram_pct(&families, "pdfbro_http_request_duration_seconds", 0.55);
+
+            // ── Per-engine conversion RPS ──────────────────────────────────
+            let chromium_total = engine_conv_total(&families, "chromium");
+            let libreoffice_total = engine_conv_total(&families, "libreoffice");
+            let (chromium_conv_rps, libreoffice_conv_rps) = {
+                let mut prev_ch = state.console.prev_chromium_conv_total.lock().await;
+                let mut prev_lo = state.console.prev_libreoffice_conv_total.lock().await;
+                let ch_rps = (chromium_total - *prev_ch).max(0.0) / 5.0;
+                let lo_rps = (libreoffice_total - *prev_lo).max(0.0) / 5.0;
+                *prev_ch = chromium_total;
+                *prev_lo = libreoffice_total;
+                (ch_rps, lo_rps)
+            };
+
+            // ── Queue wait p95 ─────────────────────────────────────────────
+            let queue_wait_p95_ms = global_histogram_pct(&families, "pdfbro_queue_wait_seconds", 0.95);
+
             // ── Concurrency ────────────────────────────────────────────────
             let _concurrency_max = state.config.concurrency as u32;
             let concurrency_active = state.console.active_requests.load(Ordering::SeqCst);
@@ -784,17 +860,17 @@ pub fn spawn_console_sampler(state: crate::state::AppState, started_at: Instant)
                 ts: std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
                 rps,
-                p50_ms: 0.0,
-                p55_ms: 0.0,
+                p50_ms,
+                p55_ms,
                 p95_ms,
                 error_pct,
                 queue_size: state.metrics.queue_size.get() as u32,
                 concurrency_active,
                 cpu_pct,
                 memory_mb,
-                chromium_conv_rps: 0.0,
-                libreoffice_conv_rps: 0.0,
-                queue_wait_p95_ms: 0.0,
+                chromium_conv_rps,
+                libreoffice_conv_rps,
+                queue_wait_p95_ms,
             };
 
             state.console.history.lock().await.push(sample);
