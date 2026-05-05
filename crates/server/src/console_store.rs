@@ -20,6 +20,10 @@ pub struct MetricsSample {
     pub ts: u64,
     /// Requests per second.
     pub rps: f64,
+    /// p50 latency in milliseconds.
+    pub p50_ms: f64,
+    /// p55 latency in milliseconds.
+    pub p55_ms: f64,
     /// p95 latency in milliseconds.
     pub p95_ms: f64,
     /// Error percentage (0-100).
@@ -32,6 +36,12 @@ pub struct MetricsSample {
     pub cpu_pct: f64,
     /// Memory usage in MB (cgroup-aware in containers).
     pub memory_mb: f64,
+    /// Chromium conversion requests per second.
+    pub chromium_conv_rps: f64,
+    /// LibreOffice conversion requests per second.
+    pub libreoffice_conv_rps: f64,
+    /// p95 queue wait time in milliseconds.
+    pub queue_wait_p95_ms: f64,
 }
 
 /// Ring buffer of metrics samples for time-series display.
@@ -103,6 +113,12 @@ pub struct ConsoleStore {
     pub prev_http_total: Mutex<f64>,
     /// Previous error total for error rate delta calculation.
     pub prev_error_total: Mutex<f64>,
+    /// Previous Chromium conversion total for per-engine RPS delta.
+    pub prev_chromium_conv_total: Mutex<f64>,
+    /// Previous LibreOffice conversion total for per-engine RPS delta.
+    pub prev_libreoffice_conv_total: Mutex<f64>,
+    /// Previous per-route HTTP totals for per-route RPS delta.
+    pub prev_route_totals: Mutex<HashMap<String, f64>>,
     /// Live count of HTTP requests currently in flight.
     pub active_requests: AtomicU32,
     /// Per-route count of HTTP requests currently in flight.
@@ -126,6 +142,9 @@ impl ConsoleStore {
             libreoffice_was_running: AtomicBool::new(false),
             prev_http_total: Mutex::new(0.0),
             prev_error_total: Mutex::new(0.0),
+            prev_chromium_conv_total: Mutex::new(0.0),
+            prev_libreoffice_conv_total: Mutex::new(0.0),
+            prev_route_totals: Mutex::new(HashMap::new()),
             active_requests: AtomicU32::new(0),
             active_per_route: Mutex::new(HashMap::new()),
         }
@@ -712,12 +731,17 @@ pub fn spawn_console_sampler(state: crate::state::AppState, started_at: Instant)
                 ts: std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
                 rps,
+                p50_ms: 0.0,
+                p55_ms: 0.0,
                 p95_ms,
                 error_pct,
                 queue_size: state.metrics.queue_size.get() as u32,
                 concurrency_active,
                 cpu_pct,
                 memory_mb,
+                chromium_conv_rps: 0.0,
+                libreoffice_conv_rps: 0.0,
+                queue_wait_p95_ms: 0.0,
             };
 
             state.console.history.lock().await.push(sample);
