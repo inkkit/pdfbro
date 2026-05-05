@@ -51,6 +51,9 @@ pub trait PdfBackend: Send + Sync + 'static {
     /// Liveness probe.
     async fn healthy(&self) -> bool;
 
+    /// Seconds since the last conversion handled by this engine. Returns 0 if never used.
+    fn idle_secs(&self) -> u64 { 0 }
+
     /// Render HTML to screenshot image.
     #[cfg(feature = "chromium")]
     async fn html_to_screenshot(&self, html: &str, opts: &ScreenshotOptions) -> EngineResult<Vec<u8>>;
@@ -115,6 +118,10 @@ impl PdfBackend for ChromiumBackend {
 
     async fn healthy(&self) -> bool {
         self.inner.healthy().await
+    }
+
+    fn idle_secs(&self) -> u64 {
+        self.inner.idle_secs()
     }
 
     async fn html_to_screenshot(&self, html: &str, opts: &ScreenshotOptions) -> EngineResult<Vec<u8>> {

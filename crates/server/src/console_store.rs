@@ -370,16 +370,26 @@ pub async fn build_console_payload(
     // fast requests that finish between sampler ticks still appear in the UI.
     let concurrency_active = state.console.active_requests.load(Ordering::SeqCst);
 
-    let (rps_series, p95_series, cpu_series, memory_series, last_rps, last_p95_ms, last_error_pct) = {
+    let (ts_series, rps_series, p95_series, cpu_series, memory_series,
+         chromium_conv_series, libreoffice_conv_series, queue_wait_p95_series,
+         last_rps, last_p50_ms, last_p55_ms, last_p95_ms, last_error_pct) = {
         let history = state.console.history.lock().await;
-        let rps_series: Vec<f64> = history.samples.iter().map(|s| s.rps).collect();
-        let p95_series: Vec<f64> = history.samples.iter().map(|s| s.p95_ms / 1000.0).collect();
-        let cpu_series: Vec<f64> = history.samples.iter().map(|s| s.cpu_pct).collect();
+        let ts_series: Vec<u64>   = history.samples.iter().map(|s| s.ts).collect();
+        let rps_series: Vec<f64>  = history.samples.iter().map(|s| s.rps).collect();
+        let p95_series: Vec<f64>  = history.samples.iter().map(|s| s.p95_ms / 1000.0).collect();
+        let cpu_series: Vec<f64>  = history.samples.iter().map(|s| s.cpu_pct).collect();
         let memory_series: Vec<f64> = history.samples.iter().map(|s| s.memory_mb).collect();
-        let last_rps = rps_series.last().copied().unwrap_or(0.0);
-        let last_p95_ms = p95_series.last().copied().unwrap_or(0.0) * 1000.0;
+        let chromium_conv_series: Vec<f64>    = history.samples.iter().map(|s| s.chromium_conv_rps).collect();
+        let libreoffice_conv_series: Vec<f64> = history.samples.iter().map(|s| s.libreoffice_conv_rps).collect();
+        let queue_wait_p95_series: Vec<f64>   = history.samples.iter().map(|s| s.queue_wait_p95_ms).collect();
+        let last_rps       = rps_series.last().copied().unwrap_or(0.0);
+        let last_p50_ms    = history.samples.back().map_or(0.0, |s| s.p50_ms);
+        let last_p55_ms    = history.samples.back().map_or(0.0, |s| s.p55_ms);
+        let last_p95_ms    = p95_series.last().copied().unwrap_or(0.0) * 1000.0;
         let last_error_pct = history.samples.back().map_or(0.0, |s| s.error_pct);
-        (rps_series, p95_series, cpu_series, memory_series, last_rps, last_p95_ms, last_error_pct)
+        (ts_series, rps_series, p95_series, cpu_series, memory_series,
+         chromium_conv_series, libreoffice_conv_series, queue_wait_p95_series,
+         last_rps, last_p50_ms, last_p55_ms, last_p95_ms, last_error_pct)
     };
 
     let queue_size = state.metrics.queue_size.get();
@@ -424,8 +434,8 @@ pub async fn build_console_payload(
         uptime_seconds,
         ticker: TickerPayload {
             rps: last_rps,
-            p50_ms: 0.0,
-            p55_ms: 0.0,
+            p50_ms: last_p50_ms,
+            p55_ms: last_p55_ms,
             p95_ms: last_p95_ms,
             error_pct: last_error_pct,
             concurrency_active,
@@ -435,31 +445,60 @@ pub async fn build_console_payload(
         },
         routes,
         engines: {
+            let eng_families = prometheus::gather();
             let mut engines = Vec::new();
             #[cfg(feature = "chromium")]
-            engines.push(EnginePayload {
-                name: "Chromium".to_string(),
-                status: chromium_status.clone(),
-                restarts: chromium_restarts,
-                mode: if state.config.chromium_lazy_start { "lazy".to_string() } else { "eager".to_string() },
-                mini_series: mini.clone(),
-                conversions_total: 0,
-                error_rate: 0.0,
-                bytes_mb: 0.0,
-                idle_secs: 0,
-            });
+            {
+                let ch_total = engine_conv_total(&eng_families, "chromium");
+                let ch_errors: f64 = eng_families.iter()
+                    .find(|f| f.get_name() == "pdfbro_conversions_total")
+                    .map(|f| f.get_metric().iter()
+                        .filter(|m| m.get_label().iter().any(|l| l.get_name() == "engine" && l.get_value() == "chromium")
+                            && m.get_label().iter().any(|l| l.get_name() == "status" && l.get_value() == "error"))
+                        .map(|m| m.get_counter().get_value())
+                        .sum())
+                    .unwrap_or(0.0);
+                let ch_bytes_mb = engine_bytes_total(&eng_families, "chromium") / (1024.0 * 1024.0);
+                let ch_error_rate = if ch_total > 0.0 { (ch_errors / ch_total) * 100.0 } else { 0.0 };
+                let ch_idle = match state.chromium.as_ref() { Some(be) => be.idle_secs(), None => 0 };
+                engines.push(EnginePayload {
+                    name: "Chromium".to_string(),
+                    status: chromium_status.clone(),
+                    restarts: chromium_restarts,
+                    mode: if state.config.chromium_lazy_start { "lazy".to_string() } else { "eager".to_string() },
+                    mini_series: mini.clone(),
+                    conversions_total: ch_total as u64,
+                    error_rate: ch_error_rate,
+                    bytes_mb: ch_bytes_mb,
+                    idle_secs: ch_idle,
+                });
+            }
             #[cfg(feature = "libreoffice")]
-            engines.push(EnginePayload {
-                name: "LibreOffice".to_string(),
-                status: libreoffice_status.clone(),
-                restarts: libreoffice_restarts,
-                mode: if state.config.libreoffice_lazy_start { "lazy".to_string() } else { "eager".to_string() },
-                mini_series: mini,
-                conversions_total: 0,
-                error_rate: 0.0,
-                bytes_mb: 0.0,
-                idle_secs: 0,
-            });
+            {
+                let lo_total = engine_conv_total(&eng_families, "libreoffice");
+                let lo_errors: f64 = eng_families.iter()
+                    .find(|f| f.get_name() == "pdfbro_conversions_total")
+                    .map(|f| f.get_metric().iter()
+                        .filter(|m| m.get_label().iter().any(|l| l.get_name() == "engine" && l.get_value() == "libreoffice")
+                            && m.get_label().iter().any(|l| l.get_name() == "status" && l.get_value() == "error"))
+                        .map(|m| m.get_counter().get_value())
+                        .sum())
+                    .unwrap_or(0.0);
+                let lo_bytes_mb = engine_bytes_total(&eng_families, "libreoffice") / (1024.0 * 1024.0);
+                let lo_error_rate = if lo_total > 0.0 { (lo_errors / lo_total) * 100.0 } else { 0.0 };
+                let lo_idle = match state.libreoffice.as_ref() { Some(lo) => lo.idle_secs(), None => 0 };
+                engines.push(EnginePayload {
+                    name: "LibreOffice".to_string(),
+                    status: libreoffice_status.clone(),
+                    restarts: libreoffice_restarts,
+                    mode: if state.config.libreoffice_lazy_start { "lazy".to_string() } else { "eager".to_string() },
+                    mini_series: mini,
+                    conversions_total: lo_total as u64,
+                    error_rate: lo_error_rate,
+                    bytes_mb: lo_bytes_mb,
+                    idle_secs: lo_idle,
+                });
+            }
             engines
         },
         concurrency: ConcurrencyPayload {
@@ -467,19 +506,22 @@ pub async fn build_console_payload(
             max: concurrency_max,
             warn_threshold: (concurrency_max as f64 * 0.60) as u32,
             crit_threshold: (concurrency_max as f64 * 0.85) as u32,
-            queue_wait_p95_ms: 0.0,
-            queue_processing: 0,
+            queue_wait_p95_ms: {
+                let h = state.console.history.lock().await;
+                h.samples.back().map_or(0.0, |s| s.queue_wait_p95_ms)
+            },
+            queue_processing: state.metrics.queue_processing.get() as u32,
         },
         resources: ResourcesPayload { cpu_series, memory_series, memory_max_mb },
         throughput: ThroughputPayload {
-            ts_series: vec![],
+            ts_series,
             rps_series,
             rps_baseline: 0.0,
             p95_series,
             p95_target_s: 2.0,
-            chromium_conv_series: vec![],
-            libreoffice_conv_series: vec![],
-            queue_wait_p95_series: vec![],
+            chromium_conv_series,
+            libreoffice_conv_series,
+            queue_wait_p95_series,
         },
         batches,
         recent_requests,
