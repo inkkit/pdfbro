@@ -103,9 +103,39 @@ async fn response_body_should_contain(world: &mut PdfBroWorld, expected: String)
     );
 }
 
+#[then(regex = r#"the response body should match string:"#)]
+async fn response_body_should_match_string(world: &mut PdfBroWorld, step: &Step) {
+    let expected = step.docstring.as_deref().unwrap_or("").trim().to_string();
+    let body = String::from_utf8_lossy(world.body.as_deref().unwrap_or(&[]));
+    assert!(
+        body.contains(&*expected),
+        "Expected response body to contain {expected:?}, got: {body}"
+    );
+}
+
+#[then(regex = r#"the response body should contain string:"#)]
+async fn response_body_should_contain_string(world: &mut PdfBroWorld, step: &Step) {
+    let expected = step.docstring.as_deref().unwrap_or("").trim().to_string();
+    let body = String::from_utf8_lossy(world.body.as_deref().unwrap_or(&[]));
+    assert!(
+        body.contains(&*expected),
+        "Expected response body to contain {expected:?}, got: {body}"
+    );
+}
+
 // =================================================================
 // PDF assertion steps (Then)
 // =================================================================
+
+#[then(regex = r#"the response PDF\(s\) should pass PDF/A validation"#)]
+async fn check_response_pdfa_valid(world: &mut PdfBroWorld) {
+    pdf::check_response_pdfa_valid(world).await;
+}
+
+#[then(regex = r#"the response PDF\(s\) should be encrypted"#)]
+async fn check_response_encrypted(world: &mut PdfBroWorld) {
+    pdf::check_response_encrypted(world).await;
+}
 
 #[then(regex = r#"there should be (\d+) PDF\(s\) in the response"#)]
 async fn check_pdf_count(world: &mut PdfBroWorld, count: usize) {

@@ -584,7 +584,7 @@ Feature: /forms/chromium/convert/html
     Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
-      omitBackground requires printBackground set to true
+      omitBackground=true requires printBackground=true
       """
     When I make a "POST" request to "/forms/chromium/convert/html" with the following form data and header(s):
       | files            | testdata/page-1-html/index.html | file  |

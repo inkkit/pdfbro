@@ -82,7 +82,7 @@ Feature: /forms/pdfengines/rotate
     Then the response status code should be 400
     Then the response body should contain string:
       """
-      Invalid form data: form field 'rotateAngle' is invalid
+      rotateAngle is not valid
       """
 
   Scenario: POST /forms/pdfengines/rotate (Bad Request - Missing Angle)
@@ -92,7 +92,7 @@ Feature: /forms/pdfengines/rotate
     Then the response status code should be 400
     Then the response body should match string:
       """
-      Invalid form data: form field 'rotateAngle' is required
+      Missing required field 'rotateAngle'
       """
 
   Scenario: POST /forms/pdfengines/rotate (Bad Request - No PDF)
@@ -102,7 +102,7 @@ Feature: /forms/pdfengines/rotate
     Then the response status code should be 400
     Then the response body should match string:
       """
-      Invalid form data: no form file found for extensions: [.pdf]
+      Missing required file 'files'
       """
 
   Scenario: POST /forms/pdfengines/rotate (Many PDFs)

@@ -140,7 +140,7 @@ Feature: /forms/pdfengines/stamp
     Then the response status code should be 400
     Then the response body should match string:
       """
-      Invalid form data: form field 'stampSource' is required
+      Missing required field 'stampExpression'
       """
 
   Scenario: POST /forms/pdfengines/stamp (Bad Request - Invalid Source)
@@ -151,7 +151,7 @@ Feature: /forms/pdfengines/stamp
     Then the response status code should be 400
     Then the response body should contain string:
       """
-      Invalid form data: form field 'stampSource' is invalid
+      stampSource is not valid
       """
 
   Scenario: POST /forms/pdfengines/stamp (Bad Request - Missing File for Image Source)
@@ -162,7 +162,7 @@ Feature: /forms/pdfengines/stamp
     Then the response status code should be 400
     Then the response body should match string:
       """
-      Invalid form data: a stamp file is required for image or pdf source
+      a stamp file is required for image or pdf source
       """
 
   Scenario: POST /forms/pdfengines/stamp (Bad Request - Missing File for PDF Source)
@@ -173,7 +173,7 @@ Feature: /forms/pdfengines/stamp
     Then the response status code should be 400
     Then the response body should match string:
       """
-      Invalid form data: a stamp file is required for image or pdf source
+      a stamp file is required for image or pdf source
       """
 
   Scenario: POST /forms/pdfengines/stamp (Bad Request - No PDF)
@@ -184,7 +184,7 @@ Feature: /forms/pdfengines/stamp
     Then the response status code should be 400
     Then the response body should match string:
       """
-      Invalid form data: no form file found for extensions: [.pdf]
+      Missing required file 'files'
       """
 
   @skip

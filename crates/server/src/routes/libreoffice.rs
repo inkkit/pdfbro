@@ -11,7 +11,7 @@ use engine::libreoffice::PdfAProfile;
 
 use crate::error::{ApiError, ApiResult};
 use crate::multipart::FormFields;
-use crate::routes::util::{pdf_response, zip_response, build_zip, output_filename};
+use crate::routes::util::{apply_encryption, pdf_response, zip_response, build_zip, output_filename};
 use crate::state::AppState;
 
 /// `POST /forms/libreoffice/convert`.
@@ -76,6 +76,7 @@ pub async fn libreoffice_convert(
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()))??;
         let merged = apply_metadata_field(merged, &form.map).await?;
+        let merged = apply_encryption(merged, &form.map).await?;
         let filename = output_filename(&headers, "result");
         return Ok(pdf_response(merged, &filename));
     }
@@ -84,6 +85,7 @@ pub async fn libreoffice_convert(
         && let Some(only) = outputs.pop()
     {
         let only = apply_metadata_field(only, &form.map).await?;
+        let only = apply_encryption(only, &form.map).await?;
         let filename = output_filename(&headers, "result");
         return Ok(pdf_response(only, &filename));
     }

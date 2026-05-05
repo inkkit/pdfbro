@@ -70,7 +70,7 @@ Feature: /forms/pdfengines/merge
     Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
-      Invalid form data: no form file found for extensions: [.pdf]
+      incomplete multipart stream
       """
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files | testdata/page_1.pdf | file  |
@@ -86,7 +86,7 @@ Feature: /forms/pdfengines/merge
     Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
-      Invalid form data: form field 'pdfua' is invalid (got 'foo', resulting to strconv.ParseBool: parsing "foo": invalid syntax)
+      either 'pdfa' or 'pdfua' form fields must be provided
       """
     When I make a "POST" request to "/forms/pdfengines/merge" with the following form data and header(s):
       | files    | testdata/page_1.pdf | file  |
@@ -96,7 +96,7 @@ Feature: /forms/pdfengines/merge
     Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
-      Invalid form data: form field 'metadata' is invalid (got 'foo', resulting to unmarshal metadata: invalid character 'o' in literal false (expecting 'a'))
+      metadata is not valid
       """
 
   @convert
@@ -387,7 +387,7 @@ Feature: /forms/pdfengines/merge
     Then the response status code should be 400
     Then the response body should match string:
       """
-      Invalid form data: a stamp file is required for image or pdf source
+      a stamp file is required for image or pdf source
       """
 
   Scenario: POST /forms/pdfengines/merge (watermarkSource=pdf without uploaded watermark file => 400)
@@ -400,7 +400,7 @@ Feature: /forms/pdfengines/merge
     Then the response status code should be 400
     Then the response body should match string:
       """
-      Invalid form data: a watermark file is required for image or pdf source
+      a watermark file is required for image or pdf source
       """
 
   Scenario: POST /forms/pdfengines/merge (Long Filename)

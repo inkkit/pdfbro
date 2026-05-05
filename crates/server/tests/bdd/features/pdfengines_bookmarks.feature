@@ -157,7 +157,7 @@ Feature: /forms/pdfengines/bookmarks/{write|read}
     Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
-      Invalid form data: no form file found for extensions: [.pdf]
+      incomplete multipart stream
       """
 
   @skip

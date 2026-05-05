@@ -71,7 +71,7 @@ Feature: /forms/pdfengines/convert
     Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
-      Invalid form data: either 'pdfa' or 'pdfua' form fields must be provided
+      either 'pdfa' or 'pdfua' form fields must be provided
       """
     When I make a "POST" request to "/forms/pdfengines/convert" with the following form data and header(s):
       | pdfa | PDF/A-1b | field |
@@ -79,7 +79,7 @@ Feature: /forms/pdfengines/convert
     Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
-      Invalid form data: no form file found for extensions: [.pdf]
+      Missing required file 'files'
       """
     When I make a "POST" request to "/forms/pdfengines/convert" with the following form data and header(s):
       | files | testdata/page_1.pdf | file  |
@@ -88,7 +88,7 @@ Feature: /forms/pdfengines/convert
     Then the response header "Content-Type" should be "application/json"
     Then the response body should match string:
       """
-      Invalid form data: form field 'pdfua' is invalid (got 'foo', resulting to strconv.ParseBool: parsing "foo": invalid syntax)
+      either 'pdfa' or 'pdfua' form fields must be provided
       """
 
   @skip

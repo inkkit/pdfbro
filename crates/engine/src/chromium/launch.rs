@@ -106,11 +106,44 @@ pub(crate) async fn launch_with(config: BrowserConfig) -> EngineResult<ChromiumE
             EngineError::ChromeLaunch(format!("failed to create user-data-dir: {e}"))
         })?;
 
-    let cx_config = build_chromiumoxide_config(&config, &executable, user_data_dir.path())?;
+    // Cold-launch retry. Chrome occasionally SIGSEGVs or fails its
+    // websocket handshake on the very first launch in a constrained
+    // container — DBus init race, crashpad probing /sys files that
+    // don't exist, etc. The errors are transient: a second attempt
+    // ~250ms later almost always succeeds. Three attempts (one + two
+    // retries) buys us reliability without making real failures slow.
+    //
+    // We rebuild the config each attempt because chromiumoxide's
+    // `BrowserConfig` is consumed by `launch`. Same `user_data_dir` is
+    // reused across attempts since it's a tempfile owned by us.
+    const LAUNCH_ATTEMPTS: u32 = 3;
+    const LAUNCH_BACKOFF: std::time::Duration = std::time::Duration::from_millis(250);
 
-    let (mut browser, mut handler) = Browser::launch(cx_config)
-        .await
-        .map_err(|e| EngineError::ChromeLaunch(e.to_string()))?;
+    let (mut browser, mut handler) = 'launched: {
+        for attempt in 1..=LAUNCH_ATTEMPTS {
+            let cfg_this_attempt =
+                build_chromiumoxide_config(&config, &executable, user_data_dir.path())?;
+            match Browser::launch(cfg_this_attempt).await {
+                Ok(pair) => break 'launched pair,
+                Err(e) => {
+                    if attempt < LAUNCH_ATTEMPTS {
+                        tracing::warn!(
+                            attempt,
+                            max = LAUNCH_ATTEMPTS,
+                            error = %e,
+                            "Chrome cold-launch failed; retrying after backoff"
+                        );
+                        tokio::time::sleep(LAUNCH_BACKOFF * attempt).await;
+                    } else {
+                        return Err(EngineError::ChromeLaunch(e.to_string()));
+                    }
+                }
+            }
+        }
+        // Unreachable: the for loop either breaks with Ok or returns
+        // on the last attempt's Err.
+        unreachable!("Chrome launch retry loop exited without resolution");
+    };
 
     let handler_task = tokio::spawn(async move {
         // chromiumoxide's handler stream yields Result<(), CdpError>.
@@ -211,14 +244,22 @@ const BASELINE_ARGS: &[&str] = &[
     "--disable-backgrounding-occluded-windows",
     "--disable-renderer-backgrounding",
 
-    // ── Subprocess + memory ──────────────────────────────────────────
-    // `site-per-process` (default in modern Chrome) creates a separate
-    // renderer process per origin. Necessary for browser security; pure
-    // overhead for headless PDF rendering. The other features here are
-    // either translation prompts, casting/Hangouts preloading, or
-    // ML-driven optimisation hints we don't want firing during a
-    // benchmarked render.
-    "--disable-features=Translate,AcceptCHFrame,MediaRouter,OptimizationHints,site-per-process",
+    // ── Subprocess + ambient features ────────────────────────────────
+    // Translate prompts, casting/Hangouts preloading, ML-driven
+    // optimisation hints — none of these are useful for headless PDF
+    // rendering and they each occasionally fire during long-running
+    // benchmarks.
+    //
+    // `site-per-process` was originally listed here to drop the
+    // origin-per-process security split, but PR #32's bench showed the
+    // hypothesised RSS reduction did not materialise (`url-local` RSS
+    // stayed flat at ~422 MiB). And combining `site-per-process`
+    // disable with `--no-zygote` in a Docker container running with
+    // `--no-sandbox` reproducibly SIGSEGVs Chrome on the third
+    // cold-launch in the same test binary (observed in
+    // `e2e_libreoffice_docx`, the only e2e test that spins up both
+    // engines). Removed.
+    "--disable-features=Translate,AcceptCHFrame,MediaRouter,OptimizationHints",
 
     // ── Startup / load-time noise ────────────────────────────────────
     "--no-first-run",
@@ -246,14 +287,22 @@ const BASELINE_ARGS: &[&str] = &[
     //    on Linux it can stall waiting for D-Bus secrets services.
     "--password-store=basic",
     "--use-mock-keychain",
-];
 
-// `--no-zygote` was DELIBERATELY removed from the baseline. Zygote is
-// Chrome's pre-forked renderer optimisation — disabling it makes every
-// new tab launch from a cold process. We carried `--no-zygote` from a
-// "headless Chrome in Docker" cargo-cult list; chromedp doesn't pass
-// it, Puppeteer doesn't pass it, and the actual Docker advice is
-// `--no-sandbox` (which we still apply via `config.no_sandbox`).
+    // ── Sandbox-disabled containerised environments: keep zygote off.
+    //    chromedp + Puppeteer both omit `--no-zygote` because they
+    //    assume the host has a usable user-namespace setup for the
+    //    zygote subprocess to fork from. Our `Dockerfile.test` and
+    //    production `Dockerfile` both pair `--no-sandbox` with no
+    //    user-namespace remapping; in that combination the zygote can
+    //    fail at first cold-launch (observed as `batch_skip_*` cli
+    //    test exiting 3 in the test container while every subsequent
+    //    Chrome-using test in the same run passed). Keeping the flag.
+    //    The "perf cost" — every new tab launches from a cold
+    //    renderer rather than forking from a pre-warmed zygote — is
+    //    fully amortised in our usage because we keep one warm
+    //    browser and reuse it across requests.
+    "--no-zygote",
+];
 
 /// Names looked up on `$PATH`, in order.
 const PATH_BINARIES: &[&str] = &[
@@ -449,15 +498,19 @@ mod tests {
         assert!(BASELINE_ARGS.contains(&"--use-mock-keychain"));
     }
 
-    /// `--no-zygote` was deliberately removed from the baseline; see
-    /// the comment block right after `BASELINE_ARGS`. If someone
-    /// re-adds it, this test reminds them why not.
+    /// `--no-zygote` is required in our sandbox-disabled containerised
+    /// environments. See the comment block at the bottom of
+    /// `BASELINE_ARGS` for the full reasoning — the short version is
+    /// that without user-namespace support paired with `--no-sandbox`,
+    /// the zygote subprocess can fail at first cold-launch, which
+    /// surfaces as the cli `batch_skip_*` test exiting 3 in the test
+    /// container.
     #[test]
-    fn baseline_args_does_not_include_no_zygote() {
+    fn baseline_args_includes_no_zygote() {
         assert!(
-            !BASELINE_ARGS.contains(&"--no-zygote"),
-            "--no-zygote disables Chrome's pre-forked-renderer optimisation; \
-             chromedp + Puppeteer both omit it; see launch.rs comments"
+            BASELINE_ARGS.contains(&"--no-zygote"),
+            "--no-zygote must stay in the baseline for sandbox-disabled \
+             containerised environments; see launch.rs comments"
         );
     }
 }

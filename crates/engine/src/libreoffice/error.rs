@@ -21,6 +21,18 @@ use crate::types::EngineError;
 /// branches drop it because their meaning is exhausted by the variant
 /// name; the message would only add LO internals to the API response.
 pub(super) fn classify_load_error(msg: &str, file_prefix: &[u8]) -> EngineError {
+    // Sniff the bytes FIRST — if the file itself unambiguously says
+    // "encrypted" (OOXML EncryptedPackage stream, encrypted ODF
+    // manifest, PDF /Encrypt token), that classification overrides
+    // whichever LO error wrapper we got. Otherwise an OOXML file
+    // whose `EncryptedPackage` makes LO bail with
+    // "loadComponentFromURL returned an empty reference" gets
+    // misclassified as `LibreOfficeCorrupted`, which sends the user
+    // looking for a corruption fix instead of a password.
+    if matches!(sniff_file_condition(file_prefix), FileCondition::Encrypted) {
+        return EngineError::LibreOfficeEncrypted;
+    }
+
     if msg.contains("Unsupported URL") {
         return match sniff_file_condition(file_prefix) {
             FileCondition::Encrypted => EngineError::LibreOfficeEncrypted,
@@ -29,7 +41,17 @@ pub(super) fn classify_load_error(msg: &str, file_prefix: &[u8]) -> EngineError 
         };
     }
     if msg.contains("loadComponentFromURL returned an empty reference") {
-        return EngineError::LibreOfficeCorrupted(msg.to_string());
+        // LO bails with this for two distinct cases: a recognised
+        // container that's structurally broken (truncated DOCX, malformed
+        // ZIP) AND completely unrecognised bytes (PNG, ELF, random
+        // binary). Sniff to disambiguate so the API caller gets the
+        // actionable error: "fix this corrupted file" vs "we don't
+        // support this format".
+        return match sniff_file_condition(file_prefix) {
+            FileCondition::Encrypted => EngineError::LibreOfficeEncrypted,
+            FileCondition::Corrupted => EngineError::LibreOfficeCorrupted(msg.to_string()),
+            FileCondition::Unknown => EngineError::LibreOfficeUnsupportedFormat,
+        };
     }
     if msg.contains("type detection failed") {
         return EngineError::LibreOfficeUnsupportedFormat;
@@ -157,6 +179,47 @@ mod tests {
             &[],
         );
         assert!(matches!(err, EngineError::LibreOfficeCorrupted(_)), "got {err:?}");
+    }
+
+    /// Regression: the classifier sniffs the bytes BEFORE it
+    /// pattern-matches the LOK error string. A real-world OOXML file
+    /// containing an `EncryptedPackage` stream causes LO to bail with
+    /// `loadComponentFromURL returned an empty reference` (not
+    /// `Unsupported URL`). Without sniff-first, that path was returning
+    /// `LibreOfficeCorrupted` — sending users looking for a corruption
+    /// fix when the actual answer is "this file needs a password".
+    #[test]
+    fn loadcomponent_failure_with_encrypted_zip_yields_encrypted() {
+        let bytes = build_zip_with_entry(b"EncryptedPackage", &[0u8; 16]);
+        let err = classify_load_error(
+            "loadComponentFromURL returned an empty reference",
+            &bytes,
+        );
+        assert!(
+            matches!(err, EngineError::LibreOfficeEncrypted),
+            "expected LibreOfficeEncrypted (sniffer should win over message), got {err:?}"
+        );
+    }
+
+    /// Regression: LO bails with the same `loadComponentFromURL` error
+    /// for genuinely-unrecognised bytes (PNG, random binary) AND for
+    /// structurally-broken-but-recognisable containers (truncated
+    /// DOCX). The classifier disambiguates by sniffing — "PNG magic +
+    /// no Office structure" → `LibreOfficeUnsupportedFormat`, not
+    /// `LibreOfficeCorrupted`. Otherwise the API tells the user to
+    /// "resave the file in Office" when their file isn't an Office
+    /// file at all.
+    #[test]
+    fn loadcomponent_failure_with_png_magic_yields_unsupported() {
+        let png_magic = b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0DIHDR\xFF\xFE\x01\x02\x03\x04";
+        let err = classify_load_error(
+            "loadComponentFromURL returned an empty reference",
+            png_magic,
+        );
+        assert!(
+            matches!(err, EngineError::LibreOfficeUnsupportedFormat),
+            "expected LibreOfficeUnsupportedFormat for PNG-magic bytes, got {err:?}"
+        );
     }
 
     #[test]

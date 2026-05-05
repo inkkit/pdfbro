@@ -76,8 +76,29 @@ async fn wait_selector(page: &Page, selector: &str) -> EngineResult<()> {
 }
 
 async fn wait_expression(page: &Page, expression: &str) -> EngineResult<()> {
-    // Coerce to bool with `!!(...)`. The user expression is wrapped in
-    // a parenthesised group to preserve the original semantics.
+    // Probe once without `!!` to distinguish undefined/exception from a
+    // falsy value that might later become truthy.  `typeof (expr)` avoids
+    // throwing on undeclared identifiers while still detecting `undefined`.
+    let type_check = format!("typeof ({expression})");
+    match page.evaluate(type_check).await {
+        Err(_) => {
+            return Err(EngineError::InvalidOption(format!(
+                "The expression '{expression}' (waitForExpression) returned an exception or undefined"
+            )));
+        }
+        Ok(result) => {
+            if result
+                .into_value::<String>()
+                .ok()
+                .map(|t| t == "undefined")
+                .unwrap_or(false)
+            {
+                return Err(EngineError::InvalidOption(format!(
+                    "The expression '{expression}' (waitForExpression) returned an exception or undefined"
+                )));
+            }
+        }
+    }
     let expr = format!("!!({expression})");
     poll_truthy(page, &expr).await
 }
