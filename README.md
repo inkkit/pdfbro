@@ -5,10 +5,10 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.0.2-blue?style=flat-square" alt="version 0.0.2"/>
+  <img src="https://img.shields.io/github/v/release/inkkit/pdfbro?style=flat-square&label=version" alt="latest release"/>
   <img src="https://img.shields.io/badge/rust-1.85%2B-orange?style=flat-square" alt="Rust 1.85+"/>
   <img src="https://img.shields.io/badge/gotenberg_parity-~90%25-green?style=flat-square" alt="Gotenberg parity ~90%"/>
-  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT"/>
+  <img src="https://img.shields.io/badge/license-AGPL--3.0-blue?style=flat-square" alt="AGPL-3.0"/>
 </p>
 
 ---
@@ -18,7 +18,7 @@ It speaks the same HTTP API as [Gotenberg](https://github.com/gotenberg/gotenber
 
 It also ships as a **Rust library, a CLI, and a single binary** — and has a live operator console at `/_/` so you can see what your PDF service is doing without wiring up Grafana first.
 
-> **Status:** active development — `v0.0.2`. Core conversions and PDF operations are production-ready.
+> **Status:** active development — `v0.2.0`. Core conversions and PDF operations are production-ready.
 
 ---
 
@@ -261,7 +261,7 @@ TLS is intentionally not handled in-process — put nginx, Caddy, or Envoy in fr
 
 ```bash
 docker pull ghcr.io/inkkit/pdfbro:latest
-docker pull ghcr.io/inkkit/pdfbro:0.0.2
+docker pull ghcr.io/inkkit/pdfbro:0.2.0
 docker pull ghcr.io/inkkit/pdfbro:latest-chromium
 docker pull ghcr.io/inkkit/pdfbro:latest-libreoffice
 ```
@@ -329,4 +329,4 @@ For larger changes, open an issue first so we can agree on the shape before code
 
 ## License
 
-MIT. See [LICENSE](./LICENSE).
+AGPL-3.0-only. See [LICENSE](./LICENSE).

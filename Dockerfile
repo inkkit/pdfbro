@@ -1,5 +1,5 @@
 ARG RUST_VERSION=1.88
-ARG PDFBRO_VERSION=0.1.0
+ARG PDFBRO_VERSION
 ARG PDFBRO_USER_UID=1001
 ARG PDFBRO_USER_GID=1001
 # Pinned for reproducible builds — bump deliberately when upgrading.

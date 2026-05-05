@@ -127,6 +127,13 @@ test-tags: ## Run tests with specific tags (make test-tags TAGS=chromium)
 	@echo "Running tests matching: $(TAGS)"
 	cargo test -p server --test integration -- --ignored $(TAGS)
 
+.PHONY: bump-version
+bump-version: ## Bump workspace version: make bump-version VERSION=x.y.z
+	@test -n "$(VERSION)" || (echo "Usage: make bump-version VERSION=x.y.z" && exit 1)
+	sed -i '' 's/^version = ".*"/version = "$(VERSION)"/' Cargo.toml
+	cargo update --workspace --quiet
+	@echo "Version bumped to $(VERSION) — commit Cargo.toml and Cargo.lock"
+
 .PHONY: fmt
 fmt: ## Format Rust code
 	cargo fmt --all
@@ -218,13 +225,15 @@ export
 # =============================================================================
 
 DOCKER_REGISTRY ?= ghcr.io/inkkit/pdfbro
-VERSION ?= 0.1.0
-MAJOR_VERSION ?= 0
+# Single source of truth: read version from Cargo.toml workspace package.
+VERSION := $(shell grep '^version' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+MAJOR_VERSION := $(shell echo $(VERSION) | cut -d. -f1)
 
 # Internal helper — build a target and tag it.
 # $(1) = Dockerfile target name, $(2) = tag suffix (e.g. "-chromium", or "" for full)
 define docker_build
 	docker build --target $(1) \
+	  --build-arg PDFBRO_VERSION=$(VERSION) \
 	  -t $(DOCKER_REGISTRY):latest$(2) \
 	  -t $(DOCKER_REGISTRY):$(MAJOR_VERSION)$(2) \
 	  .
