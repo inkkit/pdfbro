@@ -229,6 +229,7 @@ impl BatchStateManager {
         // Ensure storage directory exists
         fs::create_dir_all(&storage_path).await?;
         fs::create_dir_all(storage_path.join("outputs")).await?;
+        fs::create_dir_all(storage_path.join("inputs")).await?;
 
         let retention = Duration::from_secs(retention_minutes * 60);
 
@@ -271,11 +272,12 @@ impl BatchStateManager {
     /// Remove a batch.
     pub async fn remove_batch(&self, id: &BatchId) {
         let mut inner = self.inner.write().await;
+        let input_dir = inner.storage_path.join("inputs").join(id.to_string());
         if let Some(state) = inner.batches.remove(id) {
-            // Clean up output file if present
             if let Some(path) = state.output_path {
                 let _ = fs::remove_file(&path).await;
             }
+            let _ = fs::remove_dir_all(&input_dir).await;
             info!(batch_id = %id, "removed batch");
         }
     }
@@ -293,6 +295,12 @@ impl BatchStateManager {
             .storage_path
             .join("outputs")
             .join(format!("{}.{}", id, extension))
+    }
+
+    /// Directory where uploaded input files for a batch are stored.
+    pub async fn batch_input_dir(&self, id: &BatchId) -> PathBuf {
+        let inner = self.inner.read().await;
+        inner.storage_path.join("inputs").join(id.to_string())
     }
 
     /// Run cleanup of expired batches.

@@ -86,13 +86,13 @@ scalar_api_reference = { version = "0.1", features = ["axum"] }
 # Operator console static asset embedding
 rust-embed = { version = "8", features = ["mime-guess"] }
 mime_guess = "2"
+zip = { workspace = true }
 
 [dev-dependencies]
 tower = { workspace = true, features = ["util"] }
 reqwest = { workspace = true }
 static_assertions = { workspace = true }
 lopdf = { workspace = true }
-zip = { workspace = true }
 
 # BDD testing
 cucumber = "0.21"

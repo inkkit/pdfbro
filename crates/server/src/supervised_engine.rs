@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use engine::{BrowserConfig, ChromiumEngine, LibreOfficeConfig, LibreOfficeEngine};
 use engine::{EngineError, EngineResult};
@@ -86,7 +86,10 @@ impl SupervisedChromiumEngine {
 
     /// Update last activity timestamp.
     fn update_activity(&self) {
-        let now = Instant::now().elapsed().as_secs();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
         self.inner.last_activity.store(now, Ordering::SeqCst);
     }
 
@@ -98,13 +101,16 @@ impl SupervisedChromiumEngine {
                 let mut ticker = interval(Duration::from_secs(30)); // Check every 30s
                 loop {
                     ticker.tick().await;
-                    
+
                     if !inner.is_running.load(Ordering::SeqCst) {
                         continue; // Engine not running, nothing to do
                     }
-                    
+
                     let last = inner.last_activity.load(Ordering::SeqCst);
-                    let now = Instant::now().elapsed().as_secs();
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
                     let idle_duration = Duration::from_secs(now.saturating_sub(last));
                     
                     if idle_duration >= timeout {
@@ -220,6 +226,17 @@ impl SupervisedChromiumEngine {
         self.inner.is_running.load(Ordering::SeqCst)
     }
 
+    /// Seconds since this engine last handled a request. Returns 0 if never used.
+    pub fn idle_secs(&self) -> u64 {
+        let last = self.inner.last_activity.load(Ordering::SeqCst);
+        if last == 0 { return 0; }
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        now.saturating_sub(last)
+    }
+
     /// Shutdown the engine.
     pub async fn shutdown(&self) {
         let mut guard = self.inner.engine.lock().await;
@@ -286,7 +303,10 @@ impl SupervisedLibreOfficeEngine {
 
     /// Update last activity timestamp.
     fn update_activity(&self) {
-        let now = Instant::now().elapsed().as_secs();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
         self.inner.last_activity.store(now, Ordering::SeqCst);
     }
 
@@ -298,13 +318,16 @@ impl SupervisedLibreOfficeEngine {
                 let mut ticker = interval(Duration::from_secs(30));
                 loop {
                     ticker.tick().await;
-                    
+
                     if !inner.is_running.load(Ordering::SeqCst) {
                         continue;
                     }
-                    
+
                     let last = inner.last_activity.load(Ordering::SeqCst);
-                    let now = Instant::now().elapsed().as_secs();
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
                     let idle_duration = Duration::from_secs(now.saturating_sub(last));
                     
                     if idle_duration >= timeout {
@@ -325,7 +348,6 @@ impl SupervisedLibreOfficeEngine {
         }
     }
 
-    /// Check if the engine is healthy.
     /// Check if the engine is healthy.
     ///
     /// Only probes an already-running engine — does NOT trigger lazy start.
@@ -357,6 +379,17 @@ impl SupervisedLibreOfficeEngine {
     /// Returns true if the LibreOffice engine is currently running.
     pub fn is_running(&self) -> bool {
         self.inner.is_running.load(Ordering::SeqCst)
+    }
+
+    /// Seconds since this engine last handled a request. Returns 0 if never used.
+    pub fn idle_secs(&self) -> u64 {
+        let last = self.inner.last_activity.load(Ordering::SeqCst);
+        if last == 0 { return 0; }
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        now.saturating_sub(last)
     }
 
     /// Convert many files to PDFs in parallel.

@@ -14,6 +14,19 @@ use std::io::IsTerminal;
 use crate::config::LogFormat;
 use crate::ServerConfig;
 
+/// Runtime status of a supervised engine at banner-print time.
+#[derive(Clone, Copy)]
+pub enum EngineStatus {
+    /// Started and healthy.
+    Ready,
+    /// Configured for lazy start — will spin up on first request.
+    Lazy,
+    /// Eager start attempted but the engine failed to come up.
+    Unavailable,
+    /// Feature not compiled in; row is omitted from the banner.
+    Disabled,
+}
+
 /// A single label / value pair rendered as one banner line.
 struct Row<'a> {
     label: &'a str,
@@ -26,13 +39,13 @@ struct Row<'a> {
 /// In text mode the banner always prints regardless of TTY, so `cargo run` and
 /// Docker (tty: true) both show it. Color is automatically disabled when
 /// stdout is not a TTY.
-pub fn print(config: &ServerConfig, chromium_ready: bool, libreoffice_ready: bool) {
+pub fn print(config: &ServerConfig, chromium: EngineStatus, libreoffice: EngineStatus) {
     if matches!(config.log_format, LogFormat::Json) {
         let version = env!("CARGO_PKG_VERSION");
         tracing::info!(
             version,
-            chromium  = if chromium_ready  { "ready" } else { "unavailable" },
-            libreoffice = if libreoffice_ready { "ready" } else { "unavailable" },
+            chromium  = engine_log_str(chromium),
+            libreoffice = engine_log_str(libreoffice),
             engines = "merge,split,flatten,metadata,convert,bookmarks,watermark,stamp,encrypt,decrypt,rotate",
             "pdfbro server ready",
         );
@@ -43,16 +56,13 @@ pub fn print(config: &ServerConfig, chromium_ready: bool, libreoffice_ready: boo
     let version = env!("CARGO_PKG_VERSION");
 
     // ── Services section ─────────────────────────────────────────────
-    let services = vec![
-        Row {
-            label: "Chromium",
-            value: status(chromium_ready, c),
-        },
-        Row {
-            label: "LibreOffice",
-            value: status(libreoffice_ready, c),
-        },
-    ];
+    let mut services: Vec<Row<'_>> = Vec::new();
+    if !matches!(chromium, EngineStatus::Disabled) {
+        services.push(Row { label: "Chromium",    value: engine_status(chromium, c) });
+    }
+    if !matches!(libreoffice, EngineStatus::Disabled) {
+        services.push(Row { label: "LibreOffice", value: engine_status(libreoffice, c) });
+    }
     let service_width = compute_width(&services);
 
     // ── PDF Engines section ──────────────────────────────────────────
@@ -137,14 +147,24 @@ fn color(s: &str, code: &str, enabled: bool) -> String {
 }
 
 /// Colored status tag with a fixed visible width so columns stay aligned
-/// when the state flips between ready / unavailable.
-fn status(ready: bool, c: bool) -> String {
-    let plain = if ready {
-        format!("{:<20}", "[OK] ready")
-    } else {
-        format!("{:<20}", "[FAIL] unavailable")
+/// across all possible states.
+fn engine_status(status: EngineStatus, c: bool) -> String {
+    let (plain, code) = match status {
+        EngineStatus::Ready       => (format!("{:<20}", "[OK]   ready"),       "32"),
+        EngineStatus::Lazy        => (format!("{:<20}", "[--]   lazy"),         "2"),
+        EngineStatus::Unavailable => (format!("{:<20}", "[FAIL] unavailable"), "31"),
+        EngineStatus::Disabled    => unreachable!("disabled rows are skipped"),
     };
-    color(&plain, if ready { "32" } else { "31" }, c)
+    color(&plain, code, c)
+}
+
+fn engine_log_str(status: EngineStatus) -> &'static str {
+    match status {
+        EngineStatus::Ready       => "ready",
+        EngineStatus::Lazy        => "lazy",
+        EngineStatus::Unavailable => "unavailable",
+        EngineStatus::Disabled    => "disabled",
+    }
 }
 
 /// Simple OK tag for capability rows.
@@ -226,9 +246,19 @@ mod tests {
 
     #[test]
     fn print_does_not_panic() {
-        // We can't assert stdout in a unit test easily, but we can at
-        // least exercise the formatting code path.
         let config = dummy_config();
-        print(&config, true, true);
+        print(&config, EngineStatus::Ready, EngineStatus::Ready);
+    }
+
+    #[test]
+    fn print_lazy_statuses_do_not_panic() {
+        let config = dummy_config();
+        print(&config, EngineStatus::Lazy, EngineStatus::Lazy);
+    }
+
+    #[test]
+    fn print_disabled_statuses_do_not_panic() {
+        let config = dummy_config();
+        print(&config, EngineStatus::Disabled, EngineStatus::Disabled);
     }
 }

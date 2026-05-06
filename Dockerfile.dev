@@ -24,6 +24,9 @@ FROM rust:${RUST_VERSION} AS dev-base
 # Install cargo-watch for hot reload
 RUN cargo install cargo-watch --locked
 
+# Install bun (used to build the operator console UI inside the container)
+RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash
+
 # Install system dependencies
 RUN apt-get update -qq && apt-get upgrade -yqq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
@@ -128,15 +131,27 @@ RUN groupadd --gid 1001 pdfbro && \
 # This layer will be cached; source code changes won't invalidate it
 COPY Cargo.toml Cargo.lock ./
 COPY crates/*/Cargo.toml ./crates/*/
-RUN mkdir -p crates/engine/src crates/server/src crates/cli/src && \
+COPY bench/Cargo.toml ./bench/
+RUN mkdir -p crates/engine/src crates/server/src crates/cli/src bench/src && \
     echo "fn main() {}" > crates/cli/src/main.rs && \
     echo "pub fn dummy() {}" > crates/engine/src/lib.rs && \
     echo "pub fn dummy() {}" > crates/server/src/lib.rs && \
+    echo "fn main() {}" > bench/src/main.rs && \
     cargo build --features "chromium libreoffice" 2>/dev/null || true && \
-    rm -rf crates/
+    rm -rf crates/ bench/
 
-# Set up working directory with proper permissions
-RUN chown -R pdfbro:pdfbro /app
+# Stub UI build directory — gives rust-embed a valid folder at compile time.
+# The docker-compose volume mount will shadow /app/ui with the host source tree,
+# and the entrypoint script does a real bun build before starting the server.
+RUN mkdir -p /app/ui/build && \
+    printf '<!doctype html><html><body>dev</body></html>' > /app/ui/build/index.html && \
+    mkdir -p /app/ui/node_modules
+
+# Pre-create /app/target so the cargo-target named volume is seeded with
+# the right owner (Docker seeds an empty named volume from image content).
+# Also chown the cargo registry for the same reason.
+RUN mkdir -p /app/target && \
+    chown -R pdfbro:pdfbro /app /usr/local/cargo
 
 # Switch to non-root user for Chrome
 USER pdfbro
@@ -145,6 +160,15 @@ WORKDIR /app
 
 EXPOSE 3000
 
-# Default command: watch for changes and restart server
-# Use --poll for Docker compatibility (file system events may not work in all setups)
-CMD ["cargo", "watch", "--poll", "-x", "run -p server -- serve --port 3000 --host 0.0.0.0"]
+# On startup:
+#   1. Install/update UI deps inside the container (node_modules named volume keeps
+#      Linux binaries separate from the macOS host).
+#   2. Do an initial production build so rust-embed serves the latest UI immediately.
+#   3. Start vite build --watch in the background so UI changes rebuild automatically.
+#   4. Start cargo watch in the foreground for Rust hot-reload.
+CMD ["sh", "-c", "\
+  cd /app/ui && bun install && bun run build && \
+  bun run build:watch & \
+  cd /app && exec cargo watch --poll -w crates/ -w Cargo.toml -w Cargo.lock \
+    -x 'run -p server -- serve --port 3000 --host 0.0.0.0' \
+"]

@@ -191,6 +191,11 @@ docker-test: ## Run tests inside Docker container (with Chrome + LibreOffice)
 	docker build -t pdfbro-test -f Dockerfile.test .
 	docker run --rm pdfbro-test
 
+.PHONY: docker-test-fast
+docker-test-fast: ## Run unit tests only inside Docker (no Chrome/LO required, ~60s)
+	docker build --build-arg FAST=1 -t pdfbro-test-fast -f Dockerfile.test .
+	docker run --rm pdfbro-test-fast
+
 # IMAGE defaults to full image; override with: make test-image IMAGE=ghcr.io/inkkit/pdfbro:latest-chromium
 IMAGE ?= $(DOCKER_REGISTRY):latest
 .PHONY: test-image

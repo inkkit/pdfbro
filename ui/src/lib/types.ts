@@ -2,24 +2,29 @@
 export interface MetricsSample {
     ts: number;
     rps: number;
+    p50_ms: number;
+    p55_ms: number;
     p95_ms: number;
-    error_pct: number;
+    server_error_pct: number;
+    rate_limit_pct: number;
     queue_size: number;
     concurrency_active: number;
     cpu_pct: number;
     memory_mb: number;
+    chromium_conv_rps: number;
+    libreoffice_conv_rps: number;
+    queue_wait_p95_ms: number;
 }
 
 export interface TickerPayload {
     rps: number;
+    p50_ms: number;
+    p55_ms: number;
     p95_ms: number;
-    error_pct: number;
+    server_error_pct: number;
+    rate_limit_pct: number;
     concurrency_active: number;
     concurrency_max: number;
-    chromium_status: string;
-    chromium_restarts: number;
-    libreoffice_status: string;
-    libreoffice_restarts: number;
     queue_size: number;
     uptime_seconds: number;
 }
@@ -42,6 +47,10 @@ export interface EnginePayload {
     restarts: number;
     mode: string;
     mini_series: number[];
+    conversions_total: number;
+    error_rate: number;
+    bytes_mb: number;
+    idle_secs: number;
 }
 
 export interface ConcurrencyPayload {
@@ -49,6 +58,8 @@ export interface ConcurrencyPayload {
     max: number;
     warn_threshold: number;
     crit_threshold: number;
+    queue_wait_p95_ms: number;
+    queue_processing: number;
 }
 
 export interface ResourcesPayload {
@@ -58,10 +69,14 @@ export interface ResourcesPayload {
 }
 
 export interface ThroughputPayload {
+    ts_series: number[];
     rps_series: number[];
     rps_baseline: number;
     p95_series: number[];
     p95_target_s: number;
+    chromium_conv_series: number[];
+    libreoffice_conv_series: number[];
+    queue_wait_p95_series: number[];
 }
 
 export interface BatchPayload {
@@ -69,6 +84,10 @@ export interface BatchPayload {
     status: string;
     progress_pct: number;
     elapsed: string;
+    total_items: number;
+    completed_items: number;
+    failed_items: number;
+    output_mode: string;
 }
 
 export interface RequestLogEntry {

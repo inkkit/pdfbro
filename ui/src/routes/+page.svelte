@@ -9,9 +9,9 @@
     import Engines from '$lib/components/side-rail/Engines.svelte';
     import Concurrency from '$lib/components/side-rail/Concurrency.svelte';
     import Batches from '$lib/components/side-rail/Batches.svelte';
-    import Resources from '$lib/components/side-rail/Resources.svelte';
     import ThroughputStrip from '$lib/components/ThroughputStrip.svelte';
-    import ActivityStrip from '$lib/components/ActivityStrip.svelte';
+    import CpuChart from '$lib/components/CpuChart.svelte';
+    import MemChart from '$lib/components/MemChart.svelte';
 
     onMount(() => metricsStore.start());
     onDestroy(() => metricsStore.stop());
@@ -30,9 +30,9 @@
     let D  = $derived(themeStore.D);
 </script>
 
-<div style="background:{t.bg};color:{t.ink};font-family:'Geist Variable',ui-sans-serif,system-ui,sans-serif;min-height:100vh;padding:{D.gap + 4}px;transition:background 0.25s ease,color 0.25s ease">
+<div style="background:{t.bg};color:{t.ink};font-family:'Geist Variable',ui-sans-serif,system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;padding:{D.gap + 4}px;transition:background 0.25s ease,color 0.25s ease">
     {#if metricsStore.loading}
-        <div style="display:flex;align-items:center;justify-content:center;height:80vh;color:{t.muted}">
+        <div style="display:flex;align-items:center;justify-content:center;flex:1;color:{t.muted}">
             Connecting to pdfbro…
         </div>
     {:else if metricsStore.data}
@@ -44,25 +44,38 @@
             <Ticker ticker={metricsStore.data.ticker} {t} {D} />
         </div>
 
-        <!-- Main split: routes (8fr) + side rail (4fr) -->
-        <div style="display:grid;grid-template-columns:8fr 4fr;gap:{D.gap}px;margin-top:{D.gap}px">
-            <RoutesTable routes={metricsStore.data.routes} {t} {D} />
-            <div style="display:flex;flex-direction:column;gap:{D.gap}px">
-                <Engines engines={metricsStore.data.engines} {t} {D} />
-                <Concurrency conc={metricsStore.data.concurrency} {t} {D} />
-                <Batches batches={metricsStore.data.batches} {t} {D} />
-                <Resources resources={metricsStore.data.resources} {t} {D} />
+        <!-- Main split: flex:1 so it fills all remaining viewport height -->
+        <div style="display:grid;grid-template-columns:8fr 4fr;gap:{D.gap}px;margin-top:{D.gap}px;flex:1;min-height:0;align-items:stretch">
+
+            <!-- Left column -->
+            <div style="display:flex;flex-direction:column;gap:{D.gap}px;min-height:0">
+
+                <!-- Row 1: HTTP throughput charts -->
+                <ThroughputStrip throughput={metricsStore.data.throughput} {t} {D} />
+
+                <!-- Row 2: CPU + Memory charts -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:{D.gap}px">
+                    <CpuChart resources={metricsStore.data.resources} {t} {D} />
+                    <MemChart resources={metricsStore.data.resources} {t} {D} />
+                </div>
+
+                <!-- Routes: flex:1 to fill remaining height -->
+                <RoutesTable routes={metricsStore.data.routes} {t} {D} />
             </div>
-        </div>
 
-        <!-- Throughput strip -->
-        <div style="margin-top:{D.gap}px">
-            <ThroughputStrip throughput={metricsStore.data.throughput} {t} {D} />
-        </div>
-
-        <!-- Activity -->
-        <div style="margin-top:{D.gap}px">
-            <ActivityStrip requests={metricsStore.data.recent_requests} errors={metricsStore.data.recent_errors} {t} {D} />
+            <!-- Right rail -->
+            <div style="display:flex;flex-direction:column;gap:{D.gap}px;min-height:0">
+                <Engines
+                    engines={metricsStore.data.engines}
+                    convRps={{
+                        chromium: metricsStore.data.throughput.chromium_conv_series.at(-1) ?? 0,
+                        libreoffice: metricsStore.data.throughput.libreoffice_conv_series.at(-1) ?? 0,
+                    }}
+                    {t} {D}
+                />
+                <Concurrency conc={metricsStore.data.concurrency} {t} {D} />
+                <Batches batches={metricsStore.data.batches} {t} {D} style="flex:1;min-height:0;overflow:hidden" />
+            </div>
         </div>
     {/if}
 </div>
