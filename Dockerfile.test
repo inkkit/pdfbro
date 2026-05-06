@@ -85,11 +85,24 @@ COPY . .
 # to the buildx invocation. The default keeps the layer cacheable so a
 # repeat build with no source changes is a no-op.
 ARG TEST_RUN_ID=0
+# Set FAST=1 to run only unit tests (no BDD/integration, no Chrome/LO required, ~60s).
+# Default is 0 (full suite).
+ARG FAST=0
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/app/target \
     bash -c 'set -e -o pipefail; \
+        if [ "${FAST}" = "1" ]; then \
+            echo "::fast mode — unit tests only, no Chrome/LO (TEST_RUN_ID=${TEST_RUN_ID:-0})"; \
+            cargo test --lib 2>&1 | tee /tmp/cargo_test.log; \
+            if grep -qE "^test result: FAILED|^failures:|^error\[" /tmp/cargo_test.log; then \
+                echo "::test failures detected in libtest output"; \
+                exit 1; \
+            fi; \
+            echo "::unit tests ok"; \
+            exit 0; \
+        fi; \
         echo "::compile pass — failing fast on any compile error (TEST_RUN_ID=${TEST_RUN_ID:-0})"; \
         cargo test --no-fail-fast --no-run; \
         echo "::run pass — ignoring LO atexit teardown noise on cargo exit"; \
@@ -97,7 +110,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
         cargo test --no-fail-fast -- --test-threads=1 2>&1 | tee /tmp/cargo_test.log; \
         cargo_status=$?; \
         set -e; \
-        if grep -qE "^test result: FAILED|^failures:$|^error\\[" /tmp/cargo_test.log; then \
+        if grep -qE "^test result: FAILED|^failures:$|^error\[" /tmp/cargo_test.log; then \
             echo "::test failures detected in libtest output"; \
             exit 1; \
         fi; \
